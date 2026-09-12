@@ -1,7 +1,9 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { BeeClient, BeeStreamConsumer, WaggleDb, type Evidence } from "@waggle/core";
+import { startApi } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { handleJournalReady, sweepPractice } from "./pipeline/practice.js";
@@ -12,6 +14,9 @@ mkdirSync(DATA_DIR, { recursive: true });
 
 const CLASSIFY_INTERVAL_MS = 2 * 60_000;
 const PRACTICE_SWEEP_MS = 60_000;
+const API_PORT = Number(process.env.WAGGLE_PORT ?? 4242);
+// packages/daemon/dist/index.js -> packages/dashboard/dist
+const DASHBOARD_DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dashboard", "dist");
 
 const db = new WaggleDb(join(DATA_DIR, "waggle.db"));
 const bee = new BeeClient();
@@ -82,6 +87,21 @@ const timers = [
   setInterval(() => sweepPractice(db), PRACTICE_SWEEP_MS),
 ];
 void classifyTick();
+
+startApi(
+  {
+    db,
+    log,
+    staticDir: existsSync(DASHBOARD_DIST) ? DASHBOARD_DIST : undefined,
+    actions: {
+      // TODO(reflect): wire the reflection pass and lesson generation
+      reflectNow: async () => log("reflect requested (not implemented yet)"),
+      acceptSkill: async (id) => db.updateSkill(id, { status: "active" }),
+      dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
+    },
+  },
+  API_PORT
+);
 
 process.on("SIGINT", () => {
   timers.forEach(clearInterval);

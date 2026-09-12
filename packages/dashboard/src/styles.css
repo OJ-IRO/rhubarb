@@ -1,0 +1,49 @@
+:root {
+  --bg: #fbf8f1;
+  --ink: #1f1b14;
+  --muted: #6f6656;
+  --honey: #e9a825;
+  --comb: #f3d78a;
+  --line: #e7dfcc;
+  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+.shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px 96px;
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.masthead h1 {
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.mark {
+  font-size: 22px;
+}
+
+.muted {
+  color: var(--muted);
+  line-height: 1.6;
+}
