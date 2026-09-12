@@ -43,9 +43,28 @@ export class BeeClient {
     return this.request("POST", "/v1/facts", { text });
   }
 
-  changes(cursor?: string): Promise<Record<string, unknown>> {
+  /** Durable changefeed: arrays of entity ids changed since the cursor. */
+  changes(cursor?: string): Promise<{
+    facts: number[];
+    conversations: number[];
+    dailies: number[];
+    journals: string[];
+    todos: number[];
+    next_cursor: string;
+    since: number;
+    until: number;
+    updated: boolean;
+  }> {
     const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
     return this.request("GET", `/v1/changes${q}`);
+  }
+
+  getConversation(id: number): Promise<Record<string, unknown>> {
+    return this.request("GET", `/v1/conversations/${id}`);
+  }
+
+  todayBrief(): Promise<{ calendar_events: Array<Record<string, unknown>>; emails: Array<Record<string, unknown>>; timezone: string }> {
+    return this.request("GET", "/v1/todayBrief");
   }
 
   recentVisits(limit = 20): Promise<{ visits?: Array<Record<string, unknown>> } & Record<string, unknown>> {
