@@ -29,4 +29,4 @@ Live measurements against a physical Bee Pioneer + Bee iOS app, `@beeai/cli` 0.7
 3. Quiz-answer matching: journal events are fast (~3s) and reliable → use journals as the answer channel; dedupe journal text against subsequent ambient utterances (fuzzy, ±60s window).
 4. Track quiz todos by REST response id (no stream confirmation events for API-created todos).
 5. Demo must stage the curiosity question inside a natural conversation, and allow ~10–40s on camera for the card to appear (or cut in real time honestly).
-6. Alarm surfacing UX: (pending — test todo 28764734, alarm 12:19 PT)
+6. **Alarm surfacing UX: VALIDATED.** Todo `alarm_at` fires a real push notification — banner + haptic buzz — with the Bee app closed and phone locked (tested 12:19 in-app, 12:22 lock-screen). Quiz delivery through todo alarms is viable as the primary interruption channel. The screenless loop is fully proven: ambient speech → SSE utterance → [Waggle] → alarm quiz on locked phone → voice-note answer → transcript in ~3s.
