@@ -1,0 +1,20 @@
+{
+  "name": "waggle",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The first screenless tutor — turns your day into a curriculum, powered by the Bee wearable",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:daemon": "npm run dev -w @waggle/daemon",
+    "dev:dashboard": "npm run dev -w @waggle/dashboard"
+  }
+}
