@@ -88,17 +88,19 @@ export interface WriteOptions {
   model?: string;
   effort?: Effort;
   maxTokens?: number;
+  /** Short, latency-sensitive prose (nudges, feedback lines, tutor turns): worker model, low effort. */
+  quick?: boolean;
   onText?: (delta: string) => void;
 }
 
-/** Long-form prose generation, streamed. Defaults to the writer model at high effort. */
+/** Prose generation, streamed. Long-form defaults to the writer model at high effort. */
 export async function write(opts: WriteOptions): Promise<string> {
   const stream = llm().messages.stream({
-    model: opts.model ?? MODELS.writer,
-    max_tokens: opts.maxTokens ?? 16000,
+    model: opts.model ?? (opts.quick ? MODELS.worker : MODELS.writer),
+    max_tokens: opts.maxTokens ?? (opts.quick ? 2000 : 16000),
     system: opts.system,
     thinking: { type: "adaptive" },
-    output_config: { effort: opts.effort ?? "high" },
+    output_config: { effort: opts.effort ?? (opts.quick ? "low" : "high") },
     messages: opts.messages,
   });
   if (opts.onText) stream.on("text", opts.onText);
