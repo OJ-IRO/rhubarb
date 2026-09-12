@@ -9,8 +9,11 @@
     "test": "npm run build && node --test dist/**/*.test.js"
   },
   "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.33.5",
+    "@anthropic-ai/sdk": "^0.125.0",
     "better-sqlite3": "^12.2.0",
-    "ts-fsrs": "^5.2.0"
+    "ts-fsrs": "^5.2.0",
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

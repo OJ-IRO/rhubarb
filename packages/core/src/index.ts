@@ -3,3 +3,5 @@ export * from "./db.js";
 export * from "./bee.js";
 export * from "./detect.js";
 export * from "./scheduling.js";
+export * from "./llm.js";
+export * from "./voice.js";
