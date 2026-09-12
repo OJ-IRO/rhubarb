@@ -70,8 +70,9 @@ export function matchPractice(db: WaggleDb, now = Date.now()): Practice | null {
   return open[0] ?? null;
 }
 
-export async function gradeAnswer(deps: PracticeDeps, p: Practice, journalId: string, answer: string): Promise<Grade> {
+export async function gradeAnswer(deps: PracticeDeps, p: Practice, journalId: string, answer: string, opts: { notify?: boolean } = {}): Promise<Grade> {
   const { db, bee, log } = deps;
+  const notify = opts.notify ?? true;
   db.attachPracticeAnswer(p.id, journalId, answer);
 
   const rubric = p.rubric ?? "A clear, correct explanation in the learner's own words.";
@@ -96,8 +97,10 @@ export async function gradeAnswer(deps: PracticeDeps, p: Practice, journalId: st
   if (p.beeTodoId) await bee.completeTodo(p.beeTodoId).catch(() => undefined);
 
   // Feedback reaches the phone the same way the prompt did: a short alarm a minute out.
-  const line = `${grade.score}/5. ${grade.feedback}`.slice(0, 1900);
-  await bee.createTodo(line, new Date(Date.now() + 60_000).toISOString()).catch((e: Error) => log(`feedback nudge failed: ${e.message}`));
+  if (notify) {
+    const line = `${grade.score}/5. ${grade.feedback}`.slice(0, 1900);
+    await bee.createTodo(line, new Date(Date.now() + 60_000).toISOString()).catch((e: Error) => log(`feedback nudge failed: ${e.message}`));
+  }
 
   log(`graded practice #${p.id}: ${grade.score}/5`);
   deps.onGraded?.(p, grade);

@@ -1,7 +1,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
-import type { Profile, WaggleDb } from "@waggle/core";
+import type { Lesson, LessonBeat, Profile, Skill, WaggleDb } from "@waggle/core";
 
 export interface ApiDeps {
   db: WaggleDb;
@@ -12,6 +12,12 @@ export interface ApiDeps {
     reflectNow: () => Promise<void>;
     acceptSkill: (id: number) => Promise<void>;
     dismissSkill: (id: number) => Promise<void>;
+    saveProfile: (p: Profile) => Promise<void>;
+    answerBeat: (lesson: Lesson, beat: LessonBeat, idx: number, text: string) => Promise<{ feedback: string; score?: number }>;
+    teachbackToPendant: (lesson: Lesson, beat: LessonBeat) => Promise<void>;
+    scheduleMission: (lesson: Lesson, beat: LessonBeat) => Promise<Date>;
+    completeLesson: (lesson: Lesson) => Promise<void>;
+    tutor: (lesson: Lesson, history: Array<{ role: "user" | "assistant"; content: string }>, onText: (t: string) => void) => Promise<string>;
   };
 }
 
@@ -30,11 +36,11 @@ function json(res: ServerResponse, status: number, body: unknown): void {
   res.end(JSON.stringify(body));
 }
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+async function readBody<T>(req: IncomingMessage): Promise<T> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
   const text = Buffer.concat(chunks).toString("utf8");
-  return text ? JSON.parse(text) : null;
+  return (text ? JSON.parse(text) : null) as T;
 }
 
 function serveStatic(res: ServerResponse, dir: string, urlPath: string): boolean {
@@ -48,8 +54,17 @@ function serveStatic(res: ServerResponse, dir: string, urlPath: string): boolean
   return true;
 }
 
+/** The lesson the reader should open today: highest-priority active skill with a ready lesson at its current level. */
+export function todaysLesson(db: WaggleDb): { lesson: Lesson; skill: Skill } | null {
+  for (const skill of db.skillsByStatus(["active"])) {
+    const lesson = db.currentLesson(skill.id, skill.level);
+    if (lesson && lesson.status === "ready") return { lesson, skill };
+  }
+  return null;
+}
+
 export function startApi(deps: ApiDeps, port: number): void {
-  const { db, log } = deps;
+  const { db, log, actions } = deps;
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
@@ -59,9 +74,10 @@ export function startApi(deps: ApiDeps, port: number): void {
     try {
       if (path.startsWith("/api/")) {
         const parts = path.slice(5).split("/").filter(Boolean);
-        const [head, idStr, tail] = parts;
+        const [head, idStr, tail, tail2] = parts;
         const id = idStr ? Number(idStr) : NaN;
 
+        // ---- status / today / profile
         if (head === "status" && method === "GET") {
           return json(res, 200, {
             profile: db.getProfile(),
@@ -70,18 +86,41 @@ export function startApi(deps: ApiDeps, port: number): void {
             openPractice: db.openPractice().length,
           });
         }
+        if (head === "today" && method === "GET") {
+          const now = Date.now();
+          return json(res, 200, {
+            profile: db.getProfile(),
+            letter: db.getKv("today_letter"),
+            letterDate: db.getKv("today_letter_date"),
+            lesson: todaysLesson(db),
+            duePractice: db.openPractice().filter((p) => p.scheduledFor <= now),
+            dueCards: db.dueCards(now, 10).map((d) => ({ ...d, card: db.getCard(d.cardId) })),
+            proposed: db.skillsByStatus(["proposed"]).length,
+            active: db.skillsByStatus(["active"]).length,
+            sparks: db.cardsWithItems(5),
+          });
+        }
         if (head === "profile" && method === "GET") return json(res, 200, db.getProfile());
         if (head === "profile" && method === "PUT") {
-          const body = (await readBody(req)) as Profile;
-          db.setProfile({ ...body, onboardedAt: body.onboardedAt ?? Date.now() });
+          const body = await readBody<Profile>(req);
+          await actions.saveProfile({ ...body, onboardedAt: body.onboardedAt ?? Date.now() });
           return json(res, 200, db.getProfile());
         }
+
+        // ---- evidence / skills
         if (head === "evidence" && method === "GET") {
           const stage = (url.searchParams.get("stage") as "detected" | "classified") ?? "classified";
           return json(res, 200, db.evidenceByStage(stage, 200));
         }
         if (head === "skills" && method === "GET" && !idStr) {
-          return json(res, 200, db.skillsByStatus(["proposed", "active", "mastered"]));
+          const skills = db.skillsByStatus(["proposed", "active", "mastered"]).map((s) => ({
+            ...s,
+            evidenceCount: db.evidenceForSkill(s.id).length,
+            ladderLength: db.ladderFor(s.id).length,
+            lessonReady: Boolean(db.currentLesson(s.id, s.level)?.status === "ready"),
+            lessonId: db.currentLesson(s.id, s.level)?.id ?? null,
+          }));
+          return json(res, 200, skills);
         }
         if (head === "skills" && idStr && method === "GET") {
           const skill = db.getSkill(id);
@@ -96,24 +135,86 @@ export function startApi(deps: ApiDeps, port: number): void {
           });
         }
         if (head === "skills" && idStr && tail === "accept" && method === "POST") {
-          await deps.actions.acceptSkill(id);
+          await actions.acceptSkill(id);
           return json(res, 200, db.getSkill(id));
         }
         if (head === "skills" && idStr && tail === "dismiss" && method === "POST") {
-          await deps.actions.dismissSkill(id);
+          await actions.dismissSkill(id);
+          return json(res, 200, db.getSkill(id));
+        }
+        if (head === "skills" && idStr && tail === "priority" && method === "PUT") {
+          const { priority } = await readBody<{ priority: number }>(req);
+          db.updateSkill(id, { priority });
           return json(res, 200, db.getSkill(id));
         }
         if (head === "reflect" && method === "POST") {
-          await deps.actions.reflectNow();
-          return json(res, 200, { ok: true });
+          void actions.reflectNow();
+          return json(res, 202, { ok: true });
         }
+
+        // ---- sparks / practice
         if (head === "sparks" && method === "GET") return json(res, 200, db.cardsWithItems(100));
-        if (head === "lessons" && idStr && method === "GET") {
+        if (head === "practice" && method === "GET") return json(res, 200, db.openPractice());
+
+        // ---- lessons
+        if (head === "lessons" && idStr) {
           const lesson = db.getLesson(id);
           if (!lesson) return json(res, 404, { error: "not found" });
-          return json(res, 200, { lesson, session: db.latestSessionForLesson(id) });
+          const beats = JSON.parse(lesson.beats) as LessonBeat[];
+
+          if (!tail && method === "GET") {
+            return json(res, 200, {
+              lesson,
+              skill: db.getSkill(lesson.skillId),
+              ladder: db.ladderFor(lesson.skillId),
+              session: db.latestSessionForLesson(id),
+            });
+          }
+          if (tail === "session" && method === "POST") {
+            const existing = db.latestSessionForLesson(id);
+            const session = existing && !existing.completedAt ? existing : db.getSession(db.startSession(id));
+            return json(res, 200, session);
+          }
+          if (tail === "session" && method === "PUT") {
+            const { responses } = await readBody<{ responses: Record<string, string> }>(req);
+            const session = db.latestSessionForLesson(id);
+            if (!session) return json(res, 404, { error: "no session" });
+            db.updateSession(session.id, { responses });
+            return json(res, 200, db.getSession(session.id));
+          }
+          if (tail === "beat" && tail2 !== undefined && parts[4] === "answer" && method === "POST") {
+            const idx = Number(tail2);
+            const beat = beats[idx];
+            if (!beat) return json(res, 404, { error: "no such beat" });
+            const { text } = await readBody<{ text: string }>(req);
+            const result = await actions.answerBeat(lesson, beat, idx, text);
+            return json(res, 200, result);
+          }
+          if (tail === "teachback" && tail2 === "pendant" && method === "POST") {
+            const beat = beats.find((b) => b.kind === "teachback");
+            if (!beat) return json(res, 404, { error: "no teachback beat" });
+            await actions.teachbackToPendant(lesson, beat);
+            return json(res, 200, { ok: true });
+          }
+          if (tail === "mission" && method === "POST") {
+            const beat = beats.find((b) => b.kind === "mission");
+            if (!beat) return json(res, 404, { error: "no mission beat" });
+            const at = await actions.scheduleMission(lesson, beat);
+            return json(res, 200, { at: at.toISOString() });
+          }
+          if (tail === "complete" && method === "POST") {
+            await actions.completeLesson(lesson);
+            return json(res, 200, db.getLesson(id));
+          }
+          if (tail === "tutor" && method === "POST") {
+            const { history } = await readBody<{ history: Array<{ role: "user" | "assistant"; content: string }> }>(req);
+            res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" });
+            const full = await actions.tutor(lesson, history, (t) => res.write(t));
+            const session = db.latestSessionForLesson(id);
+            if (session) db.updateSession(session.id, { tutor: [...history, { role: "assistant", content: full }] });
+            return res.end();
+          }
         }
-        if (head === "practice" && method === "GET") return json(res, 200, db.openPractice());
         return json(res, 404, { error: `no route ${method} ${path}` });
       }
 
@@ -121,7 +222,8 @@ export function startApi(deps: ApiDeps, port: number): void {
       json(res, 404, { error: "not found" });
     } catch (e) {
       log(`api error ${method} ${path}: ${(e as Error).message}`);
-      json(res, 500, { error: (e as Error).message });
+      if (!res.headersSent) json(res, 500, { error: (e as Error).message });
+      else res.end();
     }
   });
 

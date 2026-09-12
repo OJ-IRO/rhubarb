@@ -1,0 +1,41 @@
+import { lintProse, systemBlocks, voiceGuide, write, type WaggleDb } from "@waggle/core";
+import { todaysLesson } from "../api.js";
+
+const ROLE = `You write the short note at the top of the reader's Waggle page each day. Three to five sentences. What their week has been asking of them, what is on the board and why, and the one thing to do today. Address them by name. No headers, no lists. If there is nothing new, say that honestly and keep it to two sentences.`;
+
+/** Written after each reflection; shown on the Today page. */
+export async function writeTodayLetter(db: WaggleDb, log: (m: string) => void): Promise<void> {
+  const profile = db.getProfile();
+  const proposed = db.skillsByStatus(["proposed"]);
+  const active = db.skillsByStatus(["active"]);
+  const lesson = todaysLesson(db);
+  const sparks = db.cardsWithItems(5);
+
+  const facts = `Reader: ${profile?.name ?? "the reader"}\nToday: ${new Date().toDateString()}\n\nProposed skills waiting for a decision:\n${
+    proposed.map((s) => `- ${s.name} (priority ${s.priority}): ${s.brief}`).join("\n") || "(none)"
+  }\n\nActive skills:\n${active.map((s) => `- ${s.name}, level ${s.level + 1}`).join("\n") || "(none)"}\n\nLesson ready today: ${
+    lesson ? `${lesson.skill.name}, level ${lesson.skill.level + 1}` : "none"
+  }\n\nRecent sparks:\n${sparks.map(({ card }) => `- ${card.title}`).join("\n") || "(none)"}`;
+
+  let letter = await write({
+    quick: true,
+    maxTokens: 800,
+    system: systemBlocks(voiceGuide(), ROLE),
+    messages: [{ role: "user", content: facts }],
+  });
+  letter = letter.trim();
+  const lint = lintProse(letter);
+  if (!lint.ok) {
+    letter = (
+      await write({
+        quick: true,
+        maxTokens: 800,
+        system: systemBlocks(voiceGuide(), "Rewrite this note so it follows the guide. Keep the facts."),
+        messages: [{ role: "user", content: `Problems: ${lint.issues.map((i) => i.detail).join("; ")}\n\n${letter}` }],
+      })
+    ).trim();
+  }
+  db.setKv("today_letter", letter);
+  db.setKv("today_letter_date", new Date().toDateString());
+  log("today letter written");
+}

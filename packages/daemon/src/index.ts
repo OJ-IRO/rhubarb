@@ -2,17 +2,21 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BeeClient, BeeStreamConsumer, WaggleDb, type Evidence, type Practice } from "@waggle/core";
+import { BeeClient, BeeStreamConsumer, WaggleDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@waggle/core";
+import { z } from "zod";
 import { startApi } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
 import { generateLesson, startSkill } from "./pipeline/lessons.js";
-import { handleJournalReady, sweepPractice, type Grade } from "./pipeline/practice.js";
-import { onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
+import { writeTodayLetter } from "./pipeline/letter.js";
+import { gradeAnswer, handleJournalReady, schedulePractice, sweepPractice, type Grade } from "./pipeline/practice.js";
+import { maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
 import { runReflection } from "./pipeline/reflect.js";
+import { nextLearningSlot, parseLearningWindows, saveLearningSlots } from "./pipeline/schedule.js";
 import { buildSpark } from "./pipeline/sparks.js";
 import { ingestStakes, runSweep } from "./pipeline/sweep.js";
+import { tutorReply } from "./pipeline/tutor.js";
 
 const DATA_DIR = process.env.WAGGLE_DATA_DIR ?? join(homedir(), ".waggle");
 mkdirSync(DATA_DIR, { recursive: true });
@@ -127,7 +131,56 @@ const reflectNow = guarded("reflect", async () => {
     const line = `Your learning brief is ready. ${proposed.length === 1 ? "One skill" : `${proposed.length} skills`} worth a look, starting with ${top.name}.`;
     await bee.createTodo(line, new Date(Date.now() + 2 * 60_000).toISOString()).catch((e: Error) => log(`brief nudge failed: ${e.message}`));
   }
+  await writeTodayLetter(db, log);
 });
+
+// --- in-page lesson interactions
+const QuickFeedback = z.object({ feedback: z.string().describe("two or three sentences to the learner: what they got, what they missed, in the house voice") });
+
+async function answerBeat(lesson: import("@waggle/core").Lesson, beat: import("@waggle/core").LessonBeat, idx: number, text: string) {
+  if (beat.kind === "teachback") {
+    const practiceId = db.insertPractice({
+      skillId: lesson.skillId,
+      lessonId: lesson.id,
+      kind: "teachback",
+      prompt: beat.prompt,
+      rubric: beat.rubric,
+      marker: "web",
+      scheduledFor: Date.now(),
+      beeTodoId: null,
+    });
+    const p = db.getPractice(practiceId)!;
+    const grade = await gradeAnswer(practiceDeps, p, `web-${lesson.id}-${idx}`, text, { notify: false });
+    return { feedback: grade.feedback, score: grade.score };
+  }
+  const out = await judge({
+    system: systemBlocks(voiceGuide(), "You respond to a learner's answer to a check-in or scenario inside a lesson. Be direct and specific; no grades, no praise inflation."),
+    user: `Prompt: "${beat.prompt}"\n\nWhat a good answer contains:\n${beat.rubric}\n\nTheir answer:\n"${text}"`,
+    schema: QuickFeedback,
+    effort: "low",
+  });
+  let feedback = out.feedback;
+  if (!lintProse(feedback).ok) {
+    feedback = (
+      await write({ quick: true, system: systemBlocks(voiceGuide(), "Rewrite so it follows the guide."), messages: [{ role: "user", content: feedback }] })
+    ).trim();
+  }
+  return { feedback };
+}
+
+async function completeLesson(lesson: import("@waggle/core").Lesson): Promise<void> {
+  db.completeLesson(lesson.id);
+  const session = db.latestSessionForLesson(lesson.id);
+  if (session) db.updateSession(session.id, { completedAt: Date.now() });
+  const skill = db.getSkill(lesson.skillId);
+  if (!skill) return;
+  const best = db
+    .practiceForSkill(skill.id)
+    .filter((p) => p.lessonId === lesson.id && p.kind === "teachback" && p.grade)
+    .map((p) => (JSON.parse(p.grade!) as Grade).score)
+    .reduce((a, b) => Math.max(a, b), 0);
+  advanceAndContinue(skill.id, maybeAdvance(db, skill, { teachbackScore: best }));
+}
 
 const nightly = guarded("nightly", async () => {
   const today = new Date().toDateString();
@@ -167,6 +220,40 @@ startApi(
         void startSkill(lessonDeps, id).catch((e: Error) => log(`startSkill ${id} failed: ${e.message}`));
       },
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
+      saveProfile: async (p) => {
+        db.setProfile(p);
+        const slots = await parseLearningWindows(p.learningWindows).catch((e: Error) => {
+          log(`learning windows parse failed: ${e.message}`);
+          return [];
+        });
+        saveLearningSlots(db, slots);
+        log(`profile saved for ${p.name}; ${slots.length} learning slots`);
+      },
+      answerBeat,
+      teachbackToPendant: async (lesson, beat) => {
+        await schedulePractice(practiceDeps, {
+          skillId: lesson.skillId,
+          lessonId: lesson.id,
+          kind: "teachback",
+          prompt: beat.prompt,
+          rubric: beat.rubric,
+          at: new Date(Date.now() + 60_000),
+        });
+      },
+      scheduleMission: async (lesson, beat) => {
+        const at = nextLearningSlot(db);
+        await schedulePractice(practiceDeps, {
+          skillId: lesson.skillId,
+          lessonId: lesson.id,
+          kind: "mission",
+          prompt: beat.prompt,
+          rubric: beat.rubric,
+          at,
+        });
+        return at;
+      },
+      completeLesson,
+      tutor: (lesson, history, onText) => tutorReply(db, lesson, history, onText),
     },
   },
   API_PORT

@@ -12,6 +12,7 @@ import {
 } from "@waggle/core";
 import { z } from "zod";
 import { researchThenEmit } from "./research.js";
+import { nextLearningSlot } from "./schedule.js";
 
 const Ladder = z.object({
   levels: z
@@ -128,7 +129,9 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
 
   const minutes = profile?.sessionMinutes ?? 10;
   const nudge = `Your ${skill.name} lesson is ready. About ${minutes} minutes, whenever you're at your desk.`;
-  await bee.createTodo(nudge, new Date(Date.now() + 2 * 60_000).toISOString()).catch((e: Error) => log(`lesson nudge failed: ${e.message}`));
+  const at = nextLearningSlot(db);
+  await bee.createTodo(nudge, at.toISOString()).catch((e: Error) => log(`lesson nudge failed: ${e.message}`));
+  log(`lesson nudge scheduled for ${at.toISOString()}`);
   return lessonId;
 }
 
