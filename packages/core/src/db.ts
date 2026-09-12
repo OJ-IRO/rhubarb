@@ -1,6 +1,8 @@
 import Database from "better-sqlite3";
 import type {
   Card,
+  Deck,
+  Quiz,
   Evidence,
   EvidenceKind,
   EvidenceRoute,
@@ -177,6 +179,14 @@ export class WaggleDb {
     this.db = new Database(path);
     this.db.pragma("journal_mode = WAL");
     this.db.exec(SCHEMA);
+    this.migrate();
+  }
+
+  /** Additive migrations for databases created before a column existed. */
+  private migrate(): void {
+    const cols = (this.db.prepare("PRAGMA table_info(lessons)").all() as Array<{ name: string }>).map((c) => c.name);
+    if (!cols.includes("deck")) this.db.exec("ALTER TABLE lessons ADD COLUMN deck TEXT NOT NULL DEFAULT '{}'");
+    if (!cols.includes("quiz")) this.db.exec("ALTER TABLE lessons ADD COLUMN quiz TEXT NOT NULL DEFAULT '{\"questions\":[]}'");
   }
 
   close(): void {
@@ -396,13 +406,34 @@ export class WaggleDb {
   }
 
   // ------------------------------------------------------------------ lessons
-  insertLesson(l: { skillId: number; levelIdx: number; style: LearningStyle; bodyMd: string; beats: LessonBeat[]; citations: Array<{ title: string; url: string }>; status?: "draft" | "ready" }): number {
+  insertLesson(l: {
+    skillId: number;
+    levelIdx: number;
+    style: LearningStyle;
+    bodyMd: string;
+    deck: Deck;
+    quiz: Quiz;
+    beats: LessonBeat[];
+    citations: Array<{ title: string; url: string }>;
+    status?: "draft" | "ready";
+  }): number {
     const res = this.db
       .prepare(
-        `INSERT INTO lessons (skill_id, level_idx, style, body_md, beats, citations, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO lessons (skill_id, level_idx, style, body_md, deck, quiz, beats, citations, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(l.skillId, l.levelIdx, l.style, l.bodyMd, JSON.stringify(l.beats), JSON.stringify(l.citations), l.status ?? "ready", Date.now());
+      .run(
+        l.skillId,
+        l.levelIdx,
+        l.style,
+        l.bodyMd,
+        JSON.stringify(l.deck),
+        JSON.stringify(l.quiz),
+        JSON.stringify(l.beats),
+        JSON.stringify(l.citations),
+        l.status ?? "ready",
+        Date.now()
+      );
     return Number(res.lastInsertRowid);
   }
 
@@ -649,6 +680,8 @@ function rowToLesson(r: Row): Lesson {
     levelIdx: r.level_idx as number,
     style: r.style as LearningStyle,
     bodyMd: r.body_md as string,
+    deck: (r.deck as string) ?? "{}",
+    quiz: (r.quiz as string) ?? '{"questions":[]}',
     beats: r.beats as string,
     citations: r.citations as string,
     status: r.status as Lesson["status"],

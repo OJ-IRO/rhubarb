@@ -1,114 +1,120 @@
 import { useEffect, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import { api, type LessonBeat, type LessonView } from "../api";
+import type { Deck, LessonBeat, Quiz } from "@waggle/core";
+import { api, type LessonView, type QuizResult } from "../api";
+import { DeckViewer } from "../components/Deck";
+import { QuizView } from "../components/Quiz";
 import { Link, go } from "../router";
 
-const BEAT_LABEL: Record<LessonBeat["kind"], string> = {
-  checkin: "Quick check",
-  scenario: "Work it through",
-  teachback: "Teach it back",
-  mission: "Tomorrow",
-};
+type Stage = "deck" | "quiz" | "practice";
 
 export function LessonPage({ id }: { id: number }) {
   const [view, setView] = useState<LessonView | null>(null);
-  const [responses, setResponses] = useState<Record<string, string>>({});
-  const [feedback, setFeedback] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("deck");
+  const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [sentToPendant, setSentToPendant] = useState(false);
   const [missionAt, setMissionAt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     api.lesson(id).then(async (v) => {
       setView(v);
-      const session = await api.startSession(id);
-      setResponses(JSON.parse(session.responses) as Record<string, string>);
+      await api.startSession(id);
+      window.scrollTo(0, 0);
     });
   }, [id]);
 
+  useEffect(() => window.scrollTo(0, 0), [stage]);
+
   if (!view) return null;
   const { lesson, skill, ladder } = view;
+  const deck = JSON.parse(lesson.deck) as Deck;
+  const quiz = JSON.parse(lesson.quiz) as Quiz;
   const beats = JSON.parse(lesson.beats) as LessonBeat[];
-  const level = ladder.find((l) => l.idx === lesson.levelIdx);
-  const citations = JSON.parse(lesson.citations) as Array<{ title: string; url: string }>;
-
-  async function answer(idx: number) {
-    const text = responses[idx] ?? "";
-    if (!text.trim()) return;
-    setBusy(`beat-${idx}`);
-    await api.saveResponses(id, responses);
-    const r = await api.answerBeat(id, idx, text);
-    setFeedback((f) => ({ ...f, [idx]: r.score !== undefined ? `${r.score}/5. ${r.feedback}` : r.feedback }));
-    setBusy(null);
-  }
+  const teachback = beats.find((b) => b.kind === "teachback");
+  const mission = beats.find((b) => b.kind === "mission");
+  const hasDeck = Array.isArray(deck.slides) && deck.slides.length > 0;
 
   return (
     <div className="lesson-layout">
-      <article className="reader">
+      <article className="lesson-main">
         <p className="eyebrow">
           {skill && <Link to={`/skills/${skill.id}`}>{skill.name}</Link>} · level {lesson.levelIdx + 1}
           {ladder.length ? ` of ${ladder.length}` : ""}
-        </p>
-        <h1 className="title">{level?.title ?? "Lesson"}</h1>
-        {level && <p className="muted lead">By the end: {level.outcome}</p>}
-
-        <div className="prose">
-          <Markdown>{lesson.bodyMd}</Markdown>
-        </div>
-
-        {citations.length > 0 && (
-          <p className="muted small">
-            Sources:{" "}
-            {citations.map((c, i) => (
-              <span key={c.url}>
-                {i > 0 && ", "}
-                <a href={c.url} target="_blank" rel="noreferrer">
-                  {c.title}
-                </a>
-              </span>
+          <span className="stage-tabs">
+            {(["deck", "quiz", "practice"] as Stage[]).map((s) => (
+              <button key={s} className={stage === s ? "tab on" : "tab"} onClick={() => setStage(s)}>
+                {s === "deck" ? "Lesson" : s === "quiz" ? "Check" : "Practice"}
+              </button>
             ))}
-          </p>
-        )}
+          </span>
+        </p>
 
-        <section className="beats">
-          {beats.map((b, idx) => (
-            <div key={idx} className="beat">
-              <p className="eyebrow">{BEAT_LABEL[b.kind]}</p>
-              <p className="beat-prompt">{b.prompt}</p>
+        {stage === "deck" &&
+          (hasDeck ? (
+            <DeckViewer deck={deck} onFinish={() => setStage("quiz")} />
+          ) : (
+            <div className="prose">
+              <p className="muted">This lesson was written before decks existed; here's the text version.</p>
+              {lesson.bodyMd.split("\n\n").map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+              <button className="primary" onClick={() => setStage("quiz")}>
+                Check my understanding →
+              </button>
+            </div>
+          ))}
 
-              {(b.kind === "checkin" || b.kind === "scenario" || b.kind === "teachback") && (
-                <>
-                  <textarea
-                    rows={b.kind === "checkin" ? 2 : 4}
-                    value={responses[idx] ?? ""}
-                    onChange={(e) => setResponses((r) => ({ ...r, [idx]: e.target.value }))}
-                    placeholder={b.kind === "teachback" ? "Explain it in your own words, or send it to your pendant and say it out loud." : "Your answer"}
-                  />
-                  <div className="actions">
-                    <button className="primary small" disabled={busy === `beat-${idx}`} onClick={() => answer(idx)}>
-                      {busy === `beat-${idx}` ? "Reading…" : "Check"}
-                    </button>
-                    {b.kind === "teachback" && (
-                      <button
-                        className="ghost small"
-                        disabled={sentToPendant}
-                        onClick={async () => {
-                          await api.teachbackToPendant(id);
-                          setSentToPendant(true);
-                        }}
-                      >
-                        {sentToPendant ? "Sent. Your phone will buzz in a minute." : "Send to my pendant"}
-                      </button>
-                    )}
-                  </div>
-                  {feedback[idx] && <p className="feedback">{feedback[idx]}</p>}
-                </>
+        {stage === "quiz" &&
+          (quiz.questions.length > 0 ? (
+            <>
+              <QuizView
+                quiz={quiz}
+                result={quizResult}
+                onSubmit={async (answers) => {
+                  const r = await api.submitQuiz(id, answers);
+                  setQuizResult(r);
+                }}
+              />
+              {quizResult && (
+                <div className="actions end">
+                  <button className="primary" onClick={() => setStage("practice")}>
+                    On to practice →
+                  </button>
+                </div>
               )}
+            </>
+          ) : (
+            <p className="muted">No check for this one. Straight to practice.</p>
+          ))}
 
-              {b.kind === "mission" && (
+        {stage === "practice" && (
+          <section className="practice-stage">
+            {teachback && (
+              <div className="beat">
+                <p className="eyebrow">Teach it back</p>
+                <p className="beat-prompt">{teachback.prompt}</p>
+                <p className="muted small">Say it out loud into your pendant. Waggle grades the explanation, not the vocabulary.</p>
                 <div className="actions">
                   <button
-                    className="ghost small"
+                    className="primary"
+                    disabled={sentToPendant}
+                    onClick={async () => {
+                      await api.teachbackToPendant(id);
+                      setSentToPendant(true);
+                    }}
+                  >
+                    {sentToPendant ? "Sent. Your phone will buzz in a minute." : "Send to my pendant"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {mission && (
+              <div className="beat">
+                <p className="eyebrow">Tomorrow's mission</p>
+                <p className="beat-prompt">{mission.prompt}</p>
+                <div className="actions">
+                  <button
+                    className="ghost"
                     disabled={Boolean(missionAt)}
                     onClick={async () => {
                       const r = await api.scheduleMission(id);
@@ -118,24 +124,23 @@ export function LessonPage({ id }: { id: number }) {
                     {missionAt ? `Reminder set for ${new Date(missionAt).toLocaleString()}` : "Remind me on my pendant"}
                   </button>
                 </div>
-              )}
+              </div>
+            )}
+            <div className="actions end">
+              <button
+                className="primary"
+                disabled={lesson.status === "done" || busy}
+                onClick={async () => {
+                  setBusy(true);
+                  await api.completeLesson(id);
+                  go(skill ? `/skills/${skill.id}` : "/");
+                }}
+              >
+                {lesson.status === "done" ? "Finished" : "I'm done with this one"}
+              </button>
             </div>
-          ))}
-        </section>
-
-        <div className="actions end">
-          <button
-            className="primary"
-            disabled={lesson.status === "done" || busy === "done"}
-            onClick={async () => {
-              setBusy("done");
-              await api.completeLesson(id);
-              go(skill ? `/skills/${skill.id}` : "/");
-            }}
-          >
-            {lesson.status === "done" ? "Finished" : "I'm done with this one"}
-          </button>
-        </div>
+          </section>
+        )}
       </article>
 
       <Tutor lessonId={id} initial={view.session ? (JSON.parse(view.session.tutor) as Msg[]) : []} />
@@ -152,6 +157,7 @@ function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
   const [history, setHistory] = useState<Msg[]>(initial);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [open, setOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [history]);
@@ -172,29 +178,35 @@ function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
   }
 
   return (
-    <aside className="tutor">
-      <p className="eyebrow">Push back</p>
-      <div className="thread">
-        {history.length === 0 && <p className="muted small">Ask why, disagree, or ask for a different example. The tutor knows this lesson and what you said this week.</p>}
-        {history.map((m, i) => (
-          <p key={i} className={m.role === "user" ? "msg me" : "msg"}>
-            {m.content}
-          </p>
-        ))}
-        <div ref={bottom} />
-      </div>
-      <textarea
-        rows={2}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            void send();
-          }
-        }}
-        placeholder="Wait, why does…"
-      />
+    <aside className={open ? "tutor open" : "tutor"}>
+      <button className="tutor-toggle" onClick={() => setOpen(!open)}>
+        {open ? "Close" : "Push back"}
+      </button>
+      {open && (
+        <>
+          <div className="thread">
+            {history.length === 0 && <p className="muted small">Ask why, disagree, or ask for a different example. The tutor knows this lesson and what you said this week.</p>}
+            {history.map((m, i) => (
+              <p key={i} className={m.role === "user" ? "msg me" : "msg"}>
+                {m.content}
+              </p>
+            ))}
+            <div ref={bottom} />
+          </div>
+          <textarea
+            rows={2}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void send();
+              }
+            }}
+            placeholder="Wait, why does…"
+          />
+        </>
+      )}
     </aside>
   );
 }

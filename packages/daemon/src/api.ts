@@ -17,8 +17,16 @@ export interface ApiDeps {
     teachbackToPendant: (lesson: Lesson, beat: LessonBeat) => Promise<void>;
     scheduleMission: (lesson: Lesson, beat: LessonBeat) => Promise<Date>;
     completeLesson: (lesson: Lesson) => Promise<void>;
+    gradeQuiz: (lesson: Lesson, answers: Array<number | string | null>) => Promise<QuizResult>;
     tutor: (lesson: Lesson, history: Array<{ role: "user" | "assistant"; content: string }>, onText: (t: string) => void) => Promise<string>;
   };
+}
+
+export interface QuizResult {
+  score: number;
+  total: number;
+  perQuestion: Array<{ correct: boolean; note?: string }>;
+  note: string;
 }
 
 const MIME: Record<string, string> = {
@@ -205,6 +213,10 @@ export function startApi(deps: ApiDeps, port: number): void {
           if (tail === "complete" && method === "POST") {
             await actions.completeLesson(lesson);
             return json(res, 200, db.getLesson(id));
+          }
+          if (tail === "quiz" && method === "POST") {
+            const { answers } = await readBody<{ answers: Array<number | string | null> }>(req);
+            return json(res, 200, await actions.gradeQuiz(lesson, answers));
           }
           if (tail === "tutor" && method === "POST") {
             const { history } = await readBody<{ history: Array<{ role: "user" | "assistant"; content: string }> }>(req);

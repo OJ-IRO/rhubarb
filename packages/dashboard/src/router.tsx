@@ -1,17 +1,21 @@
 import { useEffect, useState } from "react";
+import { isPreview } from "./api";
 
 export interface Route {
+  /** path with any "/preview" prefix removed */
   path: string;
-  params: Record<string, string>;
 }
+
+const PREFIX = "/preview";
 
 function parse(): Route {
-  const hash = window.location.hash.replace(/^#/, "") || "/";
-  const [path] = hash.split("?");
-  return { path, params: {} };
+  let hash = window.location.hash.replace(/^#/, "") || "/";
+  hash = hash.split("?")[0];
+  if (hash.startsWith(PREFIX)) hash = hash.slice(PREFIX.length) || "/";
+  return { path: hash };
 }
 
-/** Tiny hash router: matches patterns like "/skills/:id". */
+/** Tiny hash router. Preview mode is a URL prefix that every link preserves. */
 export function useRoute(): Route {
   const [route, setRoute] = useState<Route>(parse);
   useEffect(() => {
@@ -34,13 +38,17 @@ export function match(pattern: string, path: string): Record<string, string> | n
   return params;
 }
 
+export function href(path: string): string {
+  return `#${isPreview() ? PREFIX : ""}${path === "/" && isPreview() ? "/" : path}`;
+}
+
 export function go(path: string): void {
-  window.location.hash = path;
+  window.location.hash = href(path).slice(1);
 }
 
 export function Link({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) {
   return (
-    <a href={`#${to}`} className={className}>
+    <a href={href(to)} className={className}>
       {children}
     </a>
   );

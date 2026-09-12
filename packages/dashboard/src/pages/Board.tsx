@@ -1,10 +1,38 @@
 import { useEffect, useState } from "react";
 import { api, type SkillRow } from "../api";
+import { Meter, StatusChip } from "../components/Meter";
 import { Link } from "../router";
+
+function firstSentence(s: string): string {
+  const m = s.match(/^.*?[.!?](\s|$)/);
+  return m ? m[0].trim() : s;
+}
+
+function Action({ s, busy, onAccept }: { s: SkillRow; busy: boolean; onAccept: () => void }) {
+  if (s.status === "proposed")
+    return (
+      <button className="primary" disabled={busy} onClick={onAccept}>
+        {busy ? "Starting…" : "Yes, teach me this"}
+      </button>
+    );
+  if (s.status === "active" && s.lessonReady && s.lessonId)
+    return (
+      <Link to={`/lessons/${s.lessonId}`} className="button primary">
+        Open the lesson
+      </Link>
+    );
+  if (s.status === "active") return <span className="muted">Writing your next lesson…</span>;
+  return (
+    <Link to={`/skills/${s.id}`} className="button">
+      Look back
+    </Link>
+  );
+}
 
 export function Board() {
   const [skills, setSkills] = useState<SkillRow[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
+  const [open, setOpen] = useState<number | null>(null);
 
   const load = () => api.skills().then(setSkills);
   useEffect(() => {
@@ -14,9 +42,9 @@ export function Board() {
   }, []);
 
   if (!skills) return null;
-  const proposed = skills.filter((s) => s.status === "proposed");
-  const active = skills.filter((s) => s.status === "active");
-  const mastered = skills.filter((s) => s.status === "mastered");
+  const ranked = skills.filter((s) => s.status !== "dismissed").sort((a, b) => b.priority - a.priority);
+  const top = ranked.slice(0, 3);
+  const rest = ranked.slice(3);
 
   async function act(id: number, fn: () => Promise<unknown>) {
     setBusy(id);
@@ -26,66 +54,34 @@ export function Board() {
   }
 
   return (
-    <div>
+    <div className="board">
       <h1 className="title">The board</h1>
-      <p className="muted lead">What your days are asking you to learn, in the order Waggle would take them.</p>
+      <p className="muted lead">Everything your days have asked you to learn, in the order Waggle would take them.</p>
 
-      {skills.length === 0 && (
+      {ranked.length === 0 && (
         <p className="muted">Nothing here yet. It fills in after Waggle has heard a day or two, or when you reflect from the Today page.</p>
       )}
 
-      {proposed.length > 0 && (
-        <section>
-          <p className="eyebrow">Needs a decision</p>
-          {proposed.map((s, i) => (
-            <article key={s.id} className="card skill">
-              <div className="skill-head">
-                <span className="rank">{i + 1}</span>
-                <h2>{s.name}</h2>
-                <span className="muted">{s.evidenceCount} moments</span>
-              </div>
-              <p className="brief">{s.brief}</p>
+      {top.length > 0 && (
+        <section className="spotlight">
+          {top.map((s, i) => (
+            <article key={s.id} className={`spot spot-${i + 1}`}>
+              <div className="spot-rank">{i + 1}</div>
+              <StatusChip status={s.status} />
+              <h2>
+                <Link to={`/skills/${s.id}`}>{s.name}</Link>
+              </h2>
+              <p className="spot-why">{firstSentence(s.brief)}</p>
+              <Meter value={s.priority} />
+              <p className="muted small">
+                {s.evidenceCount} moments{s.status === "active" ? ` · level ${s.level + 1} of ${s.ladderLength || "?"}` : ""}
+              </p>
               <div className="actions">
-                <button className="primary" disabled={busy === s.id} onClick={() => act(s.id, () => api.acceptSkill(s.id))}>
-                  {busy === s.id ? "Starting…" : "Yes, teach me this"}
-                </button>
-                <button className="ghost" disabled={busy === s.id} onClick={() => act(s.id, () => api.dismissSkill(s.id))}>
-                  Not this
-                </button>
-                <span className="spacer" />
-                <button className="ghost small" onClick={() => act(s.id, () => api.setPriority(s.id, s.priority + 10))} title="Move up">
-                  ↑
-                </button>
-                <button className="ghost small" onClick={() => act(s.id, () => api.setPriority(s.id, Math.max(0, s.priority - 10)))} title="Move down">
-                  ↓
-                </button>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
-
-      {active.length > 0 && (
-        <section>
-          <p className="eyebrow">In progress</p>
-          {active.map((s) => (
-            <article key={s.id} className="card skill">
-              <div className="skill-head">
-                <h2>
-                  <Link to={`/skills/${s.id}`}>{s.name}</Link>
-                </h2>
-                <span className="muted">
-                  level {s.level + 1} of {s.ladderLength || "?"}
-                </span>
-              </div>
-              <p className="brief">{s.brief}</p>
-              <div className="actions">
-                {s.lessonReady && s.lessonId ? (
-                  <Link to={`/lessons/${s.lessonId}`} className="button primary">
-                    Open the lesson
-                  </Link>
-                ) : (
-                  <span className="muted">Writing your next lesson…</span>
+                <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
+                {s.status === "proposed" && (
+                  <button className="ghost small" disabled={busy === s.id} onClick={() => act(s.id, () => api.dismissSkill(s.id))}>
+                    Not this
+                  </button>
                 )}
               </div>
             </article>
@@ -93,16 +89,46 @@ export function Board() {
         </section>
       )}
 
-      {mastered.length > 0 && (
-        <section>
-          <p className="eyebrow">Done</p>
-          {mastered.map((s) => (
-            <article key={s.id} className="card skill">
-              <h2>
-                <Link to={`/skills/${s.id}`}>{s.name}</Link>
-              </h2>
-            </article>
-          ))}
+      {rest.length > 0 && (
+        <section className="ranking">
+          <p className="eyebrow">The rest, in order</p>
+          {rest.map((s, i) => {
+            const idx = i + 4;
+            const expanded = open === s.id;
+            return (
+              <article key={s.id} className="rank-row">
+                <div className="rank-num">{idx}</div>
+                <div className="rank-main">
+                  <div className="rank-head">
+                    <h3>
+                      <Link to={`/skills/${s.id}`}>{s.name}</Link>
+                    </h3>
+                    <StatusChip status={s.status} />
+                    <span className="muted small">{s.evidenceCount} moments</span>
+                  </div>
+                  <Meter value={s.priority} />
+                  <p className={expanded ? "brief" : "brief clamp"} onClick={() => setOpen(expanded ? null : s.id)}>
+                    {s.brief}
+                  </p>
+                  <div className="actions compact">
+                    <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
+                    {s.status === "proposed" && (
+                      <button className="ghost small" disabled={busy === s.id} onClick={() => act(s.id, () => api.dismissSkill(s.id))}>
+                        Not this
+                      </button>
+                    )}
+                    <span className="spacer" />
+                    <button className="ghost small" title="Move up" onClick={() => act(s.id, () => api.setPriority(s.id, Math.min(100, s.priority + 10)))}>
+                      ↑
+                    </button>
+                    <button className="ghost small" title="Move down" onClick={() => act(s.id, () => api.setPriority(s.id, Math.max(0, s.priority - 10)))}>
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </section>
       )}
     </div>

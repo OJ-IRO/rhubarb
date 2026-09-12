@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Profile } from "./api";
+import { api, isPreview, type Profile } from "./api";
 import { Board } from "./pages/Board";
 import { Honeycomb } from "./pages/Honeycomb";
 import { LessonPage } from "./pages/Lesson";
@@ -18,15 +18,16 @@ const NAV = [
 
 export function App() {
   const route = useRoute();
+  const preview = isPreview();
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
 
   useEffect(() => {
     api.profile().then(setProfile).catch(() => setProfile(null));
-  }, []);
+  }, [preview]);
 
   useEffect(() => {
-    if (profile === null && route.path !== "/welcome") go("/welcome");
-  }, [profile, route.path]);
+    if (!preview && profile === null && route.path !== "/welcome") go("/welcome");
+  }, [profile, route.path, preview]);
 
   if (profile === undefined) return <main className="shell" />;
 
@@ -41,7 +42,12 @@ export function App() {
   else page = <Today />;
 
   return (
-    <div className="frame">
+    <div className={preview ? "frame preview" : "frame"}>
+      {preview && (
+        <div className="preview-banner">
+          Preview: sample content, not your data. <a href="#/">Back to the live app</a>
+        </div>
+      )}
       <nav className="side">
         <Link to="/" className="brand">
           <span className="mark">🐝</span> Waggle
@@ -51,10 +57,18 @@ export function App() {
             {label}
           </Link>
         ))}
+        <Link to="/lessons/1" className={route.path.startsWith("/lessons") ? "navlink active small" : "navlink small"}>
+          {preview ? "Sample lesson" : "Current lesson"}
+        </Link>
         <div className="side-foot">
           <Link to="/welcome" className="navlink small">
             {profile ? `Settings · ${profile.name}` : "Set up"}
           </Link>
+          {!preview && (
+            <a href="#/preview/board" className="navlink small">
+              Design preview
+            </a>
+          )}
         </div>
       </nav>
       <main className="shell">{page}</main>

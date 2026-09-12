@@ -168,18 +168,81 @@ async function answerBeat(lesson: import("@waggle/core").Lesson, beat: import("@
   return { feedback };
 }
 
+/** Best demonstrated score for a lesson: teach-backs as graded, quizzes mapped from their ratio. */
+function bestScoreFor(lessonId: number, skillId: number): number {
+  return db
+    .practiceForSkill(skillId)
+    .filter((p) => p.lessonId === lessonId && p.grade)
+    .map((p) => {
+      const g = JSON.parse(p.grade!) as { score: number; total?: number };
+      if (p.kind === "quiz" && g.total) {
+        const ratio = g.score / g.total;
+        return ratio >= 0.8 ? 4 : ratio >= 0.6 ? 3 : 1;
+      }
+      return g.score;
+    })
+    .reduce((a, b) => Math.max(a, b), 0);
+}
+
 async function completeLesson(lesson: import("@waggle/core").Lesson): Promise<void> {
   db.completeLesson(lesson.id);
   const session = db.latestSessionForLesson(lesson.id);
   if (session) db.updateSession(session.id, { completedAt: Date.now() });
   const skill = db.getSkill(lesson.skillId);
   if (!skill) return;
-  const best = db
-    .practiceForSkill(skill.id)
-    .filter((p) => p.lessonId === lesson.id && p.kind === "teachback" && p.grade)
-    .map((p) => (JSON.parse(p.grade!) as Grade).score)
-    .reduce((a, b) => Math.max(a, b), 0);
-  advanceAndContinue(skill.id, maybeAdvance(db, skill, { teachbackScore: best }));
+  advanceAndContinue(skill.id, maybeAdvance(db, skill, { teachbackScore: bestScoreFor(lesson.id, skill.id) }));
+}
+
+const ShortVerdict = z.object({
+  correct: z.boolean(),
+  note: z.string().describe("one or two sentences to the learner about this answer, in the house voice"),
+});
+const ScoreNote = z.object({ note: z.string().describe("two or three sentences to the learner about how they did overall and what to do next, in the house voice") });
+
+async function gradeQuiz(lesson: import("@waggle/core").Lesson, answers: Array<number | string | null>) {
+  const quiz = JSON.parse(lesson.quiz) as import("@waggle/core").Quiz;
+  const perQuestion: Array<{ correct: boolean; note?: string }> = [];
+  for (let i = 0; i < quiz.questions.length; i++) {
+    const q = quiz.questions[i];
+    const a = answers[i];
+    if (q.kind === "mcq") {
+      perQuestion.push({ correct: a === q.answer });
+    } else {
+      const v = await judge({
+        system: systemBlocks(voiceGuide(), "You grade one short written answer inside a lesson quiz. Decide if it meets the rubric; be fair about wording, strict about substance."),
+        user: `Question: ${q.prompt}\nRubric: ${q.rubric}\nAnswer: "${String(a ?? "")}"`,
+        schema: ShortVerdict,
+        effort: "low",
+      });
+      perQuestion.push(v);
+    }
+  }
+  const score = perQuestion.filter((p) => p.correct).length;
+  const total = perQuestion.length;
+  const skill = db.getSkill(lesson.skillId);
+  const { note } = await judge({
+    system: systemBlocks(voiceGuide(), "You write the closing note of a lesson quiz."),
+    user: `Skill: ${skill?.name ?? "?"}\nScore: ${score} of ${total}\nMissed: ${quiz.questions
+      .map((q, i) => (perQuestion[i].correct ? null : q.prompt))
+      .filter(Boolean)
+      .join(" | ") || "nothing"}`,
+    schema: ScoreNote,
+    effort: "low",
+  });
+  const practiceId = db.insertPractice({
+    skillId: lesson.skillId,
+    lessonId: lesson.id,
+    kind: "quiz",
+    prompt: `Quiz for lesson ${lesson.id}`,
+    rubric: null,
+    marker: "web",
+    scheduledFor: Date.now(),
+    beeTodoId: null,
+  });
+  db.attachPracticeAnswer(practiceId, `web-quiz-${lesson.id}`, JSON.stringify(answers));
+  db.gradePractice(practiceId, { score, total, perQuestion });
+  log(`quiz for lesson #${lesson.id}: ${score}/${total}`);
+  return { score, total, perQuestion, note };
 }
 
 const nightly = guarded("nightly", async () => {
@@ -253,6 +316,7 @@ startApi(
         return at;
       },
       completeLesson,
+      gradeQuiz,
       tutor: (lesson, history, onText) => tutorReply(db, lesson, history, onText),
     },
   },

@@ -127,12 +127,44 @@ export interface LessonBeat {
 
 export type LessonStatus = "draft" | "ready" | "done";
 
+/** One card in a lesson deck. */
+export type Slide =
+  | { kind: "cover"; title: string; subtitle: string; hook: string }
+  | { kind: "text"; heading: string; body: string; aside?: string }
+  | { kind: "keyidea"; statement: string; why: string }
+  | { kind: "diagram"; heading: string; mermaid: string; caption: string }
+  | { kind: "image"; heading: string; query: string; url?: string; alt: string; caption: string; credit?: string }
+  | { kind: "example"; heading: string; quote: string; when: string; who?: string; explanation: string }
+  | { kind: "steps"; heading: string; steps: Array<{ title: string; body: string }> }
+  | { kind: "compare"; heading: string; columns: Array<{ title: string; points: string[] }> }
+  | { kind: "learnmore"; links: Array<{ title: string; url: string; why: string }> };
+
+export interface Deck {
+  title: string;
+  subtitle: string;
+  minutes: number;
+  slides: Slide[];
+}
+
+export type QuizQuestion =
+  | { kind: "mcq"; prompt: string; choices: string[]; answer: number; explanation: string }
+  | { kind: "short"; prompt: string; rubric: string };
+
+export interface Quiz {
+  questions: QuizQuestion[];
+}
+
 export interface Lesson {
   id: number;
   skillId: number;
   levelIdx: number;
   style: LearningStyle;
+  /** plain-prose rendering of the lesson (tutor context, fallback) */
   bodyMd: string;
+  /** JSON Deck */
+  deck: string;
+  /** JSON Quiz */
+  quiz: string;
   /** JSON LessonBeat[] */
   beats: string;
   /** JSON array of {title, url} */
@@ -153,7 +185,7 @@ export interface LessonSession {
   tutor: string;
 }
 
-export type PracticeKind = "teachback" | "mission" | "recall";
+export type PracticeKind = "teachback" | "mission" | "recall" | "quiz";
 export type PracticeStatus = "scheduled" | "delivered" | "answered" | "graded" | "expired";
 
 export interface Practice {
