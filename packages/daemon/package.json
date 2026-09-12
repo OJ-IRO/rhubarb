@@ -8,6 +8,7 @@
     "dev": "npm run build && node dist/index.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.125.0",
     "@waggle/core": "*",
     "zod": "^4.6.2"
   },
