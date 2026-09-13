@@ -31,11 +31,14 @@ Bee access runs through the official [`@beeai/cli`](https://github.com/bee-compu
 
 ## Setup
 
-*(In progress — full instructions coming as the build lands.)*
-
 1. Bee app → Settings → tap **Version** 5× to enable Developer Mode
-2. `npm i -g @beeai/cli && bee login`
-3. `npm install && npm run build`
+2. `npm i -g @beeai/cli && bee login` (approve the pairing in the Bee app)
+3. AWS credentials with Bedrock access to Claude in `us-east-1` (`aws configure`); optional `TAVILY_API_KEY` for web-sourced citations and images
+4. `npm install && npm run build`
+5. `./scripts/start.sh` — starts the Bee proxy and the Waggle daemon detached; logs in `~/.waggle/logs/`
+6. Open http://127.0.0.1:4242 and answer the six onboarding questions
+
+`./scripts/stop.sh` stops both. Design preview with sample content (no Bee needed): http://127.0.0.1:4242/#/preview/board
 
 ## License
 
