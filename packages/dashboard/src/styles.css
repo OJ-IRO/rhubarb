@@ -864,6 +864,8 @@ textarea {
 @media (max-width: 900px) {
   .frame {
     grid-template-columns: 1fr;
+    /* nav takes its own height; the page takes the rest, even when the page is short */
+    grid-template-rows: auto 1fr;
   }
   .side {
     position: static;
@@ -872,9 +874,13 @@ textarea {
     flex-wrap: wrap;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    align-items: center;
   }
   .preview .side {
     height: auto;
+  }
+  .brand {
+    margin-bottom: 0;
   }
   .side-foot {
     margin-top: 0;
@@ -890,4 +896,22 @@ textarea {
     width: auto;
     margin-top: 24px;
   }
+}
+
+/* ---------- error boundary ---------- */
+.error-detail {
+  margin-top: 28px;
+}
+.error-detail summary {
+  cursor: pointer;
+}
+.error-detail pre {
+  margin: 10px 0 0;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

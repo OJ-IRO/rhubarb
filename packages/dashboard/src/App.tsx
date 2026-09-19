@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, isPreview, type Profile } from "./api";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Board } from "./pages/Board";
 import { Honeycomb } from "./pages/Honeycomb";
 import { LessonPage } from "./pages/Lesson";
@@ -71,7 +72,9 @@ export function App() {
           )}
         </div>
       </nav>
-      <main className="shell">{page}</main>
+      <main className="shell">
+        <ErrorBoundary key={route.path}>{page}</ErrorBoundary>
+      </main>
     </div>
   );
 }
