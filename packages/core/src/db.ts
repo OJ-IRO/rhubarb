@@ -213,7 +213,14 @@ export class RhubarbDb {
   }
 
   // ------------------------------------------------------------------ utterances
-  /** Returns false if the utterance was already stored (dedupe on Bee id). */
+  /**
+   * Returns false if the utterance was already stored (dedupe on Bee id).
+   *
+   * The live stream carries no speaker label; only the nightly sweep of full
+   * conversations does. So when a known utterance comes back with a label, the
+   * label is kept (on the utterance and on any evidence drawn from it) rather
+   * than being dropped along with the duplicate.
+   */
   insertUtterance(u: {
     id: number;
     conversationUuid: string;
@@ -227,7 +234,19 @@ export class RhubarbDb {
         "INSERT OR IGNORE INTO utterances (id, conversation_uuid, text, spoken_at, received_at, source, speaker) VALUES (?, ?, ?, ?, ?, ?, ?)"
       )
       .run(u.id, u.conversationUuid, u.text, u.spokenAt, Date.now(), u.source, u.speaker ?? null);
-    return res.changes > 0;
+    if (res.changes > 0) return true;
+    if (u.speaker) {
+      this.db.prepare("UPDATE utterances SET speaker = ? WHERE id = ? AND speaker IS NULL").run(u.speaker, u.id);
+      this.db.prepare("UPDATE evidence SET speaker_label = ? WHERE utterance_id = ? AND speaker_label IS NULL").run(u.speaker, u.id);
+    }
+    return false;
+  }
+
+  /** The lines around one utterance, looked up by its id alone. Null if we never stored it. */
+  windowAroundUtterance(utteranceId: number, radius = 4): Array<{ id: number; text: string; speaker: string | null; spoken_at: string }> | null {
+    const row = this.db.prepare("SELECT conversation_uuid FROM utterances WHERE id = ?").get(utteranceId) as { conversation_uuid: string } | undefined;
+    if (!row) return null;
+    return this.conversationWindow(row.conversation_uuid, utteranceId, radius);
   }
 
   markUtterancesProcessed(ids: number[]): void {

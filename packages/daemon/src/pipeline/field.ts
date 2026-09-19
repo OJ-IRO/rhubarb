@@ -44,9 +44,13 @@ export async function judgeFieldEvidence(deps: FieldDeps): Promise<number> {
     const skill = db.getSkill(fe.skillId);
     if (!skill) continue;
     const ladder = db.ladderFor(skill.id);
+    // The context saved at queue time predates the nightly sweep, so its lines have no
+    // speaker labels. Re-read it now to use whatever labels have arrived since.
+    const window = db.windowAroundUtterance(fe.utteranceId, 5);
+    const context = window ? renderContext(window) : fe.context;
     let v = await judge({
       system: systemBlocks(voiceGuide(), ROLE),
-      user: `Skill: ${skill.name}\nCompetent use sounds like: ${skill.competentLooksLike}\nLadder: ${ladder.map((l) => `${l.idx + 1}. ${l.title}: ${l.outcome}`).join("; ") || "(none)"}\n\nThe moment (${fe.spokenAt}):\n"${fe.text}"\n\nAround it:\n${fe.context ?? "(none)"}`,
+      user: `Skill: ${skill.name}\nCompetent use sounds like: ${skill.competentLooksLike}\nLadder: ${ladder.map((l) => `${l.idx + 1}. ${l.title}: ${l.outcome}`).join("; ") || "(none)"}\n\nThe moment (${fe.spokenAt}):\n"${fe.text}"\n\nAround it:\n${context ?? "(none)"}`,
       schema: Verdict,
     });
     const ok = v.used && v.correct;
