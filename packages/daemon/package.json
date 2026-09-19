@@ -1,5 +1,5 @@
 {
-  "name": "@waggle/daemon",
+  "name": "@rhubarb/daemon",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.125.0",
-    "@waggle/core": "*",
+    "@rhubarb/core": "*",
     "zod": "^4.6.2"
   },
   "devDependencies": {

@@ -11,7 +11,7 @@ export function Sparks() {
   return (
     <div>
       <h1 className="title">Sparks</h1>
-      <p className="muted lead">Things you wondered out loud, answered. Waggle will ask you about them again in a few days.</p>
+      <p className="muted lead">Things you wondered out loud, answered. Rhubarb will ask you about them again in a few days.</p>
       {rows.length === 0 && <p className="muted">None yet. Wonder something out loud.</p>}
       {rows.map(({ card, item }) => {
         const cites = JSON.parse(card.citations) as Array<{ title: string; url: string }>;

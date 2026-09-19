@@ -1,4 +1,4 @@
-import { judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type WaggleDb } from "@waggle/core";
+import { judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 import { renderContext } from "./capture.js";
 
@@ -9,17 +9,17 @@ const Verdict = z.object({
   note: z.string().describe("one or two sentences to the learner about this moment, in the house voice"),
 });
 
-const ROLE = `You judge field evidence for Waggle. The wearer of a microphone has been studying a skill. Here is a moment from a later real conversation that touched that skill. Decide whether the wearer used the skill themselves, and whether they used it well. Be honest: repeating a term is not using a skill; explaining, deciding, or teaching with it is. Only credit clear cases.`;
+const ROLE = `You judge field evidence for Rhubarb. The wearer of a microphone has been studying a skill. Here is a moment from a later real conversation that touched that skill. Decide whether the wearer used the skill themselves, and whether they used it well. Be honest: repeating a term is not using a skill; explaining, deciding, or teaching with it is. Only credit clear cases.`;
 
 export interface FieldDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   bee: BeeClient;
   log: (msg: string) => void;
   onCredited?: (skillId: number, level: number) => void;
 }
 
 /** Scan recent utterances for active skills' signal terms and queue candidates. Cheap; runs after each classify batch. */
-export function findFieldCandidates(db: WaggleDb, sinceMs: number, log: (m: string) => void): number {
+export function findFieldCandidates(db: RhubarbDb, sinceMs: number, log: (m: string) => void): number {
   const active = db.skillsByStatus(["active"]);
   if (active.length === 0) return 0;
   const recent = db.recentUtterances(sinceMs);

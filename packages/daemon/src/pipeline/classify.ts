@@ -1,4 +1,4 @@
-import { classify, type Evidence, type WaggleDb } from "@waggle/core";
+import { classify, type Evidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 const Verdict = z.object({
@@ -24,7 +24,7 @@ Decide, for each item:
 Return one verdict per item id.`;
 
 export interface ClassifyDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   log: (msg: string) => void;
   /** Called for evidence routed to the sparks lane. */
   onSpark: (e: Evidence, topic: string) => void;

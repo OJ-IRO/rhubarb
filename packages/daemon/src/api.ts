@@ -1,10 +1,10 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
-import type { Lesson, LessonBeat, Profile, Skill, WaggleDb } from "@waggle/core";
+import type { Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
 
 export interface ApiDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   log: (msg: string) => void;
   /** absolute path to the built dashboard (index.html + assets); optional in dev */
   staticDir?: string;
@@ -63,7 +63,7 @@ function serveStatic(res: ServerResponse, dir: string, urlPath: string): boolean
 }
 
 /** The lesson the reader should open today: highest-priority active skill with a ready lesson at its current level. */
-export function todaysLesson(db: WaggleDb): { lesson: Lesson; skill: Skill } | null {
+export function todaysLesson(db: RhubarbDb): { lesson: Lesson; skill: Skill } | null {
   for (const skill of db.skillsByStatus(["active"])) {
     const lesson = db.currentLesson(skill.id, skill.level);
     if (lesson && lesson.status === "ready") return { lesson, skill };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Quiz } from "@waggle/core";
+import type { Quiz } from "@rhubarb/core";
 import type { QuizResult } from "../api";
 
 export function QuizView({ quiz, onSubmit, result }: { quiz: Quiz; onSubmit: (answers: Array<number | string | null>) => Promise<void>; result: QuizResult | null }) {

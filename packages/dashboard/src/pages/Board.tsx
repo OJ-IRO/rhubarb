@@ -56,10 +56,10 @@ export function Board() {
   return (
     <div className="board">
       <h1 className="title">The board</h1>
-      <p className="muted lead">Everything your days have asked you to learn, in the order Waggle would take them.</p>
+      <p className="muted lead">Everything your days have asked you to learn, in the order Rhubarb would take them.</p>
 
       {ranked.length === 0 && (
-        <p className="muted">Nothing here yet. It fills in after Waggle has heard a day or two, or when you reflect from the Today page.</p>
+        <p className="muted">Nothing here yet. It fills in after Rhubarb has heard a day or two, or when you reflect from the Today page.</p>
       )}
 
       {top.length > 0 && (

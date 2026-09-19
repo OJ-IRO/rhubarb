@@ -1,4 +1,4 @@
-import { classify, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evidence, type Profile, type Skill, type WaggleDb } from "@waggle/core";
+import { classify, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evidence, type Profile, type Skill, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 const SkillOut = z.object({
@@ -18,7 +18,7 @@ const Reflection = z.object({
   drop: z.array(z.number()).describe("evidence ids that do not belong to any skill worth pursuing"),
 });
 
-const ROLE = `You are Waggle's reflection pass. You read moments a wearable microphone caught during one person's days: questions they asked, things they hedged or got wrong, things they said they wanted to learn, jargon they were around, and upcoming events on their calendar. Your job is to decide what skills their life is actually asking them to build, and to rank them.
+const ROLE = `You are Rhubarb's reflection pass. You read moments a wearable microphone caught during one person's days: questions they asked, things they hedged or got wrong, things they said they wanted to learn, jargon they were around, and upcoming events on their calendar. Your job is to decide what skills their life is actually asking them to build, and to rank them.
 
 Rules:
 - Cluster evidence into skills. A skill is a capability someone builds over weeks, not a fact. Merge into an existing skill when the evidence clearly belongs to it (use existingId).
@@ -28,7 +28,7 @@ Rules:
 - Prefer three to six skills total. Fewer, sharper skills beat a long list.`;
 
 export interface ReflectDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   log: (msg: string) => void;
 }
 

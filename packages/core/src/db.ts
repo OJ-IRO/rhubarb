@@ -172,7 +172,7 @@ CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
 
 type Row = Record<string, unknown>;
 
-export class WaggleDb {
+export class RhubarbDb {
   readonly db: Database.Database;
 
   constructor(path: string) {

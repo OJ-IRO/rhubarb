@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Start the Bee proxy and the Waggle daemon detached from the current shell.
-# Logs and pids live in ~/.waggle. Safe to re-run: already-running services are left alone.
+# Start the Bee proxy and the Rhubarb daemon detached from the current shell.
+# Logs and pids live in ~/.rhubarb. Safe to re-run: already-running services are left alone.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DATA="${WAGGLE_DATA_DIR:-$HOME/.waggle}"
+DATA="${RHUBARB_DATA_DIR:-$HOME/.rhubarb}"
 mkdir -p "$DATA/logs"
 
 running() { [ -f "$DATA/$1.pid" ] && kill -0 "$(cat "$DATA/$1.pid")" 2>/dev/null; }
@@ -30,5 +30,5 @@ else
   echo "daemon started (pid $!)"
 fi
 
-echo "dashboard: http://127.0.0.1:${WAGGLE_PORT:-4242}"
+echo "dashboard: http://127.0.0.1:${RHUBARB_PORT:-4242}"
 echo "logs:      $DATA/logs/"

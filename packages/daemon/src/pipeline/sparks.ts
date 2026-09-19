@@ -1,4 +1,4 @@
-import { initCardSchedule, lintProse, systemBlocks, textSimilarity, voiceGuide, type Evidence, type WaggleDb } from "@waggle/core";
+import { initCardSchedule, lintProse, systemBlocks, textSimilarity, voiceGuide, type Evidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 import { researchThenEmit } from "./research.js";
 
@@ -8,15 +8,15 @@ const CardSchema = z.object({
   citations: z.array(z.object({ title: z.string(), url: z.string() })).describe("sources actually used; empty if none"),
 });
 
-const ROLE = `You write Waggle's spark cards. A spark is a passing curiosity someone voiced during their day. Answer it in one paragraph, the way a knowledgeable friend would over coffee: the real mechanism, one concrete detail worth remembering, no throat-clearing. If sources were searched, cite only the ones you actually drew on.`;
+const ROLE = `You write Rhubarb's spark cards. A spark is a passing curiosity someone voiced during their day. Answer it in one paragraph, the way a knowledgeable friend would over coffee: the real mechanism, one concrete detail worth remembering, no throat-clearing. If sources were searched, cite only the ones you actually drew on.`;
 
 export interface SparkDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   log: (msg: string) => void;
 }
 
 /** The same wondering often arrives twice (restated, or echoed); one card per topic per day. */
-function recentDuplicate(db: WaggleDb, topic: string): boolean {
+function recentDuplicate(db: RhubarbDb, topic: string): boolean {
   const dayAgo = Date.now() - 24 * 3600_000;
   return db
     .cardsWithItems(50)

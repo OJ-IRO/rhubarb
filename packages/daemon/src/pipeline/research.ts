@@ -1,4 +1,4 @@
-import { classify, llm, MODELS, type Effort } from "@waggle/core";
+import { classify, llm, MODELS, type Effort } from "@rhubarb/core";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { z } from "zod";
 import { z as zod } from "zod";

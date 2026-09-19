@@ -5,7 +5,7 @@
  */
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { BeeClient, WaggleDb } from "@waggle/core";
+import { BeeClient, RhubarbDb } from "@rhubarb/core";
 import { schedulePractice } from "../pipeline/practice.js";
 
 const cardId = Number(process.argv[2]);
@@ -15,7 +15,7 @@ if (!cardId) {
   process.exit(1);
 }
 
-const db = new WaggleDb(join(process.env.WAGGLE_DATA_DIR ?? join(homedir(), ".waggle"), "waggle.db"));
+const db = new RhubarbDb(join(process.env.RHUBARB_DATA_DIR ?? join(homedir(), ".rhubarb"), "rhubarb.db"));
 const card = db.getCard(cardId);
 if (!card) {
   console.error(`no card ${cardId}`);

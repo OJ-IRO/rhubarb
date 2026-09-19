@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { Deck, LessonBeat, Quiz } from "@waggle/core";
+import type { Deck, LessonBeat, Quiz } from "@rhubarb/core";
 import { api, type LessonView, type QuizResult } from "../api";
 import { DeckViewer } from "../components/Deck";
 import { QuizView } from "../components/Quiz";
@@ -93,7 +93,7 @@ export function LessonPage({ id }: { id: number }) {
               <div className="beat">
                 <p className="eyebrow">Teach it back</p>
                 <p className="beat-prompt">{teachback.prompt}</p>
-                <p className="muted small">Say it out loud into your pendant. Waggle grades the explanation, not the vocabulary.</p>
+                <p className="muted small">Say it out loud into your pendant. Rhubarb grades the explanation, not the vocabulary.</p>
                 <div className="actions">
                   <button
                     className="primary"

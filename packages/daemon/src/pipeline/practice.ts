@@ -9,15 +9,15 @@ import {
   type BeeClient,
   type Practice,
   type PracticeKind,
-  type WaggleDb,
-} from "@waggle/core";
+  type RhubarbDb,
+} from "@rhubarb/core";
 import { z } from "zod";
 
 /** How long after its alarm a practice prompt still accepts a voice-note answer. */
 const ANSWER_WINDOW_MS = 6 * 3600_000;
 
 export interface PracticeDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   bee: BeeClient;
   log: (msg: string) => void;
   /** Fires after grading so the lesson/skill layer can advance levels. */
@@ -65,7 +65,7 @@ export async function schedulePractice(
 }
 
 /** Find the practice prompt a fresh voice note is most likely answering. */
-export function matchPractice(db: WaggleDb, now = Date.now()): Practice | null {
+export function matchPractice(db: RhubarbDb, now = Date.now()): Practice | null {
   const open = db.openPractice().filter((p) => p.scheduledFor <= now + 60_000 && now - p.scheduledFor <= ANSWER_WINDOW_MS);
   return open[0] ?? null;
 }
@@ -115,7 +115,7 @@ export async function handleJournalReady(deps: PracticeDeps, journalId: string, 
 }
 
 /** Mark alarms that have fired as delivered; expire ones nobody answered. */
-export function sweepPractice(db: WaggleDb, now = Date.now()): void {
+export function sweepPractice(db: RhubarbDb, now = Date.now()): void {
   for (const p of db.openPractice()) {
     if (p.status === "scheduled" && p.scheduledFor <= now) db.setPracticeStatus(p.id, "delivered");
     if (now - p.scheduledFor > ANSWER_WINDOW_MS) db.setPracticeStatus(p.id, "expired");

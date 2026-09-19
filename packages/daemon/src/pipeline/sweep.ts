@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { BeeClient, WaggleDb } from "@waggle/core";
+import type { BeeClient, RhubarbDb } from "@rhubarb/core";
 import { handleUtterance, type CaptureDeps } from "./capture.js";
 
 export interface SweepDeps extends CaptureDeps {
@@ -46,7 +46,7 @@ export async function runSweep(deps: SweepDeps): Promise<{ conversations: number
 }
 
 /** Upcoming calendar events become 'stake' evidence so reflection can weigh urgency. */
-export async function ingestStakes(deps: { db: WaggleDb; bee: BeeClient; log: (m: string) => void }): Promise<number> {
+export async function ingestStakes(deps: { db: RhubarbDb; bee: BeeClient; log: (m: string) => void }): Promise<number> {
   const { db, bee, log } = deps;
   const brief = await bee.todayBrief().catch(() => null);
   if (!brief) return 0;

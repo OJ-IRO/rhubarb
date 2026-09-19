@@ -1,5 +1,5 @@
 {
-  "name": "@waggle/dashboard",
+  "name": "@rhubarb/dashboard",
   "version": "0.1.0",
   "private": true,
   "type": "module",

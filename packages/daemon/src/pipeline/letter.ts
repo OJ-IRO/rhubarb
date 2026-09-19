@@ -1,10 +1,10 @@
-import { lintProse, systemBlocks, voiceGuide, write, type WaggleDb } from "@waggle/core";
+import { lintProse, systemBlocks, voiceGuide, write, type RhubarbDb } from "@rhubarb/core";
 import { todaysLesson } from "../api.js";
 
-const ROLE = `You write the short note at the top of the reader's Waggle page each day. Three to five sentences. What their week has been asking of them, what is on the board and why, and the one thing to do today. Address them by name. No headers, no lists. If there is nothing new, say that honestly and keep it to two sentences.`;
+const ROLE = `You write the short note at the top of the reader's Rhubarb page each day. Three to five sentences. What their week has been asking of them, what is on the board and why, and the one thing to do today. Address them by name. No headers, no lists. If there is nothing new, say that honestly and keep it to two sentences.`;
 
 /** Written after each reflection; shown on the Today page. */
-export async function writeTodayLetter(db: WaggleDb, log: (m: string) => void): Promise<void> {
+export async function writeTodayLetter(db: RhubarbDb, log: (m: string) => void): Promise<void> {
   const profile = db.getProfile();
   const proposed = db.skillsByStatus(["proposed"]);
   const active = db.skillsByStatus(["active"]);

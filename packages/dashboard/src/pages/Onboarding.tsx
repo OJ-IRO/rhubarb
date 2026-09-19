@@ -81,11 +81,11 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
     </section>,
     <section key="goals" className="ask">
       <h2>Anything you already know you want to get better at?</h2>
-      <p className="muted">One per line. Waggle will listen for these specifically. Leave it empty and it will work from what it hears.</p>
+      <p className="muted">One per line. Rhubarb will listen for these specifically. Leave it empty and it will work from what it hears.</p>
       <textarea value={goals} onChange={(e) => setGoals(e.target.value)} placeholder={"public speaking\nSpanish\nreading a balance sheet"} rows={4} />
     </section>,
     <section key="off" className="ask">
-      <h2>Anything Waggle should never touch?</h2>
+      <h2>Anything Rhubarb should never touch?</h2>
       <p className="muted">Topics it hears but must not turn into lessons or keep notes about. One per line.</p>
       <textarea value={offLimits} onChange={(e) => setOffLimits(e.target.value)} placeholder={"my health\nfamily finances"} rows={3} />
     </section>,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Markdown from "react-markdown";
-import type { Deck, Slide } from "@waggle/core";
+import type { Deck, Slide } from "@rhubarb/core";
 import { Mermaid } from "./Mermaid";
 
 function SlideView({ s }: { s: Slide }) {

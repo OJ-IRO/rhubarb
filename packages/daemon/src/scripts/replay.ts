@@ -11,7 +11,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { WaggleDb, type BeeStreamEvent } from "@waggle/core";
+import { RhubarbDb, type BeeStreamEvent } from "@rhubarb/core";
 import { handleStreamEvent } from "../pipeline/capture.js";
 
 const file = process.argv[2];
@@ -20,8 +20,8 @@ if (!file) {
   process.exit(1);
 }
 
-const DATA_DIR = process.env.WAGGLE_DATA_DIR ?? join(homedir(), ".waggle");
-const db = new WaggleDb(join(DATA_DIR, "waggle.db"));
+const DATA_DIR = process.env.RHUBARB_DATA_DIR ?? join(homedir(), ".rhubarb");
+const db = new RhubarbDb(join(DATA_DIR, "rhubarb.db"));
 const deps = {
   db,
   log: (m: string) => console.log(m),

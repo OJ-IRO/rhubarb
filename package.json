@@ -1,8 +1,8 @@
 {
-  "name": "waggle",
+  "name": "rhubarb",
   "version": "0.1.0",
   "private": true,
-  "description": "The first screenless tutor — turns your day into a curriculum, powered by the Bee wearable",
+  "description": "Most of your day is rhubarb. Some of it is worth learning. A tutor that listens through the Bee wearable.",
   "license": "MIT",
   "type": "module",
   "workspaces": [
@@ -14,7 +14,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "dev:daemon": "npm run dev -w @waggle/daemon",
-    "dev:dashboard": "npm run dev -w @waggle/dashboard"
+    "dev:daemon": "npm run dev -w @rhubarb/daemon",
+    "dev:dashboard": "npm run dev -w @rhubarb/dashboard"
   }
 }

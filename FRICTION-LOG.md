@@ -1,6 +1,7 @@
 # Friction Log — Bee Developer Platform
 
-Real friction encountered while building Waggle on the Bee CLI / MCP / Agent Skills stack.
+Real friction encountered while building Rhubarb on the Bee CLI / MCP / Agent Skills stack.
+(The project was called Waggle until 2026-09-19, which is why quoted transcripts and test data in early entries say "Waggle." Quotes are left exactly as captured.)
 Format per hackathon guidance: task, steps, expected vs. actual, severity, workaround, suggestion.
 
 ---
@@ -48,3 +49,39 @@ Format per hackathon guidance: task, steps, expected vs. actual, severity, worka
 - **Severity:** minor (but any app reacting to utterances must dedupe against recent journals or it processes the same speech twice)
 - **Workaround:** fuzzy-match utterance text against journals from the surrounding time window.
 - **Suggestion:** suppress ambient capture during an active voice-note hold, or tag the resulting utterances with the journal id.
+
+### 2026-09-12 — `todo-created` is not emitted on the stream for todos created through the API
+- **Task:** Create a todo with `POST /v1/todos` (or `bee todos create`) while `bee stream --json` is running, and use the stream event as confirmation.
+- **Steps:** Started the stream; created two todos via the CLI and the proxy; later deleted one.
+- **Expected:** A `todo-created` event for each, then `todo-deleted`.
+- **Actual:** No `todo-created` event arrived for either API-created todo. Deleting one did emit `todo-deleted`.
+- **Severity:** minor (an integration cannot use the stream to confirm its own writes, and the asymmetry with `todo-deleted` is surprising)
+- **Workaround:** track the id from the REST response instead of waiting for a stream event.
+- **Suggestion:** emit `todo-created` for API-originated todos too, or document that stream events only cover app/device-originated changes.
+
+### 2026-09-12 — Stream events use camelCase where the REST API uses snake_case for the same object
+- **Task:** Reuse one todo type for both REST responses and stream events.
+- **Steps:** Compared `GET /v1/todos` output with the payload of a `todo-deleted` stream event.
+- **Expected:** The same field names for the same resource.
+- **Actual:** REST returns `alarm_at`, `created_at`; the stream sends `alarmAt`, `appleId`, `conversationId`. Journals are camelCase in both places (`createdAt`, `aiResponse`) while conversations and utterances are snake_case (`spoken_at`, `conversation_uuid`). `alarm_at` also goes in as ISO 8601 and comes back as epoch milliseconds.
+- **Severity:** papercut (every client ends up writing two mappers per resource)
+- **Workaround:** separate types for stream payloads and REST payloads.
+- **Suggestion:** pick one casing per resource across REST and stream, and return timestamps in the format they are accepted in.
+
+### 2026-09-13 to 2026-09-19 — `bee stream` drops about every 90 minutes and exits instead of reconnecting
+- **Task:** Keep a long-lived `bee stream --json` connection open for a week as the live input to an always-on app.
+- **Steps:** Ran `bee stream --json` as a child process from 09-13 to 09-19 on one always-on Mac, restarting it whenever it exited.
+- **Expected:** The CLI holds the SSE connection open, or reconnects on its own after a transient drop.
+- **Actual:** The process exited with code 1 **99 times in about 6.3 days**. Stderr on exit: "The socket connection was closed unexpectedly…" (65 times), "The operation timed out." (25), "Unable to connect. Is the computer able to access the url?" (9). Each restart reconnected within about two seconds, so the service was reachable. Because delivery is at-most-once, anything said during each gap is gone.
+- **Severity:** major (every always-on integration has to supervise the CLI, and each drop is a silent hole in capture)
+- **Workaround:** supervise the process and respawn with backoff (`BeeStreamConsumer` in `packages/core/src/bee.ts`); run a nightly `/v1/changes` sweep to recover whatever conversations survived.
+- **Suggestion:** reconnect inside `bee stream` with backoff and `Last-Event-ID` so events during a short gap are replayed; send SSE keep-alive comments so idle connections are not reaped; print the reason and a timestamp in `--json` mode as a structured event rather than only on stderr.
+
+### 2026-09-15 to 2026-09-19 — `GET /v1/changes` intermittently returns 500 with an HTML body
+- **Task:** Nightly durable sync using the changefeed cursor.
+- **Steps:** Called `GET /v1/changes?cursor=<saved cursor>` through `bee proxy` once a night.
+- **Expected:** JSON with changed ids and `next_cursor`.
+- **Actual:** On three of seven nights (09-15, 09-16, 09-19) the response was `500` with an HTML document (`<!doctype html>…`) instead of a JSON error. The same cursor succeeded on a later night, so the cursor itself was valid. Related: open CLI issue #14 reports 500s from `/v1/todos` and `/v1/daily` during `bee sync`.
+- **Severity:** major (the changefeed is the documented recovery path for the at-most-once stream; when it fails too, there is no second backstop)
+- **Workaround:** keep the old cursor on failure and retry on the next run; never advance the cursor unless the call succeeds.
+- **Suggestion:** return JSON errors with a request id from the API, and document retry guidance and cursor lifetime for `/v1/changes`.

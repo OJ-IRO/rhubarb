@@ -1,4 +1,4 @@
-const UA = "Waggle/0.1 (open-source learning app; github.com/jdesai840/waggle)";
+const UA = "Rhubarb/0.1 (open-source learning app; github.com/jdesai840/rhubarb)";
 const TIMEOUT_MS = 6000;
 
 async function withTimeout<T>(p: Promise<T>, ms = TIMEOUT_MS): Promise<T> {

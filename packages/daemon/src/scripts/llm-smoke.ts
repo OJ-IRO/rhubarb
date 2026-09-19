@@ -4,7 +4,7 @@
  * Run: node packages/daemon/dist/scripts/llm-smoke.js
  */
 import { z } from "zod";
-import { classify, lintProse, judgeProse, systemBlocks, voiceGuide, write } from "@waggle/core";
+import { classify, lintProse, judgeProse, systemBlocks, voiceGuide, write } from "@rhubarb/core";
 
 const Evidence = z.object({
   kind: z.enum(["question", "gap", "struggle", "intent", "none"]),
@@ -25,7 +25,7 @@ console.log("classification:", c);
 
 console.time("write");
 const prose = await write({
-  system: systemBlocks(voiceGuide(), "You write Waggle's phone nudges."),
+  system: systemBlocks(voiceGuide(), "You write Rhubarb's phone nudges."),
   messages: [
     {
       role: "user",

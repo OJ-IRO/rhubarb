@@ -52,7 +52,7 @@ export function Honeycomb() {
   return (
     <div>
       <h1 className="title">Honeycomb</h1>
-      <p className="muted lead">One cell per skill. It fills as you climb the ladder, and it fills faster when Waggle hears you use the skill for real.</p>
+      <p className="muted lead">One cell per skill. It fills as you climb the ladder, and it fills faster when Rhubarb hears you use the skill for real.</p>
       {cells.length === 0 && <p className="muted">Empty comb. It fills from the board.</p>}
       <svg viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} className="comb">
         {cells.map((s, i) => {

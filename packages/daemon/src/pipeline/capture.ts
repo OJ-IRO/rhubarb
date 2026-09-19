@@ -1,4 +1,4 @@
-import { stage1Detect, textSimilarity, type BeeStreamEvent, type WaggleDb } from "@waggle/core";
+import { stage1Detect, textSimilarity, type BeeStreamEvent, type RhubarbDb } from "@rhubarb/core";
 
 // Voice notes echo into ambient capture as near-duplicate utterances ~20s later
 // (docs/spike-results.md), so utterances are checked against recent journal texts.
@@ -6,13 +6,13 @@ const DEDUP_WINDOW_MS = 120_000;
 const DEDUP_SIMILARITY = 0.6;
 
 export interface CaptureDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   log: (msg: string) => void;
   /** Called when a voice note finishes transcribing (teach-back answers, missions). */
   onJournalReady: (journalId: string, text: string) => void;
 }
 
-function isJournalEcho(db: WaggleDb, text: string): boolean {
+function isJournalEcho(db: RhubarbDb, text: string): boolean {
   const recent = db.recentJournalTexts(Date.now() - DEDUP_WINDOW_MS);
   return recent.some((j) => textSimilarity(j, text) >= DEDUP_SIMILARITY);
 }

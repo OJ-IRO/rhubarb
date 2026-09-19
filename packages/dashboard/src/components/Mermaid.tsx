@@ -26,7 +26,7 @@ export function Mermaid({ code }: { code: string }) {
             fontSize: "15px",
           },
         });
-        const { svg } = await mermaid.render(`waggle-diagram-${++counter}`, code.trim());
+        const { svg } = await mermaid.render(`rhubarb-diagram-${++counter}`, code.trim());
         if (!cancelled && ref.current) ref.current.innerHTML = svg;
       } catch {
         if (!cancelled) setFailed(true);

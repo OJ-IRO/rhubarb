@@ -54,10 +54,10 @@ export interface BeeTodo {
 }
 
 // ---------------------------------------------------------------------------
-// Waggle domain
+// Rhubarb domain
 // ---------------------------------------------------------------------------
 
-/** What Waggle heard that suggests something worth learning. */
+/** What Rhubarb heard that suggests something worth learning. */
 export type EvidenceKind = "question" | "gap" | "struggle" | "intent" | "exposure" | "stake";
 export type EvidenceStage = "detected" | "classified";
 export type EvidenceRoute = "spark" | "skill" | "noise";

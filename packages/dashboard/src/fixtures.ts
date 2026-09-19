@@ -2,7 +2,7 @@
  * Sample content for preview mode (#/preview/...). Hand-written in the house voice so the
  * UI can be judged without a daemon or a Bee. Never shown as real data: the banner says so.
  */
-import type { Card, Deck, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, Practice, Profile, Quiz, Skill } from "@waggle/core";
+import type { Card, Deck, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, Practice, Profile, Quiz, Skill } from "@rhubarb/core";
 import type { SkillRow, Today, SkillDetail, LessonView } from "./api";
 
 const now = Date.now();

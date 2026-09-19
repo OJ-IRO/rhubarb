@@ -1,5 +1,7 @@
 # Week-1 Hardware Spike Results (2026-09-12)
 
+> The project was called Waggle when this was written; test phrases and todo text quoted below are left as they were actually spoken and sent.
+
 Live measurements against a physical Bee Pioneer + Bee iOS app, `@beeai/cli` 0.7.3, production API, real account.
 
 ## Auth & access
@@ -18,7 +20,7 @@ Live measurements against a physical Bee Pioneer + Bee iOS app, `@beeai/cli` 0.7
 ## Voice notes (teach-back answer channel) — VALIDATED
 - Press-and-hold → `journal-created` (PREPARING) → **`journal-text` with full transcript** → `journal-updated` (ANALYZING, `sound:"success"`) → `journal-updated` (READY) in **~3s total**.
 - Failed attempts (no speech detected) emit `journal-created` then `journal-deleted` `{reason:"silence", sound:"failure"}` ~1s later — several observed; filter these.
-- **Bee's own AI answers voice notes** (`aiResponse.message`, with `cleanedUpText`, `followUp`, `questions`, `pushTitle`/`pushBody`). Implication: Waggle's differentiation must center on AMBIENT capture (questions spoken in conversation, not into the device), spaced repetition, teach-back grading, and mastery tracking — NOT "ask Bee a question via voice note," which the product already handles.
+- **Bee's own AI answers voice notes** (`aiResponse.message`, with `cleanedUpText`, `followUp`, `questions`, `pushTitle`/`pushBody`). Implication: Rhubarb's differentiation must center on AMBIENT capture (questions spoken in conversation, not into the device), spaced repetition, teach-back grading, and mastery tracking — NOT "ask Bee a question via voice note," which the product already handles.
 
 ## ASR quality notes
 - Casual speech garbles: "it'd super interesting", "honey bees actually make honey bees actually make", "12: 14 p. m" formatting. Stage-2 LLM classification must tolerate noisy text; exact-match dedupe won't work (use time-window + fuzzy text).
@@ -29,4 +31,4 @@ Live measurements against a physical Bee Pioneer + Bee iOS app, `@beeai/cli` 0.7
 3. Quiz-answer matching: journal events are fast (~3s) and reliable → use journals as the answer channel; dedupe journal text against subsequent ambient utterances (fuzzy, ±60s window).
 4. Track quiz todos by REST response id (no stream confirmation events for API-created todos).
 5. Demo must stage the curiosity question inside a natural conversation, and allow ~10–40s on camera for the card to appear (or cut in real time honestly).
-6. **Alarm surfacing UX: VALIDATED.** Todo `alarm_at` fires a real push notification — banner + haptic buzz — with the Bee app closed and phone locked (tested 12:19 in-app, 12:22 lock-screen). Quiz delivery through todo alarms is viable as the primary interruption channel. The screenless loop is fully proven: ambient speech → SSE utterance → [Waggle] → alarm quiz on locked phone → voice-note answer → transcript in ~3s.
+6. **Alarm surfacing UX: VALIDATED.** Todo `alarm_at` fires a real push notification — banner + haptic buzz — with the Bee app closed and phone locked (tested 12:19 in-app, 12:22 lock-screen). Quiz delivery through todo alarms is viable as the primary interruption channel. The screenless loop is fully proven: ambient speech → SSE utterance → [Rhubarb] → alarm quiz on locked phone → voice-note answer → transcript in ~3s.

@@ -50,7 +50,7 @@ export function App() {
       )}
       <nav className="side">
         <Link to="/" className="brand">
-          <span className="mark">🐝</span> Waggle
+          <span className="mark">🐝</span> Rhubarb
         </Link>
         {NAV.map(([to, label]) => (
           <Link key={to} to={to} className={route.path === to ? "navlink active" : "navlink"}>

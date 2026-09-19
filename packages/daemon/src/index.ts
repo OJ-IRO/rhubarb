@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BeeClient, BeeStreamConsumer, WaggleDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@waggle/core";
+import { BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
@@ -18,7 +18,7 @@ import { buildSpark } from "./pipeline/sparks.js";
 import { ingestStakes, runSweep } from "./pipeline/sweep.js";
 import { tutorReply } from "./pipeline/tutor.js";
 
-const DATA_DIR = process.env.WAGGLE_DATA_DIR ?? join(homedir(), ".waggle");
+const DATA_DIR = process.env.RHUBARB_DATA_DIR ?? join(homedir(), ".rhubarb");
 mkdirSync(DATA_DIR, { recursive: true });
 
 const CLASSIFY_INTERVAL_MS = 2 * 60_000;
@@ -26,15 +26,15 @@ const PRACTICE_SWEEP_MS = 60_000;
 const NIGHTLY_CHECK_MS = 10 * 60_000;
 const FIELD_INTERVAL_MS = 15 * 60_000;
 const REFLECT_HOUR_LOCAL = 3;
-const API_PORT = Number(process.env.WAGGLE_PORT ?? 4242);
+const API_PORT = Number(process.env.RHUBARB_PORT ?? 4242);
 // packages/daemon/dist/index.js -> packages/dashboard/dist
 const DASHBOARD_DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dashboard", "dist");
 
-const db = new WaggleDb(join(DATA_DIR, "waggle.db"));
+const db = new RhubarbDb(join(DATA_DIR, "rhubarb.db"));
 const bee = new BeeClient();
 
 function log(msg: string): void {
-  console.log(`[waggle ${new Date().toISOString()}] ${msg}`);
+  console.log(`[rhubarb ${new Date().toISOString()}] ${msg}`);
 }
 
 const lessonDeps = { db, bee, log };
@@ -137,7 +137,7 @@ const reflectNow = guarded("reflect", async () => {
 // --- in-page lesson interactions
 const QuickFeedback = z.object({ feedback: z.string().describe("two or three sentences to the learner: what they got, what they missed, in the house voice") });
 
-async function answerBeat(lesson: import("@waggle/core").Lesson, beat: import("@waggle/core").LessonBeat, idx: number, text: string) {
+async function answerBeat(lesson: import("@rhubarb/core").Lesson, beat: import("@rhubarb/core").LessonBeat, idx: number, text: string) {
   if (beat.kind === "teachback") {
     const practiceId = db.insertPractice({
       skillId: lesson.skillId,
@@ -184,7 +184,7 @@ function bestScoreFor(lessonId: number, skillId: number): number {
     .reduce((a, b) => Math.max(a, b), 0);
 }
 
-async function completeLesson(lesson: import("@waggle/core").Lesson): Promise<void> {
+async function completeLesson(lesson: import("@rhubarb/core").Lesson): Promise<void> {
   db.completeLesson(lesson.id);
   const session = db.latestSessionForLesson(lesson.id);
   if (session) db.updateSession(session.id, { completedAt: Date.now() });
@@ -199,8 +199,8 @@ const ShortVerdict = z.object({
 });
 const ScoreNote = z.object({ note: z.string().describe("two or three sentences to the learner about how they did overall and what to do next, in the house voice") });
 
-async function gradeQuiz(lesson: import("@waggle/core").Lesson, answers: Array<number | string | null>) {
-  const quiz = JSON.parse(lesson.quiz) as import("@waggle/core").Quiz;
+async function gradeQuiz(lesson: import("@rhubarb/core").Lesson, answers: Array<number | string | null>) {
+  const quiz = JSON.parse(lesson.quiz) as import("@rhubarb/core").Quiz;
   const perQuestion: Array<{ correct: boolean; note?: string }> = [];
   for (let i = 0; i < quiz.questions.length; i++) {
     const q = quiz.questions[i];
@@ -323,9 +323,11 @@ startApi(
   API_PORT
 );
 
-process.on("SIGINT", () => {
+function shutdown(): void {
   timers.forEach(clearInterval);
   consumer.stop();
   db.close();
   process.exit(0);
-});
+}
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

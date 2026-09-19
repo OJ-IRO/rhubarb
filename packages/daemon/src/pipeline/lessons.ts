@@ -11,8 +11,8 @@ import {
   type Quiz,
   type Skill,
   type Slide,
-  type WaggleDb,
-} from "@waggle/core";
+  type RhubarbDb,
+} from "@rhubarb/core";
 import { z } from "zod";
 import { resolveImage, sanitizeMermaid, urlAlive } from "./images.js";
 import { researchThenEmit } from "./research.js";
@@ -79,7 +79,7 @@ const LessonOut = z.object({
   citations: z.array(z.object({ title: z.string(), url: z.string() })),
 });
 
-const LADDER_ROLE = `You design competence ladders for Waggle. Given a skill and what the learner's life is asking of them, lay out three to six levels from 'can follow the conversation' to 'can teach it', each a concrete outcome. Levels should be about what they can do, not what they know.`;
+const LADDER_ROLE = `You design competence ladders for Rhubarb. Given a skill and what the learner's life is asking of them, lay out three to six levels from 'can follow the conversation' to 'can teach it', each a concrete outcome. Levels should be about what they can do, not what they know.`;
 
 const STYLE_NOTES: Record<Profile["style"], string> = {
   story: "Teach through a narrative: a situation unfolds, the concept becomes necessary, the learner sees it work. Characters and stakes from the reader's own week where possible.",
@@ -92,13 +92,13 @@ const STYLE_NOTES: Record<Profile["style"], string> = {
 function lessonRole(profile: Profile | null): string {
   const style = profile?.style ?? "story";
   const minutes = profile?.sessionMinutes ?? 10;
-  return `You design Waggle lessons as a deck of cards. One reader, one skill, one level of the ladder. About ${minutes} minutes to work through.
+  return `You design Rhubarb lessons as a deck of cards. One reader, one skill, one level of the ladder. About ${minutes} minutes to work through.
 
 Learning style: ${STYLE_NOTES[style]}
 
 Deck rules:
 - 8 to 12 cards. Open with a cover whose hook promises something specific. Close with learnmore.
-- At least one example card built from a real moment in the reader's evidence: quote it verbatim, say when, name who if known, then explain what was actually going on. This card is the reason Waggle exists; a deck without it has failed.
+- At least one example card built from a real moment in the reader's evidence: quote it verbatim, say when, name who if known, then explain what was actually going on. This card is the reason Rhubarb exists; a deck without it has failed.
 - Exactly one diagram card when the idea has structure (a flow, a sequence, states). Mermaid only: flowchart, sequenceDiagram, or stateDiagram-v2, at most 12 nodes, short plain labels, no styling or class lines. If a diagram would be forced, use a steps card instead.
 - One or two image cards where a real photo or diagram would help. Give a search query that will actually find something on Wikimedia Commons (concrete nouns, no jargon), plus a caption that does teaching work on its own.
 - One keyidea card: the single sentence to keep.
@@ -113,7 +113,7 @@ Every word follows the writing guide. The reader's own moments are the examples.
 }
 
 export interface LessonDeps {
-  db: WaggleDb;
+  db: RhubarbDb;
   bee: BeeClient;
   log: (msg: string) => void;
 }

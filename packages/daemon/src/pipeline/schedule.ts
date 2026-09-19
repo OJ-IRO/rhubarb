@@ -1,4 +1,4 @@
-import { classify, type WaggleDb } from "@waggle/core";
+import { classify, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 export interface LearningSlot {
@@ -24,17 +24,17 @@ export async function parseLearningWindows(text: string): Promise<LearningSlot[]
   return out.slots;
 }
 
-export function saveLearningSlots(db: WaggleDb, slots: LearningSlot[]): void {
+export function saveLearningSlots(db: RhubarbDb, slots: LearningSlot[]): void {
   db.setKv("learning_slots", JSON.stringify(slots));
 }
 
-export function learningSlots(db: WaggleDb): LearningSlot[] {
+export function learningSlots(db: RhubarbDb): LearningSlot[] {
   return JSON.parse(db.getKv("learning_slots") ?? "[]") as LearningSlot[];
 }
 
 /** The next time the reader said they like to learn; tomorrow 09:00 if they never said. */
-export function nextLearningSlot(db: WaggleDb, from = new Date()): Date {
-  if (process.env.WAGGLE_NUDGE_NOW) return new Date(from.getTime() + 2 * 60_000);
+export function nextLearningSlot(db: RhubarbDb, from = new Date()): Date {
+  if (process.env.RHUBARB_NUDGE_NOW) return new Date(from.getTime() + 2 * 60_000);
   const slots = learningSlots(db);
   const candidates: Date[] = [];
   for (let dayOffset = 0; dayOffset < 8; dayOffset++) {

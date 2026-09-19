@@ -5,7 +5,7 @@ import { z } from "zod";
 import { classify, MODELS } from "./llm.js";
 
 function locateGuide(): string {
-  if (process.env.WAGGLE_VOICE_PATH) return process.env.WAGGLE_VOICE_PATH;
+  if (process.env.RHUBARB_VOICE_PATH) return process.env.RHUBARB_VOICE_PATH;
   // packages/core/dist/voice.js -> repo root
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 5; i++) {
@@ -13,7 +13,7 @@ function locateGuide(): string {
     if (existsSync(candidate)) return candidate;
     dir = dirname(dir);
   }
-  throw new Error("VOICE.md not found; set WAGGLE_VOICE_PATH");
+  throw new Error("VOICE.md not found; set RHUBARB_VOICE_PATH");
 }
 
 let cachedGuide: string | null = null;
