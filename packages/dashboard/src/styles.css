@@ -873,6 +873,9 @@ textarea {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  .preview .side {
+    height: auto;
+  }
   .side-foot {
     margin-top: 0;
   }

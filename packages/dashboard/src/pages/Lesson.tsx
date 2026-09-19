@@ -23,7 +23,9 @@ export function LessonPage({ id }: { id: number }) {
     });
   }, [id]);
 
-  useEffect(() => window.scrollTo(0, 0), [stage]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [stage]);
 
   if (!view) return null;
   const { lesson, skill, ladder } = view;
@@ -160,7 +162,9 @@ function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
   const [open, setOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
-  useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [history]);
+  useEffect(() => {
+    bottom.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history]);
 
   async function send() {
     const text = draft.trim();
