@@ -23,7 +23,8 @@ Everything Rhubarb writes follows [`VOICE.md`](VOICE.md) and is checked against 
 ```
 packages/core      — types, SQLite store, Bee client + stream consumer, detectors, FSRS scheduling, Bedrock LLM layer, voice lint
 packages/daemon    — capture → classify → reflect → lessons → practice → field evidence; HTTP API; serves the dashboard
-packages/dashboard — local web app (Vite + React): Today, Board, Skill, Lesson decks + quiz + tutor, Sparks, Honeycomb, preview mode
+packages/dashboard — local web app (Vite + React): Today, Board, Skill, Lesson decks + quiz + tutor, Sparks, a three.js Honeycomb, preview mode
+rhubarb-skill/      — an Agent Skill that reads your learning state from the local API
 docs/              — Bee capability research, the plan, hardware spike results, a real captured event log for replay
 ```
 
@@ -39,6 +40,16 @@ Bee access runs through the official [`@beeai/cli`](https://github.com/bee-compu
 6. Open http://127.0.0.1:4242 and answer the six onboarding questions
 
 `./scripts/stop.sh` stops both.
+
+To keep Rhubarb running across reboots on macOS, use `./scripts/install-launchd.sh` instead of `start.sh` (`--dry-run` shows what it would install; `./scripts/uninstall-launchd.sh` removes it). Keys such as `TAVILY_API_KEY` go in `~/.rhubarb/env`, never in the repo.
+
+## Tests
+
+`npm test` runs 28 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, and the API's handling of hostile requests.
+
+## For agents
+
+[`rhubarb-skill/SKILL.md`](rhubarb-skill/SKILL.md) is an Agent Skill. It lets any agent read what you're learning, what's due and how a skill is going from the local API, so it can pitch its help at your level. It reads only what a question needs, and it changes nothing without being asked.
 
 **No Bee?** The design preview runs on sample content with no hardware and no daemon: `npm run dev -w @rhubarb/dashboard`, then http://127.0.0.1:5173/#/preview/board. See [`HANDOFF.md`](HANDOFF.md) for the full tour.
 

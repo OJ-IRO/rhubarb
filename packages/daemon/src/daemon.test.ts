@@ -68,3 +68,48 @@ test("the API shrugs off a malformed URL and refuses requests addressed to anoth
     server.close();
   }
 });
+
+// ---- which practice is a fresh voice note answering?
+
+import { matchPractice, sweepPractice } from "./pipeline/practice.js";
+
+function practiceAt(db: RhubarbDb, scheduledFor: number): number {
+  return db.insertPractice({ skillId: null, lessonId: null, cardId: null, kind: "teachback", prompt: "Explain a rolling deployment.", rubric: null, marker: "w1", scheduledFor, beeTodoId: null });
+}
+
+test("a voice note answers a practice whose alarm has gone off, within the answer window", () => {
+  const now = Date.now();
+  const db = new RhubarbDb(":memory:");
+  assert.equal(matchPractice(db, now), null, "nothing scheduled, nothing to answer");
+
+  const future = practiceAt(db, now + 2 * 3600_000);
+  assert.equal(matchPractice(db, now), null, "an alarm two hours away is not what they are answering");
+
+  const due = practiceAt(db, now - 5 * 60_000);
+  assert.equal(matchPractice(db, now)?.id, due);
+
+  const nearly = practiceAt(db, now + 30_000);
+  assert.ok([due, nearly].includes(matchPractice(db, now)!.id), "an alarm firing within the minute counts too");
+  assert.notEqual(matchPractice(db, now)?.id, future);
+});
+
+test("a practice nobody answered expires, and stops matching", () => {
+  const now = Date.now();
+  const db = new RhubarbDb(":memory:");
+  const stale = practiceAt(db, now - 7 * 3600_000);
+  assert.equal(matchPractice(db, now), null, "seven hours on, a voice note is about something else");
+  sweepPractice(db, now);
+  assert.equal(db.getPractice(stale)?.status, "expired");
+
+  const fired = practiceAt(db, now - 60_000);
+  sweepPractice(db, now);
+  assert.equal(db.getPractice(fired)?.status, "delivered");
+});
+
+test("an answered practice is not matched a second time", () => {
+  const now = Date.now();
+  const db = new RhubarbDb(":memory:");
+  const id = practiceAt(db, now - 60_000);
+  db.attachPracticeAnswer(id, "journal-1", "it swaps pods a few at a time");
+  assert.equal(matchPractice(db, now), null);
+});

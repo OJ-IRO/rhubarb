@@ -11,3 +11,4 @@ dist/
 
 # The captured event log is real test data used by the replay script; keep it in the repo.
 !docs/spike-stream.log
+launchd-preview/

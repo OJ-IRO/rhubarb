@@ -77,13 +77,16 @@ Live capture, classification, spark cards, the practice loop through the Bee (al
 
 ## What's next, in order
 
-1. **The first real end-to-end run of the main path.** Reflection, accepting a skill, and deck generation are built but have never run on real evidence, because the Bee wasn't worn much last week. Whoever has the device: wear it for a day, say a few true things about what you want to get better at, hit "Reflect now," accept a skill, and see what comes out. Expect to tune prompts in `reflect.ts` and `lessons.ts`.
-2. **Make the UI look exactly right**, in preview mode. Jay has opinions here; ask him.
-3. `rhubarb-skill/SKILL.md`, an agent skill that lets any agent ask what you're learning and what's due. Not written yet.
-4. Tests. There are none. Start with `detect.ts`, `textSimilarity`, the voice lint, and answer matching in `practice.ts`.
-5. Connect Google Calendar in the Bee app so upcoming events feed the ranking; get a Tavily key.
-6. A launchd plist so the services survive a reboot.
-7. The demo video (script is in `docs/PLAN.md`) and the Devpost submission.
+Status as of September 20. Items 3, 4 and 6 from the original list are done.
+
+1. **The first real end-to-end run of the main path.** Still the most important thing, and still not done. Reflection, accepting a skill, and deck generation are built but have never run on real evidence. It needs a paired Bee (`bee login`) and AWS credentials with Bedrock access. Wear it for a day, say a few true things about what you want to get better at, hit "Reflect now," accept a skill, and see what comes out. Expect to tune prompts in `reflect.ts` and `lessons.ts`.
+2. **Who is speaking.** Bee's live stream carries no speaker label, so every line reaches the models as "someone". The nightly sweep's labels are now kept (they used to be thrown away). Still to do: work out which label is the wearer, using the voice-note echo that `capture.ts` already detects, and mark lines as the wearer's or someone else's. This protects field evidence, which is the pitch. Bee's onboarding includes owner voice training, so check on the first live run whether the API marks the owner's lines.
+3. **UI polish**, in preview mode. Done so far: every screen checked at desktop and phone width, an error boundary, the Honeycomb rebuilt in three.js, the tutor's send button, quiz and copy fixes.
+4. Connect Google Calendar in the Bee app so upcoming events feed the ranking; get a Tavily key.
+5. Smaller backend items: the spark queue is in memory and lost on restart; a voice note is matched to a practice by timing alone; nothing schedules recall practice for due spark cards.
+6. The demo video (script is in `docs/PLAN.md`) and the Devpost submission, including the placeholders still in `FEEDBACK.md`.
+
+Done since the first handoff: `rhubarb-skill/SKILL.md`; 28 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
 
 ## House rules
 
