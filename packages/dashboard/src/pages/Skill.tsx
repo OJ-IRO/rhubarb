@@ -34,7 +34,7 @@ export function SkillPage({ id }: { id: number }) {
                     {lesson.status === "done" ? "Reread" : "Open"}
                   </Link>
                 ) : (
-                  <span className="muted small">{l.status === "locked" ? "locked" : "writing…"}</span>
+                  <span className="muted small">{l.status === "locked" ? "locked" : l.status === "done" ? "passed" : "writing…"}</span>
                 )}
               </li>
             );

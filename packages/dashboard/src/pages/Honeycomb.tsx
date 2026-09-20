@@ -1,8 +1,13 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { api, type SkillRow } from "../api";
+import type { CombCell } from "../components/Comb3D";
+import { hexSpiral, wrapLabel } from "../lib/hexLayout";
 import { go } from "../router";
 
-const R = 52; // hex radius
+// three.js is only fetched when someone opens this page.
+const Comb3D = lazy(() => import("../components/Comb3D"));
+
+const R = 52; // hex radius of the flat comb, in SVG units
 
 function hexPoints(cx: number, cy: number, r: number): string {
   return Array.from({ length: 6 }, (_, i) => {
@@ -11,75 +16,109 @@ function hexPoints(cx: number, cy: number, r: number): string {
   }).join(" ");
 }
 
-/** Spiral hex layout: first cell in the middle, then rings outward. */
-function positions(n: number): Array<{ x: number; y: number }> {
-  const out: Array<{ x: number; y: number }> = [{ x: 0, y: 0 }];
-  const w = Math.sqrt(3) * R;
-  const dirs = [
-    [w / 2, -1.5 * R],
-    [-w / 2, -1.5 * R],
-    [-w, 0],
-    [-w / 2, 1.5 * R],
-    [w / 2, 1.5 * R],
-    [w, 0],
-  ];
-  for (let ring = 1; out.length < n; ring++) {
-    let x = w * ring;
-    let y = 0;
-    for (let side = 0; side < 6 && out.length < n; side++) {
-      for (let step = 0; step < ring && out.length < n; step++) {
-        out.push({ x, y });
-        x += dirs[side][0];
-        y += dirs[side][1];
-      }
-    }
+function fillOf(s: SkillRow): number {
+  if (s.status === "mastered") return 1;
+  return s.ladderLength ? Math.min(s.level / s.ladderLength, 1) : 0;
+}
+
+function standing(s: SkillRow): string {
+  if (s.status === "mastered") return "mastered";
+  if (s.status === "proposed") return "waiting for your decision";
+  return `level ${s.level + 1} of ${s.ladderLength || "?"}`;
+}
+
+function canWebGL(): boolean {
+  try {
+    const c = document.createElement("canvas");
+    return Boolean(c.getContext("webgl2") ?? c.getContext("webgl"));
+  } catch {
+    return false;
   }
-  return out;
+}
+
+/** The comb drawn flat. Used when WebGL isn't available, and while the 3D comb loads. */
+function FlatComb({ cells, skills, onHover }: { cells: CombCell[]; skills: Map<number, SkillRow>; onHover: (id: number | null) => void }) {
+  const reach = Math.max(...cells.map((c) => Math.hypot(c.x, c.y)), 0) * R + R * 1.25;
+  return (
+    <svg viewBox={`${-reach} ${-reach} ${2 * reach} ${2 * reach}`} className="comb" role="img" aria-label="Your skills as a honeycomb">
+      {cells.map((c) => {
+        const x = c.x * R;
+        const y = c.y * R;
+        const clipId = `clip-${c.id}`;
+        const lines = wrapLabel(c.name);
+        return (
+          <g key={c.id} onMouseEnter={() => onHover(c.id)} onMouseLeave={() => onHover(null)} onClick={() => go(`/skills/${c.id}`)} style={{ cursor: "pointer" }}>
+            <title>{`${c.name}: ${standing(skills.get(c.id)!)}`}</title>
+            <defs>
+              <clipPath id={clipId}>
+                <polygon points={hexPoints(x, y, R - 3)} />
+              </clipPath>
+            </defs>
+            <polygon points={hexPoints(x, y, R - 3)} className={c.waiting ? "cell proposed" : "cell"} />
+            <rect x={x - R} y={y + R - 2 * R * c.fill} width={2 * R} height={2 * R} className="honey" clipPath={`url(#${clipId})`} />
+            <text x={x} y={y - (lines.length - 1) * 6.5 + 4} textAnchor="middle" className="cell-label">
+              {lines.map((line, i) => (
+                <tspan key={i} x={x} dy={i === 0 ? 0 : 13}>
+                  {line}
+                </tspan>
+              ))}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
 }
 
 export function Honeycomb() {
   const [skills, setSkills] = useState<SkillRow[] | null>(null);
-  const [hover, setHover] = useState<SkillRow | null>(null);
+  const [hover, setHover] = useState<number | null>(null);
+  const [flat, setFlat] = useState(() => !canWebGL());
+
   useEffect(() => {
     api.skills().then(setSkills);
   }, []);
-  if (!skills) return null;
 
-  const cells = [...skills].sort((a, b) => (a.status === "proposed" ? 1 : 0) - (b.status === "proposed" ? 1 : 0) || b.priority - a.priority);
-  const pos = positions(Math.max(cells.length, 1));
-  const size = 2 * R * (1 + Math.ceil(Math.sqrt(cells.length))) + R;
+  // Skills you've taken on sit at the heart of the comb; ones waiting on a decision ring them.
+  const ordered = useMemo(
+    () => (skills ? skills.filter((s) => s.status !== "dismissed").sort((a, b) => (a.status === "proposed" ? 1 : 0) - (b.status === "proposed" ? 1 : 0) || b.priority - a.priority) : []),
+    [skills]
+  );
+  const cells = useMemo<CombCell[]>(() => {
+    const pos = hexSpiral(ordered.length, 1);
+    return ordered.map((s, i) => ({ id: s.id, name: s.name, x: pos[i].x, y: pos[i].y, fill: fillOf(s), waiting: s.status === "proposed" }));
+  }, [ordered]);
+  const byId = useMemo(() => new Map(ordered.map((s) => [s.id, s])), [ordered]);
+
+  if (!skills) return null;
+  const pointed = hover === null ? null : byId.get(hover) ?? null;
+  const flatComb = <FlatComb cells={cells} skills={byId} onHover={setHover} />;
 
   return (
     <div>
       <h1 className="title">Honeycomb</h1>
       <p className="muted lead">One cell per skill. It fills as you climb the ladder, and it fills faster when Rhubarb hears you use the skill for real.</p>
-      {cells.length === 0 && <p className="muted">Empty comb. It fills from the board.</p>}
-      <svg viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} className="comb">
-        {cells.map((s, i) => {
-          const { x, y } = pos[i];
-          const fill = s.status === "mastered" ? 1 : s.ladderLength ? s.level / s.ladderLength : 0;
-          const clipId = `clip-${s.id}`;
-          const top = y + R - 2 * R * fill;
-          return (
-            <g key={s.id} onMouseEnter={() => setHover(s)} onMouseLeave={() => setHover(null)} onClick={() => go(`/skills/${s.id}`)} style={{ cursor: "pointer" }}>
-              <defs>
-                <clipPath id={clipId}>
-                  <polygon points={hexPoints(x, y, R - 3)} />
-                </clipPath>
-              </defs>
-              <polygon points={hexPoints(x, y, R - 3)} className={s.status === "proposed" ? "cell proposed" : "cell"} />
-              <rect x={x - R} y={top} width={2 * R} height={2 * R} className="honey" clipPath={`url(#${clipId})`} />
-              <text x={x} y={y + 4} textAnchor="middle" className="cell-label">
-                {s.name.length > 18 ? `${s.name.slice(0, 17)}…` : s.name}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      {hover && (
-        <p className="muted">
-          <strong>{hover.name}</strong> · {hover.status === "mastered" ? "mastered" : hover.status === "proposed" ? "waiting for your decision" : `level ${hover.level + 1} of ${hover.ladderLength || "?"}`}
-        </p>
+      {cells.length === 0 ? (
+        <p className="muted">Empty comb. It fills from the board.</p>
+      ) : (
+        <>
+          {flat ? (
+            flatComb
+          ) : (
+            <Suspense fallback={flatComb}>
+              <Comb3D cells={cells} hovered={hover} onHover={setHover} onOpen={(id) => go(`/skills/${id}`)} onFail={() => setFlat(true)} />
+            </Suspense>
+          )}
+          <p className="comb-caption muted" aria-live="polite">
+            {pointed ? (
+              <>
+                <strong>{pointed.name}</strong> · {standing(pointed)}
+              </>
+            ) : (
+              "Point at a cell to see where you stand. The pale, shallow ones are waiting for your decision."
+            )}
+          </p>
+        </>
       )}
     </div>
   );
