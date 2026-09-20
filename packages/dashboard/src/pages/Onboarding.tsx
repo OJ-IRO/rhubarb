@@ -41,9 +41,9 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
 
   const steps = [
     <section key="name" className="ask">
-      <h2>First, what should I call you?</h2>
-      <p className="muted">Your Bee already knows. This is just how the lessons will address you.</p>
-      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Jay" />
+      <h2>First, what's your name?</h2>
+      <p className="muted">It stays on this page. Everywhere else, Rhubarb just says "you."</p>
+      <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" autoComplete="given-name" />
     </section>,
     <section key="style" className="ask">
       <h2>How do you like to be taught?</h2>

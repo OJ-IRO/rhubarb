@@ -14,7 +14,7 @@ export async function tutorReply(db: RhubarbDb, lesson: Lesson, history: TutorMs
   const profile = db.getProfile();
   const context = `## Skill\n${skill?.name ?? "(unknown)"}\n\n## The lesson they are reading\n${lesson.bodyMd}\n\n## Moments from their week\n${
     evidence.map((e) => `- ${e.spokenAt}: "${e.text}"`).join("\n") || "(none)"
-  }\n\n## Reader\n${profile ? `${profile.name}, prefers ${profile.style} teaching` : "no profile"}`;
+  }\n\n## Reader\n${profile ? `prefers ${profile.style} teaching` : "no profile"}`;
 
   return write({
     quick: true,

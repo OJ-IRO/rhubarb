@@ -3,6 +3,16 @@ import { api, when, type SkillDetail } from "../api";
 import { HexLevels, HexNode, Loading } from "../components/Hex";
 import { Link } from "../router";
 
+// The detector's internal words mean little to the person reading their own week.
+const KIND_LABEL: Record<string, string> = {
+  question: "you asked",
+  gap: "you weren't sure",
+  struggle: "you didn't follow",
+  intent: "you said you wanted this",
+  exposure: "it kept coming up around you",
+  stake: "coming up on your calendar",
+};
+
 export function SkillPage({ id }: { id: number }) {
   const [d, setD] = useState<SkillDetail | null>(null);
   useEffect(() => {
@@ -101,7 +111,7 @@ export function SkillPage({ id }: { id: number }) {
             <span className="quote">"{e.text}"</span>
             <span className="muted">
               {" "}
-              · {e.kind} · {when(e.spokenAt)}
+              · {KIND_LABEL[e.kind] ?? e.kind} · {when(e.spokenAt)}
               {e.speakerLabel ? ` · ${e.speakerLabel}` : ""}
               {e.place ? ` · ${e.place}` : ""}
             </span>

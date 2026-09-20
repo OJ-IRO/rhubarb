@@ -205,7 +205,7 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     earlier.length ? `\nEarlier levels already covered: ${earlier.map((l) => ladder[l.levelIdx]?.title).join(", ")}` : ""
   }\n\n## Why this skill is on their board\n${skill.brief}\n\n## Moments from their life to draw on\n${
     evidence.map((e) => `- ${e.spokenAt}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
-  }\n\n## Reader\n${profile ? `${profile.name}; goals: ${profile.goals.join("; ") || "none stated"}` : "no profile yet"}`;
+  }\n\n## Reader\n${profile ? `goals: ${profile.goals.join("; ") || "none stated"}` : "no profile yet"}`;
 
   const research = (feedback?: string[]) =>
     researchThenEmit({

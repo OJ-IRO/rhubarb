@@ -155,6 +155,7 @@ export function DeckViewer({ deck, onFinish }: { deck: Deck; onFinish: () => voi
           {last ? "Check my understanding →" : "Next →"}
         </button>
       </div>
+      <p className="deck-hint muted small">The arrow keys turn the cards too.</p>
     </div>
   );
 }

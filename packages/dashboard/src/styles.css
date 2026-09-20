@@ -1228,6 +1228,41 @@ textarea {
   margin: 6px 0 0;
 }
 
+/* ---------- when the service isn't running ---------- */
+.offline {
+  max-width: 640px;
+  margin: 0 auto;
+  padding-top: 12vh;
+}
+.offline .brand {
+  margin-bottom: 28px;
+}
+.offline-steps {
+  margin: 22px 0 6px;
+  padding-left: 22px;
+  line-height: 1.9;
+  font-size: 18px;
+}
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  background: #f4ecd4;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
+.deck-hint {
+  text-align: center;
+  margin: 10px 0 0;
+  display: none;
+}
+/* Only where there is a keyboard to press. */
+@media (hover: hover) and (pointer: fine) {
+  .deck-hint {
+    display: block;
+  }
+}
+
 /* ---------- the comb's pieces, used across pages (components/Hex.tsx) ---------- */
 .hexbadge {
   position: relative;

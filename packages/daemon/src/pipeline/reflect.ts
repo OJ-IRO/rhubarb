@@ -50,7 +50,7 @@ function renderSkills(list: Skill[]): string {
 
 function renderProfile(p: Profile | null): string {
   if (!p) return "No profile yet: assume a curious generalist with no stated goals or off-limits topics.";
-  return `Name: ${p.name}\nLearning style: ${p.style}\nSession length: ${p.sessionMinutes} minutes\nWhen they like to learn: ${p.learningWindows}\nGoals they already named: ${p.goals.join("; ") || "(none)"}\nOff-limits topics: ${p.offLimits.join("; ") || "(none)"}`;
+  return `Learning style: ${p.style}\nSession length: ${p.sessionMinutes} minutes\nWhen they like to learn: ${p.learningWindows}\nGoals they already named: ${p.goals.join("; ") || "(none)"}\nOff-limits topics: ${p.offLimits.join("; ") || "(none)"}`;
 }
 
 async function fixBrief(brief: string, reasons: string[]): Promise<string> {

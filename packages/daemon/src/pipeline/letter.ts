@@ -11,7 +11,7 @@ export async function writeTodayLetter(db: RhubarbDb, log: (m: string) => void):
   const lesson = todaysLesson(db);
   const sparks = db.cardsWithItems(5);
 
-  const facts = `Reader: ${profile?.name ?? "the reader"}\nToday: ${new Date().toDateString()}\n\nProposed skills waiting for a decision:\n${
+  const facts = `Today: ${new Date().toDateString()}\n\nProposed skills waiting for a decision:\n${
     proposed.map((s) => `- ${s.name} (priority ${s.priority}): ${s.brief}`).join("\n") || "(none)"
   }\n\nActive skills:\n${active.map((s) => `- ${s.name}, level ${s.level + 1}`).join("\n") || "(none)"}\n\nLesson ready today: ${
     lesson ? `${lesson.skill.name}, level ${lesson.skill.level + 1}` : "none"

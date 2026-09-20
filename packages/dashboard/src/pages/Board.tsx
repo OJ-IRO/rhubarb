@@ -126,10 +126,10 @@ export function Board() {
                       </button>
                     )}
                     <span className="spacer" />
-                    <button className="ghost small" title="Move up" onClick={() => act(s.id, () => api.setPriority(s.id, Math.min(100, s.priority + 10)))}>
+                    <button className="ghost small" title="Move up" aria-label={`Move ${s.name} up`} onClick={() => act(s.id, () => api.setPriority(s.id, Math.min(100, s.priority + 10)))}>
                       ↑
                     </button>
-                    <button className="ghost small" title="Move down" onClick={() => act(s.id, () => api.setPriority(s.id, Math.max(0, s.priority - 10)))}>
+                    <button className="ghost small" title="Move down" aria-label={`Move ${s.name} down`} onClick={() => act(s.id, () => api.setPriority(s.id, Math.max(0, s.priority - 10)))}>
                       ↓
                     </button>
                   </div>

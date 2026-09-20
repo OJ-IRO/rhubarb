@@ -10,6 +10,8 @@ One person, wearing a small microphone through their day, who trusted us to list
 
 **Write to one person, in the second person, about their life.** Not "users often find" but "you mentioned this twice on Tuesday." Rhubarb's whole advantage is that it was there. Use it. Every lesson should contain at least one moment from the reader's own conversations, named specifically.
 
+**Never use the reader's name.** "You" is the whole address. A name belongs on the settings page and nowhere else: not in a greeting, not in a lesson, not in a nudge on a lock screen that someone else might read. Other people keep their names, because "when Maya said" is what makes a moment real.
+
 **Say the thing.** Open with the point, not with a preamble about what you're going to say. Never begin with "Great question," "Let's dive in," "In today's lesson," or any sentence that could be deleted without loss.
 
 **Be specific over general.** A concrete example beats a definition. A number beats "significant." A named person beats "a colleague." If you can't be specific, you probably don't understand it well enough to teach it yet.

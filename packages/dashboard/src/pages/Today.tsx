@@ -22,7 +22,7 @@ export function Today() {
   return (
     <div>
       <h1 className="title">
-        {greeting}, {data.profile?.name ?? "there"}.
+        Good {greeting.toLowerCase()}.
       </h1>
 
       {data.letter ? (

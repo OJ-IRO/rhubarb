@@ -11,7 +11,7 @@ const d = 24 * h;
 const iso = (ago: number) => new Date(now - ago).toISOString();
 
 export const profile: Profile = {
-  name: "Jay",
+  name: "Riley",
   style: "story",
   sessionMinutes: 10,
   learningWindows: "weekday evenings after 8, Sunday mornings",
@@ -282,7 +282,7 @@ export const cards: Array<{ card: Card; item: Item }> = [
 export const today: Today = {
   profile,
   letter:
-    "Jay, your week has mostly been about Thursday. Kubernetes came up again yesterday, and you handled the readiness question with Sam better than you think, so level two is closer than the board suggests. The salary conversation is the other thing on your mind; you've mentioned it three times and decided nothing, which is exactly when a plan helps. Today: ten minutes on the rolling deployment lesson, then leave the rest.",
+    "Your week has mostly been about Thursday. Kubernetes came up again yesterday, and you handled the readiness question with Sam better than you think, so level two is closer than the board suggests. The salary conversation is the other thing on your mind; you've mentioned it three times and decided nothing, which is exactly when a plan helps. Today: ten minutes on the rolling deployment lesson, then leave the rest.",
   letterDate: new Date().toDateString(),
   lesson: { lesson, skill: skills[0], ladderLength: ladder.length },
   duePractice: [],

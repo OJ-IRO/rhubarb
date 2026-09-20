@@ -301,7 +301,7 @@ startApi(
           return [];
         });
         saveLearningSlots(db, slots);
-        log(`profile saved for ${p.name}; ${slots.length} learning slots`);
+        log(`profile saved; ${slots.length} learning slots`);
       },
       answerBeat,
       teachbackToPendant: async (lesson, beat) => {
