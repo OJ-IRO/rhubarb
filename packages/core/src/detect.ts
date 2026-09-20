@@ -124,5 +124,11 @@ export function stage1Detect(text: string): Stage1Result {
 /** Does this utterance touch any of a skill's signal terms? Used to find field-evidence candidates. */
 export function matchesSkillTerms(text: string, terms: string[]): string[] {
   const t = text.toLowerCase();
-  return terms.filter((term) => term.length > 2 && t.includes(term.toLowerCase()));
+  // Whole words only: a bare substring test matches the term "api" inside "capital".
+  return terms.filter((term) => {
+    const needle = term.trim().toLowerCase();
+    if (needle.length <= 2) return false;
+    const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`).test(t);
+  });
 }

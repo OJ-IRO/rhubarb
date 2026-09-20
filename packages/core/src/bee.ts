@@ -126,19 +126,58 @@ export class BeeStreamConsumer {
         this.opts.onStatus?.("stream connected");
         return;
       }
-      this.opts.onEvent(ev as unknown as BeeStreamEvent);
+      // One malformed event, or a database hiccup while handling it, must not take the daemon down.
+      try {
+        this.opts.onEvent(ev as unknown as BeeStreamEvent);
+      } catch (e) {
+        this.opts.onStatus?.(`stream event dropped (${String(ev.type)}): ${(e as Error).message}`);
+      }
     });
 
     child.stderr.on("data", (d: Buffer) => this.opts.onStatus?.(`bee stream stderr: ${d.toString().trim()}`));
 
-    child.on("exit", (code) => {
+    // A spawn failure (bee not on PATH, too many open files) emits "error" and may never emit
+    // "exit". Without a listener it would be an uncaught exception. Either event restarts, once.
+    let restarted = false;
+    const restart = (why: string) => {
       rl.close();
-      if (this.stopped) return;
-      this.opts.onStatus?.(`bee stream exited (${code}); restarting in ${this.backoffMs}ms`);
+      if (this.stopped || restarted) return;
+      restarted = true;
+      if (this.child === child) this.child = null;
+      this.opts.onStatus?.(`bee stream ${why}; restarting in ${this.backoffMs}ms`);
       setTimeout(() => this.spawnOnce(), this.backoffMs);
       this.backoffMs = Math.min(this.backoffMs * 2, this.opts.maxBackoffMs ?? 60_000);
-    });
+    };
+    child.on("error", (e) => restart(`failed to run (${e.message})`));
+    child.on("exit", (code) => restart(`exited (${code})`));
   }
+}
+
+function tokenSet(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 1)
+  );
+}
+
+/**
+ * How much of the shorter text's vocabulary appears in the longer one (0..1).
+ *
+ * A voice note comes back through the ambient channel in 4-10 second chunks, so each chunk is a
+ * small piece of the note. Jaccard similarity scores a 12-word chunk of a 60-word note around 0.2
+ * and misses it; containment scores it near 1.
+ */
+export function textContainment(a: string, b: string): number {
+  const ta = tokenSet(a);
+  const tb = tokenSet(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  const [small, large] = ta.size <= tb.size ? [ta, tb] : [tb, ta];
+  let inter = 0;
+  for (const w of small) if (large.has(w)) inter++;
+  return inter / small.size;
 }
 
 /** Normalized token-set Jaccard similarity, for cross-channel dedupe of journals vs ambient utterances. */

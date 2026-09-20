@@ -36,3 +36,20 @@ test("windowAroundUtterance returns null for an utterance we never stored", () =
   const db = new RhubarbDb(":memory:");
   assert.equal(db.windowAroundUtterance(404), null);
 });
+
+test("echoes of the wearer's own voice notes are left out of recent speech", () => {
+  const db = new RhubarbDb(":memory:");
+  db.insertUtterance(utterance(1, "a rolling deployment swaps pods a few at a time"));
+  db.insertUtterance(utterance(2, "so yeah the rollout stalled for four minutes"));
+  db.markUtteranceEcho(1);
+  assert.deepEqual(db.recentUtterances(0).map((u) => u.id), [2]);
+});
+
+test("a voice note is only ever the answer to one practice", () => {
+  const db = new RhubarbDb(":memory:");
+  const id = db.insertPractice({ skillId: null, lessonId: null, cardId: null, kind: "teachback", prompt: "Explain a rolling deployment.", rubric: null, marker: "w1", scheduledFor: Date.now(), beeTodoId: null });
+  assert.equal(db.practiceHasJournal("journal-1"), false);
+  db.attachPracticeAnswer(id, "journal-1", "it swaps pods a few at a time");
+  assert.equal(db.practiceHasJournal("journal-1"), true);
+  assert.equal(db.practiceHasJournal("journal-2"), false);
+});

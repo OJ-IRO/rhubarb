@@ -1,7 +1,8 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
 import type { Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
+import { z } from "zod";
 
 export interface ApiDeps {
   db: RhubarbDb;
@@ -39,6 +40,17 @@ const MIME: Record<string, string> = {
   ".woff2": "font/woff2",
 };
 
+const ProfileIn = z.object({
+  name: z.string().trim().min(1).max(80),
+  style: z.enum(["story", "hands-on", "socratic", "structured", "analogy"]),
+  sessionMinutes: z.union([z.literal(5), z.literal(10), z.literal(20)]),
+  learningWindows: z.string().max(500).default(""),
+  goals: z.array(z.string().max(200)).max(30).default([]),
+  offLimits: z.array(z.string().max(200)).max(30).default([]),
+  timezone: z.string().max(80).default(() => Intl.DateTimeFormat().resolvedOptions().timeZone),
+  onboardedAt: z.number().nullable().default(null),
+});
+
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(body));
@@ -58,7 +70,9 @@ function serveStatic(res: ServerResponse, dir: string, urlPath: string): boolean
   if (!existsSync(file) || statSync(file).isDirectory()) file = join(dir, "index.html"); // SPA fallback
   if (!existsSync(file)) return false;
   res.writeHead(200, { "Content-Type": MIME[extname(file)] ?? "application/octet-stream" });
-  createReadStream(file).pipe(res);
+  createReadStream(file)
+    .on("error", () => res.destroy())
+    .pipe(res);
   return true;
 }
 
@@ -71,15 +85,37 @@ export function todaysLesson(db: RhubarbDb): { lesson: Lesson; skill: Skill } | 
   return null;
 }
 
-export function startApi(deps: ApiDeps, port: number): void {
+export function startApi(deps: ApiDeps, port: number): Server {
   const { db, log, actions } = deps;
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://localhost");
-    const path = url.pathname;
     const method = req.method ?? "GET";
+    let path = "/";
+    let url = new URL("http://localhost/");
 
     try {
+      // Transcripts live behind this API. Refuse anything not addressed to this machine by name,
+      // which is what a DNS-rebinding page would look like.
+      const host = (req.headers.host ?? "").replace(/:\d+$/, "");
+      if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") return json(res, 403, { error: "forbidden" });
+      // Browsers attach Origin to cross-site requests. Any other site's page could otherwise POST
+      // here blind, to accept skills or start Opus runs on the wearer's bill.
+      const origin = req.headers.origin;
+      if (origin) {
+        let from = "";
+        try {
+          from = new URL(origin).hostname;
+        } catch {
+          /* unparseable origin is treated as foreign */
+        }
+        if (from !== "127.0.0.1" && from !== "localhost" && from !== "[::1]") return json(res, 403, { error: "forbidden" });
+      }
+      try {
+        url = new URL(req.url ?? "/", "http://localhost");
+        path = url.pathname;
+      } catch {
+        return json(res, 400, { error: "bad request" });
+      }
       if (path.startsWith("/api/")) {
         const parts = path.slice(5).split("/").filter(Boolean);
         const [head, idStr, tail, tail2] = parts;
@@ -110,7 +146,11 @@ export function startApi(deps: ApiDeps, port: number): void {
         }
         if (head === "profile" && method === "GET") return json(res, 200, db.getProfile());
         if (head === "profile" && method === "PUT") {
-          const body = await readBody<Profile>(req);
+          // Reflection and lesson writing call goals.join() and friends on every run, so a
+          // half-formed profile saved here would break them all until someone fixed the row by hand.
+          const parsed = ProfileIn.safeParse(await readBody<unknown>(req));
+          if (!parsed.success) return json(res, 400, { error: `That profile is missing something: ${parsed.error.issues.map((i) => i.path.join(".") || "body").join(", ")}` });
+          const body: Profile = parsed.data;
           await actions.saveProfile({ ...body, onboardedAt: body.onboardedAt ?? Date.now() });
           return json(res, 200, db.getProfile());
         }
@@ -240,4 +280,5 @@ export function startApi(deps: ApiDeps, port: number): void {
   });
 
   server.listen(port, "127.0.0.1", () => log(`dashboard + api on http://127.0.0.1:${port}`));
+  return server;
 }

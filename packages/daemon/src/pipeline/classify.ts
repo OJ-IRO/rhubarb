@@ -30,17 +30,39 @@ export interface ClassifyDeps {
   onSpark: (e: Evidence, topic: string) => void;
 }
 
+type VerdictOut = z.infer<typeof Verdict>;
+
+/**
+ * Classify a batch. If the model call fails (a refusal on something sensitive it overheard, a
+ * malformed reply twice over, a token limit), split the batch and try each half, down to single
+ * items. An item that fails alone comes back with no verdict, and the caller files it as noise.
+ * Without this, the same oldest 25 rows were retried every two minutes forever and nothing
+ * behind them was ever classified.
+ */
+async function classifyResilient(items: Evidence[], log: (msg: string) => void): Promise<VerdictOut[]> {
+  const user = items
+    .map((e) => `### item ${e.id} (heuristic kind: ${e.kind}, spoken ${e.spokenAt})\nline: "${e.text}"\ncontext:\n${e.context ?? "(none)"}`)
+    .join("\n\n");
+  try {
+    return (await classify({ system: SYSTEM, user, schema: Batch, maxTokens: 8000 })).verdicts;
+  } catch (e) {
+    if (items.length === 1) {
+      log(`classify: gave up on evidence #${items[0].id} (${(e as Error).message})`);
+      return [];
+    }
+    const mid = Math.ceil(items.length / 2);
+    log(`classify: batch of ${items.length} failed (${(e as Error).message}); splitting`);
+    return [...(await classifyResilient(items.slice(0, mid), log)), ...(await classifyResilient(items.slice(mid), log))];
+  }
+}
+
 /** Stage-2: batch-classify detected evidence with context. Runs on a timer. */
 export async function runClassifyBatch(deps: ClassifyDeps, limit = 25): Promise<number> {
   const { db, log } = deps;
   const pending = db.evidenceByStage("detected", limit);
   if (pending.length === 0) return 0;
 
-  const user = pending
-    .map((e) => `### item ${e.id} (heuristic kind: ${e.kind}, spoken ${e.spokenAt})\nline: "${e.text}"\ncontext:\n${e.context ?? "(none)"}`)
-    .join("\n\n");
-
-  const { verdicts } = await classify({ system: SYSTEM, user, schema: Batch, maxTokens: 8000 });
+  const verdicts = await classifyResilient(pending, log);
   const byId = new Map(pending.map((e) => [e.id, e]));
   let handled = 0;
 

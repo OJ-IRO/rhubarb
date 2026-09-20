@@ -35,8 +35,14 @@ export async function runSweep(deps: SweepDeps): Promise<{ conversations: number
     const list = detail.utterances ?? detail.transcriptions?.flatMap((t) => t.utterances ?? []) ?? [];
     for (const u of list) {
       if (!u?.text) continue;
-      handleUtterance(deps, uuid, u, "sweep");
-      utterances++;
+      // If one utterance throws, skip it. Otherwise the cursor never advances and every
+      // later night dies on the same conversation.
+      try {
+        handleUtterance(deps, uuid, u, "sweep");
+        utterances++;
+      } catch (e) {
+        log(`sweep: utterance ${u.id} skipped (${(e as Error).message})`);
+      }
     }
   }
 
@@ -53,7 +59,8 @@ export async function ingestStakes(deps: { db: RhubarbDb; bee: BeeClient; log: (
   const seen = new Set<string>(JSON.parse(db.getKv("stakes_seen") ?? "[]") as string[]);
   let added = 0;
 
-  for (const ev of brief.calendar_events) {
+  // No calendar connected in the Bee app means no calendar_events field at all.
+  for (const ev of Array.isArray(brief.calendar_events) ? brief.calendar_events : []) {
     const title = String(ev.title ?? ev.summary ?? ev.name ?? "").trim();
     const start = String(ev.start ?? ev.start_time ?? ev.starts_at ?? "");
     if (!title) continue;

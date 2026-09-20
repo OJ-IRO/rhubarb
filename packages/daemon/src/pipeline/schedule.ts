@@ -54,3 +54,20 @@ export function nextLearningSlot(db: RhubarbDb, from = new Date()): Date {
   fallback.setHours(9, 0, 0, 0);
   return fallback;
 }
+
+const QUIET_FROM_HOUR = 22;
+const QUIET_UNTIL_HOUR = 8;
+
+/**
+ * Bee todo alarms buzz a locked phone. Work that runs overnight (the 3am reflection, field
+ * credits from the nightly sweep) must not wake anyone, so anything that would land in quiet
+ * hours is held until the morning.
+ */
+export function afterQuietHours(at: Date): Date {
+  const h = at.getHours();
+  if (h >= QUIET_UNTIL_HOUR && h < QUIET_FROM_HOUR) return at;
+  const morning = new Date(at);
+  if (h >= QUIET_FROM_HOUR) morning.setDate(morning.getDate() + 1);
+  morning.setHours(QUIET_UNTIL_HOUR, 30, 0, 0);
+  return morning;
+}

@@ -76,11 +76,24 @@ export async function gradeAnswer(deps: PracticeDeps, p: Practice, journalId: st
   db.attachPracticeAnswer(p.id, journalId, answer);
 
   const rubric = p.rubric ?? "A clear, correct explanation in the learner's own words.";
-  let grade = await judge({
-    system: systemBlocks(voiceGuide(), "You grade a spoken teach-back. Be fair and specific. Feedback is addressed to the learner directly."),
-    user: `Prompt they were given: "${p.prompt}"\n\nWhat a good answer contains:\n${rubric}\n\nWhat they said (voice transcript, may have recognition errors):\n"${answer}"`,
-    schema: GradeSchema,
-  });
+  let grade: Grade;
+  try {
+    grade = await judge({
+      system: systemBlocks(voiceGuide(), "You grade a spoken teach-back. Be fair and specific. Feedback is addressed to the learner directly."),
+      user: `Prompt they were given: "${p.prompt}"\n\nWhat a good answer contains:\n${rubric}\n\nWhat they said (voice transcript, may have recognition errors):\n"${answer}"`,
+      schema: GradeSchema,
+    });
+  } catch (e) {
+    // "answered" with no grade is a dead end: nothing re-opens it, and for a recall card it hides
+    // the card for good. Put the practice back in play and ask for the answer again.
+    db.setPracticeStatus(p.id, "delivered");
+    if (notify) {
+      await bee
+        .createTodo("I lost your last answer before I could read it. Hold the button and say it once more when you have a minute.", new Date(Date.now() + 60_000).toISOString())
+        .catch((err: Error) => log(`regrade nudge failed: ${err.message}`));
+    }
+    throw e;
+  }
 
   const lint = lintProse(grade.feedback);
   if (!lint.ok) {
@@ -109,6 +122,9 @@ export async function gradeAnswer(deps: PracticeDeps, p: Practice, journalId: st
 
 /** Entry point from the capture layer when a voice note finishes transcribing. */
 export async function handleJournalReady(deps: PracticeDeps, journalId: string, text: string): Promise<void> {
+  // Bee can report the same voice note READY more than once (an edit in the app, a reconnect).
+  // It answers one practice, once.
+  if (deps.db.practiceHasJournal(journalId)) return;
   const p = matchPractice(deps.db);
   if (!p) return;
   await gradeAnswer(deps, p, journalId, text);

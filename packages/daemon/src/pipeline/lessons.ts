@@ -250,11 +250,61 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   return lessonId;
 }
 
-/** Called when a skill is accepted from the board: build its ladder and first lesson. */
+const writing = new Set<number>();
+const resumeTries = new Map<number, number>();
+const MAX_RESUME_TRIES = 3;
+
+/** Write the lesson for a level unless something is already writing for this skill. */
+export async function generateLessonOnce(deps: LessonDeps, skill: Skill, levelIdx: number): Promise<void> {
+  if (writing.has(skill.id)) return;
+  writing.add(skill.id);
+  try {
+    await generateLesson(deps, skill, levelIdx);
+  } finally {
+    writing.delete(skill.id);
+  }
+}
+
+/** Is a ladder or lesson for this skill being written right now? */
+export function isWriting(skillId: number): boolean {
+  return writing.has(skillId);
+}
+
+/**
+ * Called when a skill is accepted from the board: build its ladder and first lesson.
+ * Two quick taps on "Yes, teach me this" used to write two ladders, two lessons and two nudges.
+ */
 export async function startSkill(deps: LessonDeps, skillId: number): Promise<void> {
   const skill = deps.db.getSkill(skillId);
-  if (!skill) return;
-  deps.db.updateSkill(skillId, { status: "active" });
-  await ensureLadder(deps, skill);
-  if (!deps.db.currentLesson(skillId, skill.level)) await generateLesson(deps, skill, skill.level);
+  if (!skill || writing.has(skillId)) return;
+  writing.add(skillId);
+  try {
+    deps.db.updateSkill(skillId, { status: "active" });
+    await ensureLadder(deps, skill);
+    if (!deps.db.currentLesson(skillId, skill.level)) await generateLesson(deps, skill, skill.level);
+  } finally {
+    writing.delete(skillId);
+  }
+}
+
+/**
+ * An active skill with no lesson at its current level sits on "writing your next lesson" with
+ * nothing actually writing it. That happens when generation failed (the lesson schema is strict)
+ * or the daemon restarted halfway. Run at boot and on a slow timer to pick those back up.
+ */
+export async function resumeMissingLessons(deps: LessonDeps): Promise<number> {
+  let resumed = 0;
+  for (const skill of deps.db.skillsByStatus(["active"])) {
+    if (writing.has(skill.id) || deps.db.currentLesson(skill.id, skill.level)) continue;
+    // Each try is a pair of Opus calls. A lesson that will not come out is left for a person.
+    const tries = resumeTries.get(skill.id) ?? 0;
+    if (tries >= MAX_RESUME_TRIES) continue;
+    resumeTries.set(skill.id, tries + 1);
+    const ladder = deps.db.ladderFor(skill.id);
+    if (ladder.length > 0 && skill.level >= ladder.length) continue; // finished the ladder
+    deps.log(`lessons: ${skill.name} has no lesson at level ${skill.level + 1}; writing it`);
+    await startSkill(deps, skill.id).catch((e: Error) => deps.log(`lessons: resume failed for ${skill.name}: ${e.message}`));
+    resumed++;
+  }
+  return resumed;
 }

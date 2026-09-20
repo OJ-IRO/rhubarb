@@ -8,12 +8,12 @@ import { startApi } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
-import { generateLesson, startSkill } from "./pipeline/lessons.js";
+import { generateLessonOnce, resumeMissingLessons, startSkill } from "./pipeline/lessons.js";
 import { writeTodayLetter } from "./pipeline/letter.js";
 import { gradeAnswer, handleJournalReady, schedulePractice, sweepPractice, type Grade } from "./pipeline/practice.js";
-import { maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
+import { bestFieldRung, maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
 import { runReflection } from "./pipeline/reflect.js";
-import { nextLearningSlot, parseLearningWindows, saveLearningSlots } from "./pipeline/schedule.js";
+import { afterQuietHours, nextLearningSlot, parseLearningWindows, saveLearningSlots } from "./pipeline/schedule.js";
 import { buildSpark } from "./pipeline/sparks.js";
 import { ingestStakes, runSweep } from "./pipeline/sweep.js";
 import { tutorReply } from "./pipeline/tutor.js";
@@ -45,7 +45,7 @@ function advanceAndContinue(skillId: number, nextLevel: number | null): void {
   const skill = db.getSkill(skillId);
   if (!skill || skill.status !== "active") return;
   log(`skill #${skillId} ${skill.name} advanced to level ${nextLevel + 1}`);
-  void generateLesson(lessonDeps, skill, nextLevel).catch((e: Error) => log(`next lesson failed: ${e.message}`));
+  void generateLessonOnce(lessonDeps, skill, nextLevel).catch((e: Error) => log(`next lesson failed: ${e.message}`));
 }
 
 const practiceDeps = {
@@ -98,18 +98,22 @@ const classifyDeps = {
 };
 
 // --- guarded periodic jobs
+// A caller that arrives while the job is running waits for that run rather than returning at
+// once. "Reflect now" relies on this: it awaits classification, and must not reflect on evidence
+// that the timer's batch is still halfway through classifying.
 function guarded(name: string, job: () => Promise<unknown>): () => Promise<void> {
-  let running = false;
-  return async () => {
-    if (running) return;
-    running = true;
-    try {
-      await job();
-    } catch (e) {
-      log(`${name} failed: ${(e as Error).message}`);
-    } finally {
-      running = false;
-    }
+  let inFlight: Promise<void> | null = null;
+  return () => {
+    inFlight ??= (async () => {
+      try {
+        await job();
+      } catch (e) {
+        log(`${name} failed: ${(e as Error).message}`);
+      } finally {
+        inFlight = null;
+      }
+    })();
+    return inFlight;
   };
 }
 
@@ -120,16 +124,18 @@ const classifyTick = guarded("classify", async () => {
 });
 
 const fieldTick = guarded("field", () => judgeFieldEvidence(fieldDeps));
+const lessonsTick = guarded("lessons", () => resumeMissingLessons(lessonDeps));
 
 const reflectNow = guarded("reflect", async () => {
-  await ingestStakes({ db, bee, log });
+  // Calendar stakes are a nice-to-have. Their failure must not stop the reflection itself.
+  await ingestStakes({ db, bee, log }).catch((e: Error) => log(`stakes skipped: ${e.message}`));
   await classifyTick();
   const touched = await runReflection({ db, log });
   const proposed = db.skillsByStatus(["proposed"]);
   if (touched.length > 0 && proposed.length > 0) {
     const top = proposed[0];
     const line = `Your learning brief is ready. ${proposed.length === 1 ? "One skill" : `${proposed.length} skills`} worth a look, starting with ${top.name}.`;
-    await bee.createTodo(line, new Date(Date.now() + 2 * 60_000).toISOString()).catch((e: Error) => log(`brief nudge failed: ${e.message}`));
+    await bee.createTodo(line, afterQuietHours(new Date(Date.now() + 2 * 60_000)).toISOString()).catch((e: Error) => log(`brief nudge failed: ${e.message}`));
   }
   await writeTodayLetter(db, log);
 });
@@ -190,7 +196,8 @@ async function completeLesson(lesson: import("@rhubarb/core").Lesson): Promise<v
   if (session) db.updateSession(session.id, { completedAt: Date.now() });
   const skill = db.getSkill(lesson.skillId);
   if (!skill) return;
-  advanceAndContinue(skill.id, maybeAdvance(db, skill, { teachbackScore: bestScoreFor(lesson.id, skill.id) }));
+  // A real-world credit can arrive before the lesson is marked done. Count it now rather than lose it.
+  advanceAndContinue(skill.id, maybeAdvance(db, skill, { teachbackScore: bestScoreFor(lesson.id, skill.id), fieldLevel: bestFieldRung(db, skill.id) }));
 }
 
 const ShortVerdict = z.object({
@@ -249,7 +256,8 @@ const nightly = guarded("nightly", async () => {
   const today = new Date().toDateString();
   if (db.getKv("last_nightly") === today || new Date().getHours() < REFLECT_HOUR_LOCAL) return;
   db.setKv("last_nightly", today);
-  await runSweep({ ...captureDeps, bee });
+  // Bee's /v1/changes returns a 500 some nights. Reflect on what the live stream caught anyway.
+  await runSweep({ ...captureDeps, bee }).catch((e: Error) => log(`sweep failed, reflecting without it: ${e.message}`));
   await reflectNow();
 });
 
@@ -268,8 +276,11 @@ const timers = [
   setInterval(() => sweepPractice(db), PRACTICE_SWEEP_MS),
   setInterval(() => void nightly(), NIGHTLY_CHECK_MS),
   setInterval(() => void fieldTick(), FIELD_INTERVAL_MS),
+  setInterval(() => void lessonsTick(), 30 * 60_000),
 ];
 void classifyTick();
+// A restart mid-generation leaves a skill with no lesson and nothing writing one. Pick those up.
+setTimeout(() => void lessonsTick(), 20_000);
 
 startApi(
   {
@@ -329,5 +340,7 @@ function shutdown(): void {
   db.close();
   process.exit(0);
 }
+// Last line of defence for a process meant to run for weeks: log a stray rejection, keep listening.
+process.on("unhandledRejection", (reason) => log(`unhandled rejection: ${reason instanceof Error ? reason.stack ?? reason.message : String(reason)}`));
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

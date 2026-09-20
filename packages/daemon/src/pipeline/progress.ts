@@ -13,7 +13,7 @@ export function maybeAdvance(db: RhubarbDb, skill: Skill, reason: { teachbackSco
 
   const lesson = db.currentLesson(skill.id, skill.level);
   const lessonDone = lesson?.status === "done";
-  const shown = (reason.teachbackScore ?? 0) >= 4 || (reason.fieldLevel ?? -1) >= skill.level;
+  const shown = (reason.teachbackScore ?? 0) >= 4 || fieldShowsLevel(reason.fieldLevel, skill.level);
   if (!lessonDone || !shown) return null;
 
   db.setLevelStatus(skill.id, skill.level, "done");
@@ -25,6 +25,30 @@ export function maybeAdvance(db: RhubarbDb, skill: Skill, reason: { teachbackSco
   db.setLevelStatus(skill.id, next, "current");
   db.updateSkill(skill.id, { level: next });
   return next;
+}
+
+/**
+ * The field judge sees the ladder numbered from 1 ("1. Follow the conversation") and answers in
+ * those numbers, with 0 for "not used". A skill's level is a 0-based index into the same ladder.
+ * So rung N on the judge's scale is index N - 1 here. Comparing the two directly promoted a
+ * learner on rung 2 for showing only rung 1.
+ */
+export function fieldShowsLevel(judgedRung: number | undefined, levelIdx: number): boolean {
+  return (judgedRung ?? 0) - 1 >= levelIdx;
+}
+
+/** Highest rung (judge's 1-based scale) any credited real-world moment has shown for this skill. */
+export function bestFieldRung(db: RhubarbDb, skillId: number): number {
+  let best = 0;
+  for (const fe of db.fieldEvidenceForSkill(skillId)) {
+    if (!fe.credited || !fe.verdict) continue;
+    try {
+      best = Math.max(best, Number((JSON.parse(fe.verdict) as { level?: number }).level ?? 0));
+    } catch {
+      /* a verdict we can't read credits nothing */
+    }
+  }
+  return best;
 }
 
 export function onTeachbackGraded(db: RhubarbDb, p: Practice, grade: Grade): number | null {

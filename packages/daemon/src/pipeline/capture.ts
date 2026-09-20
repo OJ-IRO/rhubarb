@@ -1,4 +1,4 @@
-import { stage1Detect, textSimilarity, type BeeStreamEvent, type RhubarbDb } from "@rhubarb/core";
+import { stage1Detect, textContainment, type BeeStreamEvent, type RhubarbDb } from "@rhubarb/core";
 
 // Voice notes echo into ambient capture as near-duplicate utterances ~20s later
 // (docs/spike-results.md), so utterances are checked against recent journal texts.
@@ -14,7 +14,7 @@ export interface CaptureDeps {
 
 function isJournalEcho(db: RhubarbDb, text: string): boolean {
   const recent = db.recentJournalTexts(Date.now() - DEDUP_WINDOW_MS);
-  return recent.some((j) => textSimilarity(j, text) >= DEDUP_SIMILARITY);
+  return recent.some((j) => textContainment(j, text) >= DEDUP_SIMILARITY);
 }
 
 export function renderContext(window: Array<{ text: string; speaker: string | null }>): string {
@@ -39,6 +39,9 @@ export function handleUtterance(
   if (!fresh) return;
 
   if (isJournalEcho(db, u.text)) {
+    // Flagged as well as skipped: otherwise the field-evidence scan finds the learner's own
+    // practice answer in the ambient feed and credits it as real-world use.
+    db.markUtteranceEcho(u.id);
     db.markUtterancesProcessed([u.id]);
     return;
   }

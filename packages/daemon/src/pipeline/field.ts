@@ -1,6 +1,7 @@
-import { judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type RhubarbDb } from "@rhubarb/core";
+import { judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type FieldEvidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 import { renderContext } from "./capture.js";
+import { afterQuietHours } from "./schedule.js";
 
 const Verdict = z.object({
   used: z.boolean().describe("the wearer actually exercised this skill here (not just heard someone else, not just mentioned the topic)"),
@@ -36,13 +37,40 @@ export function findFieldCandidates(db: RhubarbDb, sinceMs: number, log: (m: str
   return queued;
 }
 
+const MAX_JUDGED_PER_TICK = 12; // each is an Opus call; a chatty day must not become hours of spend
+const MAX_ATTEMPTS = 3;
+const attempts = new Map<number, number>();
+
 /** Judge queued candidates; credit real uses and tell the learner. */
 export async function judgeFieldEvidence(deps: FieldDeps): Promise<number> {
-  const { db, bee, log } = deps;
+  const { db, log } = deps;
   let credited = 0;
-  for (const fe of db.unjudgedFieldEvidence()) {
+  for (const fe of db.unjudgedFieldEvidence().slice(0, MAX_JUDGED_PER_TICK)) {
+    try {
+      if (await judgeOne(deps, fe)) credited++;
+      attempts.delete(fe.id);
+    } catch (e) {
+      // Keep going: one row the judge chokes on used to abort the loop every tick, forever.
+      const n = (attempts.get(fe.id) ?? 0) + 1;
+      attempts.set(fe.id, n);
+      log(`field: judging #${fe.id} failed (${(e as Error).message}), attempt ${n}`);
+      if (n >= MAX_ATTEMPTS) {
+        db.setFieldVerdict(fe.id, { used: false, correct: false, level: 0, note: "" }, false);
+        attempts.delete(fe.id);
+      }
+    }
+  }
+  return credited;
+}
+
+async function judgeOne(deps: FieldDeps, fe: FieldEvidence): Promise<boolean> {
+  const { db, bee, log } = deps;
+  {
     const skill = db.getSkill(fe.skillId);
-    if (!skill) continue;
+    if (!skill) {
+      db.setFieldVerdict(fe.id, { used: false, correct: false, level: 0, note: "" }, false);
+      return false;
+    }
     const ladder = db.ladderFor(skill.id);
     // The context saved at queue time predates the nightly sweep, so its lines have no
     // speaker labels. Re-read it now to use whatever labels have arrived since.
@@ -63,11 +91,10 @@ export async function judgeFieldEvidence(deps: FieldDeps): Promise<number> {
       v = { ...v, note: fixed.trim() };
     }
     db.setFieldVerdict(fe.id, v, ok);
-    if (!ok) continue;
-    credited++;
+    if (!ok) return false;
     log(`field: credited ${skill.name} at level ${v.level}: "${fe.text.slice(0, 60)}"`);
-    await bee.createTodo(`Heard you use ${skill.name} today. ${v.note}`.slice(0, 1900), new Date(Date.now() + 60_000).toISOString()).catch((e: Error) => log(`field nudge failed: ${e.message}`));
+    await bee.createTodo(`Heard you use ${skill.name} today. ${v.note}`.slice(0, 1900), afterQuietHours(new Date(Date.now() + 60_000)).toISOString()).catch((e: Error) => log(`field nudge failed: ${e.message}`));
     deps.onCredited?.(skill.id, v.level);
+    return true;
   }
-  return credited;
 }

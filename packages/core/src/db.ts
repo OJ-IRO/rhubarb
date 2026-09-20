@@ -187,6 +187,8 @@ export class RhubarbDb {
     const cols = (this.db.prepare("PRAGMA table_info(lessons)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!cols.includes("deck")) this.db.exec("ALTER TABLE lessons ADD COLUMN deck TEXT NOT NULL DEFAULT '{}'");
     if (!cols.includes("quiz")) this.db.exec("ALTER TABLE lessons ADD COLUMN quiz TEXT NOT NULL DEFAULT '{\"questions\":[]}'");
+    const ucols = (this.db.prepare("PRAGMA table_info(utterances)").all() as Array<{ name: string }>).map((c) => c.name);
+    if (!ucols.includes("echo")) this.db.exec("ALTER TABLE utterances ADD COLUMN echo INTEGER NOT NULL DEFAULT 0");
   }
 
   close(): void {
@@ -264,9 +266,15 @@ export class RhubarbDb {
     return all.slice(Math.max(0, at - radius), at + radius + 1);
   }
 
+  /** A voice note heard again through the ambient channel. It is practice, not real-world use. */
+  markUtteranceEcho(id: number): void {
+    this.db.prepare("UPDATE utterances SET echo = 1 WHERE id = ?").run(id);
+  }
+
+  /** Recent ambient speech, leaving out echoes of the wearer's own voice notes. */
   recentUtterances(sinceMs: number): Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }> {
     return this.db
-      .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE received_at >= ? ORDER BY id")
+      .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE received_at >= ? AND echo = 0 ORDER BY id")
       .all(sinceMs) as Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }>;
   }
 
@@ -541,6 +549,11 @@ export class RhubarbDb {
     return (this.db
       .prepare("SELECT * FROM practice WHERE status IN ('scheduled','delivered') ORDER BY scheduled_for DESC")
       .all() as Row[]).map(rowToPractice);
+  }
+
+  /** True if this voice note has already been taken as the answer to some practice. */
+  practiceHasJournal(journalId: string): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM practice WHERE journal_id = ? LIMIT 1").get(journalId));
   }
 
   setPracticeStatus(id: number, status: PracticeStatus): void {
