@@ -4,7 +4,7 @@ OJ, this is everything you need to pick this up. Ten minutes to read, and you ca
 
 ## What this is
 
-Rhubarb listens to your day through the Bee wearable, works out which skills your life is asking you to build, ranks them, teaches them with lessons written around your own conversations, has you practise out loud through the pendant, and then credits you when it hears you use the skill for real. The name is the theatre word for background chatter: "most of your day is rhubarb, some of it is worth learning."
+Rhubarb listens to your day through the Bee wearable, works out which skills your life is asking you to build, ranks them, teaches them with lessons written around your own conversations, has you practise out loud through the Bee, and then credits you when it hears you use the skill for real. The name is the theatre word for background chatter: "most of your day is rhubarb, some of it is worth learning."
 
 It's our entry for the Bee track of Amazon's [Build, Ship, Shape hackathon](https://amazonappdev2026.devpost.com/). First place is $12,000. We're also entering the Open Source and AWS Builder mini challenges.
 
@@ -73,7 +73,7 @@ packages/dashboard/src
 
 ## What's done
 
-Live capture, classification, spark cards, the practice loop through the pendant (alarm, spoken answer, grade, feedback alarm), nightly sweep, reflection into ranked skills with briefs, ladders, lesson decks with diagrams and sourced images and a quiz, field evidence judging, level progression, the whole dashboard, preview mode, and start/stop scripts. The capture, spark, and alarm paths have been proven on the real device.
+Live capture, classification, spark cards, the practice loop through the Bee (alarm, spoken answer, grade, feedback alarm), nightly sweep, reflection into ranked skills with briefs, ladders, lesson decks with diagrams and sourced images and a quiz, field evidence judging, level progression, the whole dashboard, preview mode, and start/stop scripts. The capture, spark, and alarm paths have been proven on the real device.
 
 ## What's next, in order
 

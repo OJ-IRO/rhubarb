@@ -58,7 +58,7 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
     </section>,
     <section key="minutes" className="ask">
       <h2>How long is a session?</h2>
-      <p className="muted">Lessons are written to fit. Shorter is fine; the pendant carries the practice anyway.</p>
+      <p className="muted">Lessons are written to fit. Shorter is fine; your Bee carries the practice anyway.</p>
       <div className="choices row">
         {([5, 10, 20] as const).map((m) => (
           <button key={m} className={minutes === m ? "choice on" : "choice"} onClick={() => setMinutes(m)}>

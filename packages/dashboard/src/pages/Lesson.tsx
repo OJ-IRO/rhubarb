@@ -95,7 +95,7 @@ export function LessonPage({ id }: { id: number }) {
               <div className="beat">
                 <p className="eyebrow">Teach it back</p>
                 <p className="beat-prompt">{teachback.prompt}</p>
-                <p className="muted small">Say it out loud into your pendant. Rhubarb grades the explanation, not the vocabulary.</p>
+                <p className="muted small">Say it out loud into your Bee. Rhubarb grades the explanation, not the vocabulary.</p>
                 <div className="actions">
                   <button
                     className="primary"
@@ -105,7 +105,7 @@ export function LessonPage({ id }: { id: number }) {
                       setSentToPendant(true);
                     }}
                   >
-                    {sentToPendant ? "Sent. Your phone will buzz in a minute." : "Send to my pendant"}
+                    {sentToPendant ? "Sent. Your phone will buzz in a minute." : "Send to my Bee"}
                   </button>
                 </div>
               </div>
@@ -123,7 +123,7 @@ export function LessonPage({ id }: { id: number }) {
                       setMissionAt(r.at);
                     }}
                   >
-                    {missionAt ? `Reminder set for ${new Date(missionAt).toLocaleString()}` : "Remind me on my pendant"}
+                    {missionAt ? `Reminder set for ${new Date(missionAt).toLocaleString()}` : "Remind me on my phone"}
                   </button>
                 </div>
               </div>
@@ -174,11 +174,20 @@ function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
     setDraft("");
     setStreaming(true);
     let acc = "";
-    await api.tutor(lessonId, next, (t) => {
-      acc += t;
-      setHistory([...next, { role: "assistant", content: acc }]);
-    });
-    setStreaming(false);
+    try {
+      await api.tutor(lessonId, next, (t) => {
+        acc += t;
+        setHistory([...next, { role: "assistant", content: acc }]);
+      });
+      if (!acc) throw new Error("empty reply");
+    } catch {
+      // Without this the streaming flag stayed set and the tutor never accepted another message.
+      // Put their words back so nothing they typed is lost.
+      setHistory([...history, { role: "assistant", content: "I couldn't get to that one. Your message is back in the box, so send it again in a moment." }]);
+      setDraft(text);
+    } finally {
+      setStreaming(false);
+    }
   }
 
   return (
@@ -208,7 +217,14 @@ function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
               }
             }}
             placeholder="Wait, why does…"
+            aria-label="Your message to the tutor"
           />
+          <div className="tutor-send">
+            <span className="muted small">{streaming ? "Thinking…" : "Enter sends. Shift and Enter for a new line."}</span>
+            <button className="primary small" disabled={streaming || !draft.trim()} onClick={() => void send()}>
+              Send
+            </button>
+          </div>
         </>
       )}
     </aside>

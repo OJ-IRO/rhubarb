@@ -66,7 +66,7 @@ export function Today() {
             {data.duePractice.map((p) => (
               <li key={p.id}>
                 <strong>{p.kind === "mission" ? "Mission" : p.kind === "teachback" ? "Teach it back" : "Recall"}</strong> · {p.prompt}
-                <span className="muted"> · sent to your pendant {when(p.scheduledFor)}</span>
+                <span className="muted"> · sent to your Bee {when(p.scheduledFor)}</span>
               </li>
             ))}
             {data.dueCards.map((d) => (

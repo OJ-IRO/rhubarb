@@ -71,7 +71,7 @@ const LessonOut = z.object({
     .array(
       z.object({
         kind: z.enum(["checkin", "scenario", "teachback", "mission"]),
-        prompt: z.string().describe("the teachback prompt is spoken aloud into a pendant: one or two sentences"),
+        prompt: z.string().describe("the teachback prompt is answered aloud into a Bee wearable: one or two sentences"),
         rubric: z.string(),
       })
     )

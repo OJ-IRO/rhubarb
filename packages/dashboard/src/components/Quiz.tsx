@@ -38,7 +38,7 @@ export function QuizView({ quiz, onSubmit, result }: { quiz: Quiz; onSubmit: (an
                           setRevealed((s) => new Set(s).add(i));
                         }}
                       >
-                        <span className="letter">{String.fromCharCode(65 + j)}</span>
+                        <span className="choice-letter">{String.fromCharCode(65 + j)}</span>
                         {c}
                       </button>
                     );

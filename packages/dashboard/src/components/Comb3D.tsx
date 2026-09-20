@@ -246,9 +246,15 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
     };
 
     const point = new THREE.Vector3();
+    const edgeA = new THREE.Vector3();
+    const edgeB = new THREE.Vector3();
     const placeLabels = () => {
       const w = host.clientWidth;
       const h = host.clientHeight;
+      // Width of the centre cell in CSS pixels, so label size follows the comb on any screen.
+      edgeA.set(-Math.sqrt(3) / 2, WALL, 0).project(camera);
+      edgeB.set(Math.sqrt(3) / 2, WALL, 0).project(camera);
+      host.style.setProperty("--cell", `${(((edgeB.x - edgeA.x) / 2) * w).toFixed(1)}px`);
       for (const l of live) {
         const el = labels.current.get(l.cell.id);
         if (!el) continue;

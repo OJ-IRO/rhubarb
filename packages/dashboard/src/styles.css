@@ -741,7 +741,8 @@ textarea {
   gap: 12px;
   padding: 10px 14px;
 }
-.q .choice .letter {
+/* Not ".letter": that is the Today page's morning letter, and its margins leaked in here. */
+.q .choice .choice-letter {
   width: 26px;
   height: 26px;
   border-radius: 50%;
@@ -811,6 +812,13 @@ textarea {
   color: var(--comb);
   border-color: var(--ink);
 }
+.tutor-send {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
 .tutor.open .thread {
   max-height: 340px;
 }
@@ -868,6 +876,8 @@ textarea {
   max-width: 760px;
   aspect-ratio: 16 / 10;
   margin: 4px 0 0;
+  /* set by Comb3D: how wide one cell is on screen, so labels can scale with it */
+  --cell: 120px;
   overflow: hidden;
 }
 .comb3d canvas {
@@ -880,10 +890,11 @@ textarea {
   position: absolute;
   top: 0;
   left: 0;
-  width: 104px;
+  width: calc(var(--cell) * 0.84);
   text-align: center;
-  font-size: 13px;
+  font-size: clamp(9.5px, calc(var(--cell) * 0.105), 13.5px);
   line-height: 1.2;
+  overflow-wrap: anywhere;
   color: var(--ink);
   pointer-events: none;
   text-wrap: balance;
@@ -929,6 +940,18 @@ textarea {
   .side-foot {
     margin-top: 0;
   }
+  .slide h1 {
+    font-size: 27px;
+  }
+  .slide h2 {
+    font-size: 22px;
+  }
+  .slide.cover .hook {
+    font-size: 18px;
+  }
+  .title {
+    font-size: 28px;
+  }
   .spotlight {
     grid-template-columns: 1fr;
   }
@@ -958,4 +981,14 @@ textarea {
   font-size: 13px;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+@media (max-width: 600px) {
+  /* A squarer box gives the comb room on a phone, where width is what runs out. */
+  .comb3d {
+    aspect-ratio: 1 / 1;
+  }
+  .shell {
+    padding: 32px 22px 96px;
+  }
 }

@@ -72,7 +72,15 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     const answers = body ? (JSON.parse(String(body)) as { answers: Array<number | string> }).answers : [];
     const per = f.quiz.questions.map((q, i) => (q.kind === "mcq" ? { correct: answers[i] === q.answer } : { correct: true, note: "Clear, and you named the stall as the safe failure. That's the level-two answer." }));
     const score = per.filter((p) => p.correct).length;
-    return as({ score, total: per.length, perQuestion: per, note: score >= 4 ? "That's a pass, and a comfortable one. You can narrate a rollout now; Thursday is the place to prove it." : "Two of these tripped you up, both about what the readiness gate does. Reread the diagram card and try the quiz again tomorrow." });
+    const missed = per.length - score;
+    const counts = ["None", "One", "Two", "Three", "Four", "Five"];
+    const note =
+      missed === 0
+        ? "All of them. You can narrate a rollout now; Thursday is the place to prove it."
+        : score >= 4
+          ? "That's a pass, and a comfortable one. The one you missed is about what the readiness gate does; the diagram card covers it."
+          : `${counts[missed] ?? missed} of these tripped you up, mostly around what the readiness gate does. Reread the diagram card and try the quiz again tomorrow.`;
+    return as({ score, total: per.length, perQuestion: per, note });
   }
   if (/\/mission$/.test(path)) return as({ at: new Date(Date.now() + 15 * 3600_000).toISOString() });
   if (method !== "GET") return as({ ok: true });

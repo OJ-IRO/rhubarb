@@ -11,7 +11,7 @@ Built for the Bee track of the [Build, Ship, Shape: Amazon Developer Hackathon](
 1. **Listens.** Questions you ask out loud, facts you hedge on, things you say you want to get better at, jargon you're around but never use, and what's coming up on your calendar all become evidence, each with when, where, and who.
 2. **Reflects.** Every night (or when you ask) it clusters that evidence into skills and ranks them, with a short note for each explaining why this, and why now, in terms of what you actually said.
 3. **Teaches.** Accept a skill and it builds a ladder from "can follow the conversation" to "can teach it," then writes each lesson as a deck of cards in the way you like to be taught: your own moments as the examples, a diagram, sourced images, further reading, and a check on whether it landed.
-4. **Practices through the pendant.** A prompt arrives as an alarm on your phone. You hold the Bee's button and explain the idea out loud. Your explanation is graded and the feedback comes back the same way.
+4. **Practices through the Bee.** A prompt arrives as an alarm on your phone. You hold the Bee's button and explain the idea out loud. Your explanation is graded and the feedback comes back the same way.
 5. **Hears you get better.** When a later conversation shows you using the skill correctly, that counts toward your level. Competence is measured in your life, not in the app.
 
 Passing curiosity ("I wonder how bees make honey") takes a lighter path: a one-paragraph answer card, and a recall prompt a few days later.
