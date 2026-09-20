@@ -89,6 +89,13 @@ export function Honeycomb() {
     return ordered.map((s, i) => ({ id: s.id, name: s.name, x: pos[i].x, y: pos[i].y, fill: fillOf(s), waiting: s.status === "proposed" }));
   }, [ordered]);
   const byId = useMemo(() => new Map(ordered.map((s) => [s.id, s])), [ordered]);
+  // Round the comb out to a whole ring (1, 7, 19, 37 cells…) with faint empty cells.
+  const ghosts = useMemo(() => {
+    let ring = 0;
+    while (1 + 3 * ring * (ring + 1) < ordered.length) ring++;
+    const full = Math.max(1 + 3 * ring * (ring + 1), 7);
+    return hexSpiral(full, 1).slice(ordered.length);
+  }, [ordered.length]);
 
   if (!skills) return null;
   const pointed = hover === null ? null : byId.get(hover) ?? null;
@@ -106,7 +113,7 @@ export function Honeycomb() {
             flatComb
           ) : (
             <Suspense fallback={flatComb}>
-              <Comb3D cells={cells} hovered={hover} onHover={setHover} onOpen={(id) => go(`/skills/${id}`)} onFail={() => setFlat(true)} />
+              <Comb3D cells={cells} ghosts={ghosts} hovered={hover} onHover={setHover} onOpen={(id) => go(`/skills/${id}`)} onFail={() => setFlat(true)} />
             </Suspense>
           )}
           <p className="comb-caption muted" aria-live="polite">

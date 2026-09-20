@@ -890,11 +890,14 @@ textarea {
   position: absolute;
   top: 0;
   left: 0;
-  width: calc(var(--cell) * 0.84);
+  /* Narrower than the hexagon's inner width, so a name wraps inside its own cell instead of
+     running across the neighbour's wall. */
+  width: calc(var(--cell) * 0.6);
   text-align: center;
-  font-size: clamp(9.5px, calc(var(--cell) * 0.105), 13.5px);
-  line-height: 1.2;
-  overflow-wrap: anywhere;
+  font-size: clamp(9px, calc(var(--cell) * 0.098), 13.5px);
+  line-height: 1.18;
+  hyphens: auto;
+  overflow-wrap: break-word;
   color: var(--ink);
   pointer-events: none;
   text-wrap: balance;

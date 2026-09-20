@@ -19,15 +19,17 @@ interface Props {
   hovered: number | null;
   onHover: (id: number | null) => void;
   onOpen: (id: number) => void;
+  /** Empty positions that round the comb out to a full ring. Drawn faint, never labelled. */
+  ghosts?: Array<{ x: number; y: number }>;
   /** WebGL could not start; the page falls back to the flat comb. */
   onFail: () => void;
 }
 
-const WALL = 0.9; // wall height of a cell you've taken on
-const WALL_WAITING = 0.32; // cells waiting on a decision sit low and pale
+const WALL = 0.62; // wall height of a cell you've taken on
+const WALL_WAITING = 0.3; // cells waiting on a decision sit low and pale
 const OUTER = 0.965;
 const INNER = 0.83;
-const LIFT = 0.16;
+const LIFT = 0.14;
 const MARGIN = 0.9; // how much of the frame the comb may fill, in NDC
 
 function hexShape(r: number): THREE.Shape {
@@ -57,7 +59,7 @@ function token(name: string, fallback: string): THREE.Color {
 
 const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
 
-export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Props) {
+export default function Comb3D({ cells, ghosts = [], hovered, onHover, onOpen, onFail }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const labels = useRef(new Map<number, HTMLAnchorElement>());
   const hoveredRef = useRef<number | null>(hovered);
@@ -104,7 +106,7 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
     sun.shadow.bias = -0.0005;
     scene.add(sun);
 
-    const extent = Math.max(...cells.map((c) => Math.hypot(c.x, c.y)), 0) + 1.35;
+    const extent = Math.max(...[...cells, ...ghosts].map((c) => Math.hypot(c.x, c.y)), 0) + 1.35;
     const sc = sun.shadow.camera;
     sc.left = sc.bottom = -extent - 1;
     sc.right = sc.top = extent + 1;
@@ -135,6 +137,20 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
       emissiveIntensity: 0.1,
     });
     const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+    const ghostMat = new THREE.MeshStandardMaterial({ color: token("--comb-light", "#faedc8"), roughness: 1, transparent: true, opacity: 0.55 });
+    const ghostEdge = new THREE.LineBasicMaterial({ color: token("--comb", "#f3d78a"), transparent: true, opacity: 0.9 });
+    for (const g of ghosts) {
+      const group = new THREE.Group();
+      group.position.set(g.x, 0, g.y);
+      const walls = new THREE.Mesh(wallGeo, ghostMat);
+      walls.scale.y = 0.1;
+      const floor = new THREE.Mesh(floorGeo, ghostMat);
+      floor.scale.y = 0.03;
+      const lines = new THREE.LineSegments(edgeGeo, ghostEdge);
+      lines.scale.y = 0.1;
+      group.add(walls, floor, lines);
+      scene.add(group);
+    }
 
     interface Live {
       cell: CombCell;
@@ -187,6 +203,12 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
         corners.push(new THREE.Vector3(l.cell.x + Math.cos(a), 0, l.cell.y + Math.sin(a)), new THREE.Vector3(l.cell.x + Math.cos(a), l.wall + LIFT, l.cell.y + Math.sin(a)));
       }
     }
+    for (const g of ghosts) {
+      for (let i = 0; i < 6; i++) {
+        const a = (Math.PI / 3) * i + Math.PI / 6;
+        corners.push(new THREE.Vector3(g.x + Math.cos(a), 0, g.y + Math.sin(a)));
+      }
+    }
     const resize = () => {
       const w = host.clientWidth;
       const h = host.clientHeight;
@@ -196,7 +218,7 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
       camera.updateProjectionMatrix();
       // Frame the comb on what it really covers on screen. The tilt means the on-screen shape
       // depends on distance, so: find the distance that fits, centre vertically, and repeat once.
-      const dir = new THREE.Vector3(0, 1.1, 1).normalize();
+      const dir = new THREE.Vector3(0, 1.75, 1).normalize();
       const probe = new THREE.Vector3();
       const cover = (dist: number, target: number) => {
         camera.position.copy(dir).multiplyScalar(dist);
@@ -258,7 +280,9 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
       for (const l of live) {
         const el = labels.current.get(l.cell.id);
         if (!el) continue;
-        point.set(l.cell.x, l.wall + l.lift + 0.02, l.cell.y).project(camera);
+        // Anchor to the surface the eye reads as "the cell": the honey, or the floor of an empty one.
+        const surface = l.honey ? 0.05 + l.level * (l.wall - 0.09) : 0.05;
+        point.set(l.cell.x, surface + l.lift, l.cell.y).project(camera);
         el.style.transform = `translate(-50%, -50%) translate(${((point.x + 1) / 2) * w}px, ${((1 - point.y) / 2) * h}px)`;
       }
     };
@@ -330,13 +354,13 @@ export default function Comb3D({ cells, hovered, onHover, onOpen, onFail }: Prop
       canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("click", onClick as EventListener);
       for (const g of [wallGeo, floorGeo, honeyGeo, hitGeo, edgeGeo, ground.geometry]) g.dispose();
-      for (const m of [wax, waxWaiting, honey, hitMat, edge, edgeWaiting, ground.material as THREE.Material]) m.dispose();
+      for (const m of [wax, waxWaiting, honey, hitMat, ghostMat, ghostEdge, edge, edgeWaiting, ground.material as THREE.Material]) m.dispose();
       env.dispose();
       pmrem.dispose();
       renderer.dispose();
       canvas.remove();
     };
-  }, [cells]);
+  }, [cells, ghosts]);
 
   return (
     <div className="comb3d" ref={wrap}>
