@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type SkillRow } from "../api";
+import { HexBadge, HexLevels, Loading } from "../components/Hex";
 import { Meter, StatusChip } from "../components/Meter";
 import { Link } from "../router";
 
@@ -41,7 +42,7 @@ export function Board() {
     return () => clearInterval(t);
   }, []);
 
-  if (!skills) return null;
+  if (!skills) return <Loading />;
   const ranked = skills.filter((s) => s.status !== "dismissed").sort((a, b) => b.priority - a.priority);
   const top = ranked.slice(0, 3);
   const rest = ranked.slice(3);
@@ -66,15 +67,20 @@ export function Board() {
         <section className="spotlight">
           {top.map((s, i) => (
             <article key={s.id} className={`spot spot-${i + 1}`}>
-              <div className="spot-rank">{i + 1}</div>
-              <StatusChip status={s.status} />
+              <div className="spot-top">
+                <HexBadge n={i + 1} tone={i === 0 ? "honey" : "wax"} size={42} />
+                <StatusChip status={s.status} />
+              </div>
               <h2>
                 <Link to={`/skills/${s.id}`}>{s.name}</Link>
               </h2>
               <p className="spot-why">{firstSentence(s.brief)}</p>
               <Meter value={s.priority} />
-              <p className="muted small">
-                {s.evidenceCount} moments{s.status === "active" ? ` · level ${s.level + 1} of ${s.ladderLength || "?"}` : ""}
+              <p className="muted small spot-foot">
+                {s.status !== "proposed" && <HexLevels level={s.level} total={s.ladderLength} mastered={s.status === "mastered"} size={15} />}
+                <span>
+                  {s.evidenceCount} moments{s.status === "active" ? ` · level ${s.level + 1} of ${s.ladderLength || "?"}` : ""}
+                </span>
               </p>
               <div className="actions">
                 <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
@@ -97,7 +103,9 @@ export function Board() {
             const expanded = open === s.id;
             return (
               <article key={s.id} className="rank-row">
-                <div className="rank-num">{idx}</div>
+                <div className="rank-num">
+                  <HexBadge n={idx} size={34} />
+                </div>
                 <div className="rank-main">
                   <div className="rank-head">
                     <h3>

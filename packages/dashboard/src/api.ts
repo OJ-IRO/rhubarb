@@ -13,7 +13,7 @@ export interface Today {
   profile: Profile | null;
   letter: string | null;
   letterDate: string | null;
-  lesson: { lesson: Lesson; skill: Skill } | null;
+  lesson: { lesson: Lesson; skill: Skill; ladderLength?: number } | null;
   duePractice: Practice[];
   dueCards: Array<{ cardId: number; dueAt: number; card: Card | null }>;
   proposed: number;

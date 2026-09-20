@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { HexLevels, Loading } from "../components/Hex";
 import type { Deck, LessonBeat, Quiz } from "@rhubarb/core";
 import { api, type LessonView, type QuizResult } from "../api";
 import { DeckViewer } from "../components/Deck";
@@ -12,6 +13,7 @@ export function LessonPage({ id }: { id: number }) {
   const [stage, setStage] = useState<Stage>("deck");
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [sentToPendant, setSentToPendant] = useState(false);
+  const [tutorOpen, setTutorOpen] = useState(false);
   const [missionAt, setMissionAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -27,7 +29,7 @@ export function LessonPage({ id }: { id: number }) {
     window.scrollTo(0, 0);
   }, [stage]);
 
-  if (!view) return null;
+  if (!view) return <Loading label="Opening your lesson" />;
   const { lesson, skill, ladder } = view;
   const deck = JSON.parse(lesson.deck) as Deck;
   const quiz = JSON.parse(lesson.quiz) as Quiz;
@@ -40,14 +42,22 @@ export function LessonPage({ id }: { id: number }) {
     <div className="lesson-layout">
       <article className="lesson-main">
         <p className="eyebrow">
-          {skill && <Link to={`/skills/${skill.id}`}>{skill.name}</Link>} · level {lesson.levelIdx + 1}
-          {ladder.length ? ` of ${ladder.length}` : ""}
+          <span>
+            {skill && <Link to={`/skills/${skill.id}`}>{skill.name}</Link>} · level {lesson.levelIdx + 1}
+            {ladder.length ? ` of ${ladder.length}` : ""}
+          </span>
+          <HexLevels level={lesson.levelIdx} total={ladder.length} size={14} />
+          <span className="spacer" />
           <span className="stage-tabs">
             {(["deck", "quiz", "practice"] as Stage[]).map((s) => (
               <button key={s} className={stage === s ? "tab on" : "tab"} onClick={() => setStage(s)}>
                 {s === "deck" ? "Lesson" : s === "quiz" ? "Check" : "Practice"}
               </button>
             ))}
+            {/* Lives here, not floating over the page, where it used to sit on top of "Next". */}
+            <button className={tutorOpen ? "tab pushback on" : "tab pushback"} aria-expanded={tutorOpen} onClick={() => setTutorOpen(!tutorOpen)}>
+              Push back
+            </button>
           </span>
         </p>
 
@@ -145,7 +155,7 @@ export function LessonPage({ id }: { id: number }) {
         )}
       </article>
 
-      <Tutor lessonId={id} initial={view.session ? (JSON.parse(view.session.tutor) as Msg[]) : []} />
+      <Tutor lessonId={id} initial={view.session ? (JSON.parse(view.session.tutor) as Msg[]) : []} open={tutorOpen} onClose={() => setTutorOpen(false)} />
     </div>
   );
 }
@@ -155,11 +165,10 @@ interface Msg {
   content: string;
 }
 
-function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
+function Tutor({ lessonId, initial, open, onClose }: { lessonId: number; initial: Msg[]; open: boolean; onClose: () => void }) {
   const [history, setHistory] = useState<Msg[]>(initial);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
-  const [open, setOpen] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -191,12 +200,15 @@ function Tutor({ lessonId, initial }: { lessonId: number; initial: Msg[] }) {
   }
 
   return (
-    <aside className={open ? "tutor open" : "tutor"}>
-      <button className="tutor-toggle" onClick={() => setOpen(!open)}>
-        {open ? "Close" : "Push back"}
-      </button>
+    <aside className={open ? "tutor open" : "tutor"} aria-label="Tutor" hidden={!open}>
       {open && (
         <>
+          <div className="tutor-head">
+            <strong>Push back</strong>
+            <button className="ghost small" onClick={onClose}>
+              Close
+            </button>
+          </div>
           <div className="thread">
             {history.length === 0 && <p className="muted small">Ask why, disagree, or ask for a different example. The tutor knows this lesson and what you said this week.</p>}
             {history.map((m, i) => (

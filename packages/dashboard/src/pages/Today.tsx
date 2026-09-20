@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, when, type Today as TodayData } from "../api";
+import { HexBadge, HexLevels, Loading } from "../components/Hex";
 import { Link } from "../router";
 
 export function Today() {
@@ -13,7 +14,8 @@ export function Today() {
     return () => clearInterval(t);
   }, []);
 
-  if (!data) return null;
+  if (!data) return <Loading />;
+  const due = data.duePractice.length + data.dueCards.length;
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
 
@@ -33,11 +35,43 @@ export function Today() {
         </p>
       )}
 
+      {data.active + data.proposed > 0 && (
+        <div className="glance">
+          <Link to="/honeycomb" className="glance-tile">
+            <HexBadge n={data.active} tone="honey" size={38} />
+            <span>
+              <strong>{data.active === 1 ? "skill" : "skills"} under way</strong>
+              <span className="muted">See the comb</span>
+            </span>
+          </Link>
+          <Link to="/board" className="glance-tile">
+            <HexBadge n={data.proposed} size={38} />
+            <span>
+              <strong>{data.proposed === 1 ? "needs" : "need"} a decision</strong>
+              <span className="muted">{data.proposed > 0 ? "Have a look at the board" : "Nothing waiting on you"}</span>
+            </span>
+          </Link>
+          <div className="glance-tile">
+            <HexBadge n={due} size={38} />
+            <span>
+              <strong>due today</strong>
+              <span className="muted">{due > 0 ? "Listed below" : "You're clear"}</span>
+            </span>
+          </div>
+        </div>
+      )}
+
       {data.lesson ? (
         <section className="card lesson-card">
           <p className="eyebrow">Today's lesson</p>
           <h2>{data.lesson.skill.name}</h2>
-          <p className="muted">Level {data.lesson.skill.level + 1}. About {data.profile?.sessionMinutes ?? 10} minutes.</p>
+          <p className="lesson-meta">
+            <HexLevels level={data.lesson.skill.level} total={data.lesson.ladderLength ?? 0} size={18} />
+            <span>
+              Level {data.lesson.skill.level + 1}
+              {data.lesson.ladderLength ? ` of ${data.lesson.ladderLength}` : ""} · about {data.profile?.sessionMinutes ?? 10} minutes
+            </span>
+          </p>
           <Link to={`/lessons/${data.lesson.lesson.id}`} className="button primary">
             Open the lesson
           </Link>
@@ -49,29 +83,23 @@ export function Today() {
         </section>
       ) : null}
 
-      {data.proposed > 0 && (
-        <section className="card">
-          <p className="eyebrow">Waiting on you</p>
-          <p>
-            {data.proposed === 1 ? "One skill" : `${data.proposed} skills`} on the board need a decision.{" "}
-            <Link to="/board">Have a look.</Link>
-          </p>
-        </section>
-      )}
-
       {(data.duePractice.length > 0 || data.dueCards.length > 0) && (
         <section className="card">
           <p className="eyebrow">Due</p>
-          <ul className="plain">
+          <ul className="due-list">
             {data.duePractice.map((p) => (
               <li key={p.id}>
-                <strong>{p.kind === "mission" ? "Mission" : p.kind === "teachback" ? "Teach it back" : "Recall"}</strong> · {p.prompt}
-                <span className="muted"> · sent to your Bee {when(p.scheduledFor)}</span>
+                <span className="due-kind">{p.kind === "mission" ? "Mission" : p.kind === "teachback" ? "Teach it back" : "Recall"}</span>
+                <span>
+                  {p.prompt}
+                  <span className="muted"> · sent to your Bee {when(p.scheduledFor)}</span>
+                </span>
               </li>
             ))}
             {data.dueCards.map((d) => (
               <li key={d.cardId}>
-                <strong>Recall</strong> · {d.card?.title}
+                <span className="due-kind">Recall</span>
+                <span>{d.card?.title}</span>
               </li>
             ))}
           </ul>
@@ -81,10 +109,11 @@ export function Today() {
       {data.sparks.length > 0 && (
         <section className="card">
           <p className="eyebrow">Things you wondered lately</p>
-          <ul className="plain">
+          <ul className="due-list">
             {data.sparks.map(({ card, item }) => (
               <li key={card.id}>
-                {card.title} <span className="muted">· {when(item.spokenAt)}</span>
+                <span className="due-kind">{new Date(item.spokenAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span>
+                <span>{card.title}</span>
               </li>
             ))}
           </ul>

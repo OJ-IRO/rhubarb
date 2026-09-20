@@ -43,7 +43,7 @@ function SlideView({ s }: { s: Slide }) {
       return (
         <div className="slide image">
           <h2>{s.heading}</h2>
-          {s.url ? <img src={s.url} alt={s.alt} /> : <div className="img-missing">{s.alt}</div>}
+          <SlideImage url={s.url} alt={s.alt} />
           <p className="caption">
             {s.caption}
             {s.credit && <span className="credit"> · {s.credit}</span>}
@@ -157,4 +157,11 @@ export function DeckViewer({ deck, onFinish }: { deck: Deck; onFinish: () => voi
       </div>
     </div>
   );
+}
+
+/** A picture that can fail. Links on the web die, and a broken-image icon mid-lesson looks like our bug. */
+function SlideImage({ url, alt }: { url?: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return <div className="img-missing">{alt}</div>;
+  return <img src={url} alt={alt} loading="lazy" onError={() => setFailed(true)} />;
 }

@@ -11,6 +11,14 @@
   --credit: #fff4d6;
   --good: #3c7a3f;
   --bad: #b2452f;
+  /* Shadows are tinted amber, like light through wax. Grey shadows read as a different app. */
+  --shadow-rest: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 1px 2px rgba(122, 84, 10, 0.07), 0 10px 26px -16px rgba(122, 84, 10, 0.32);
+  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 2px 4px rgba(122, 84, 10, 0.08), 0 22px 40px -20px rgba(122, 84, 10, 0.42);
+  --shadow-press: 0 1px 2px rgba(122, 84, 10, 0.18) inset;
+  --wax: linear-gradient(180deg, #fffefb 0%, #fdf8ea 100%);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* One tile of comb, used as a faint texture. */
+  --comb-tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='27.71' height='48' viewBox='0 0 27.71 48'%3E%3Cpath d='M13.86 0 L27.71 8 V24 L13.86 32 L0 24 V8 Z M13.86 32 V48' fill='none' stroke='%23d9b95a' stroke-width='1'/%3E%3C/svg%3E");
   font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   color: var(--ink);
   background: var(--bg);
@@ -22,7 +30,18 @@
 }
 body {
   margin: 0;
-  background: var(--bg);
+  background: radial-gradient(1100px 620px at 100% -8%, rgba(243, 215, 138, 0.3), transparent 62%), var(--bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+:focus-visible {
+  outline: 2px solid var(--honey-deep);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+::selection {
+  background: var(--comb);
 }
 a {
   color: var(--honey-deep);
@@ -60,6 +79,8 @@ a:hover {
 }
 .side {
   border-right: 1px solid var(--line);
+  background: linear-gradient(180deg, #fdf7e6 0%, rgba(251, 248, 241, 0.4) 55%);
+  isolation: isolate;
   padding: 32px 20px;
   display: flex;
   flex-direction: column;
@@ -72,22 +93,85 @@ a:hover {
   top: 38px;
   height: calc(100vh - 38px);
 }
+/* Comb texture rising from the foot of the sidebar, fading out before it reaches the links. */
+.side::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 46%;
+  background-image: var(--comb-tile);
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, transparent 92%);
+  mask-image: linear-gradient(0deg, #000 0%, transparent 92%);
+  pointer-events: none;
+  z-index: -1;
+}
 .brand {
-  font-size: 22px;
+  font-size: 23px;
+  letter-spacing: -0.01em;
   color: var(--ink);
-  margin-bottom: 20px;
+  margin-bottom: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+.brand:hover {
+  text-decoration: none;
+}
+.brandmark {
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 2px rgba(122, 84, 10, 0.25));
+}
+.bm-wax {
+  fill: var(--comb-light);
+  stroke: var(--honey-deep);
+  stroke-width: 5;
+  stroke-linejoin: round;
+}
+.bm-honey {
+  fill: var(--honey);
+  stroke: var(--honey-deep);
+  stroke-width: 5;
+  stroke-linejoin: round;
 }
 .mark {
   font-size: 18px;
 }
 .navlink {
   color: var(--muted);
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  transition: background 160ms var(--ease), color 160ms var(--ease);
+}
+/* A small cell marks where you are: empty for the other pages, full of honey for this one. */
+.navlink::before {
+  content: "";
+  width: 9px;
+  height: 10px;
+  flex-shrink: 0;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--line);
+  transition: background 160ms var(--ease), transform 200ms var(--ease);
+}
+.navlink:hover {
+  color: var(--ink);
+  background: rgba(243, 215, 138, 0.35);
+  text-decoration: none;
+}
+.navlink:hover::before {
+  background: var(--comb);
 }
 .navlink.active {
   color: var(--ink);
   background: var(--comb);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 6px 14px -10px rgba(122, 84, 10, 0.5);
+}
+.navlink.active::before {
+  background: var(--honey-deep);
+  transform: scale(1.15);
 }
 .navlink.small {
   font-size: 14px;
@@ -101,13 +185,29 @@ a:hover {
 .shell {
   max-width: 860px;
   padding: 48px 40px 120px;
+  position: relative;
+}
+/* Whatever page is showing arrives with a short rise, like the honey in the comb. */
+.shell > * {
+  animation: rise 420ms var(--ease) both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- type ---------- */
 .title {
-  font-size: 34px;
+  font-size: 40px;
   font-weight: 500;
-  line-height: 1.15;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
   margin: 0 0 12px;
 }
 h2 {
@@ -125,11 +225,27 @@ h3 {
   margin-top: 0;
 }
 .eyebrow {
-  font-size: 13px;
-  letter-spacing: 0.08em;
+  font-size: 12.5px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
   margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+/* Section headings get a hairline that runs out to the right, so a page has rhythm without boxes. */
+section > .eyebrow:first-child::after {
+  content: "";
+  flex: 1;
+  min-width: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line), transparent);
+}
+/* Sections that are not themselves cards get air above them, including the first one on a page. */
+.shell section:not(.card) {
+  margin-top: 34px;
 }
 .muted {
   color: var(--muted);
@@ -138,10 +254,18 @@ h3 {
   font-size: 14px;
 }
 .letter {
-  font-size: 19px;
-  line-height: 1.65;
+  font-size: 19.5px;
+  line-height: 1.68;
   max-width: 62ch;
-  margin: 0 0 32px;
+  margin: 0 0 30px;
+}
+/* It is a letter, so it opens like one. */
+.letter:not(.muted)::first-letter {
+  float: left;
+  font-size: 3.35em;
+  line-height: 0.86;
+  padding: 0.07em 0.09em 0 0;
+  color: var(--honey-deep);
 }
 .brief {
   line-height: 1.6;
@@ -164,7 +288,8 @@ h3 {
 .feedback {
   background: var(--credit);
   border-left: 3px solid var(--honey);
-  padding: 10px 14px;
+  border-radius: 0 10px 10px 0;
+  padding: 12px 16px;
   line-height: 1.55;
   margin: 10px 0 0;
 }
@@ -174,18 +299,65 @@ h3 {
 
 /* ---------- cards & buttons ---------- */
 .card {
-  background: var(--paper);
+  background: var(--wax);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 20px 24px;
+  border-radius: 14px;
+  padding: 22px 26px;
   margin: 0 0 16px;
+  box-shadow: var(--shadow-rest);
+  animation: rise 460ms var(--ease) both;
+}
+.card:nth-of-type(2) {
+  animation-delay: 60ms;
+}
+.card:nth-of-type(3) {
+  animation-delay: 120ms;
+}
+.card:nth-of-type(n + 4) {
+  animation-delay: 180ms;
+}
+.card > :last-child {
+  margin-bottom: 0;
 }
 .card.credited {
-  background: var(--credit);
+  background: linear-gradient(180deg, #fff8e2, var(--credit));
   border-color: var(--comb);
+  border-left: 4px solid var(--honey);
 }
+/* Today's lesson is the one thing on the page to do, so it is the one thing that glows. */
 .lesson-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   border-color: var(--honey);
+  background: linear-gradient(135deg, #fff3cf 0%, #fffdf6 58%);
+  padding: 28px 30px;
+  box-shadow: var(--shadow-lift);
+}
+.lesson-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 45%;
+  background-image: var(--comb-tile);
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(120% 130% at 100% 0%, #000 0%, transparent 70%);
+  mask-image: radial-gradient(120% 130% at 100% 0%, #000 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
+}
+.lesson-card h2 {
+  font-size: 30px;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin: 2px 0 10px;
+}
+.lesson-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+  color: var(--muted);
 }
 .skill-head {
   display: flex;
@@ -221,30 +393,48 @@ h3 {
 button,
 .button {
   font: inherit;
-  border-radius: 8px;
-  padding: 9px 16px;
+  border-radius: 10px;
+  padding: 9px 17px;
   border: 1px solid var(--line);
-  background: var(--paper);
+  background: var(--wax);
   color: var(--ink);
   cursor: pointer;
   display: inline-block;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 1px 2px rgba(122, 84, 10, 0.1);
+  transition: transform 140ms var(--ease), box-shadow 140ms var(--ease), background 140ms var(--ease), border-color 140ms var(--ease);
+}
+button:hover:not(:disabled),
+.button:hover {
+  border-color: var(--comb);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 6px 14px -8px rgba(122, 84, 10, 0.45);
+  text-decoration: none;
+}
+button:active:not(:disabled),
+.button:active {
+  transform: translateY(1px);
+  box-shadow: var(--shadow-press);
 }
 button:disabled {
   opacity: 0.55;
   cursor: default;
 }
+/* The main action has the honey's gloss: a lit top edge, a deeper foot. */
 .primary {
-  background: var(--honey);
-  border-color: var(--honey);
+  background: linear-gradient(180deg, #f6c34f 0%, var(--honey) 55%, #dd9c1c 100%);
+  border-color: #c98a0e;
+  color: #2a1e04;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 -1px 0 rgba(122, 84, 10, 0.25) inset, 0 8px 16px -10px rgba(201, 138, 14, 0.9);
 }
 .primary:hover:not(:disabled) {
-  background: var(--honey-deep);
+  background: linear-gradient(180deg, #f8cb62 0%, #eeb02f 55%, #d99515 100%);
   border-color: var(--honey-deep);
-  color: #fff;
-  text-decoration: none;
+  color: #2a1e04;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 -1px 0 rgba(122, 84, 10, 0.25) inset, 0 12px 22px -10px rgba(201, 138, 14, 0.95);
 }
 .ghost {
   background: transparent;
+  box-shadow: none;
 }
 button.small,
 .button.small {
@@ -255,12 +445,20 @@ input,
 textarea {
   font: inherit;
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 14px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--paper);
   color: var(--ink);
   margin-top: 8px;
+  box-shadow: 0 1px 2px rgba(122, 84, 10, 0.08) inset;
+  transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease);
+}
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--honey);
+  box-shadow: 0 0 0 3px rgba(233, 168, 37, 0.22);
 }
 textarea {
   resize: vertical;
@@ -268,17 +466,29 @@ textarea {
 }
 
 /* ---------- meter & chips ---------- */
+/* A trough with honey poured into it. */
 .meter {
-  height: 6px;
-  background: var(--line);
-  border-radius: 3px;
+  height: 9px;
+  background: #efe6cf;
+  border-radius: 999px;
   overflow: hidden;
-  margin: 6px 0;
+  margin: 8px 0;
+  box-shadow: 0 1px 2px rgba(122, 84, 10, 0.22) inset;
 }
 .meter-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--comb), var(--honey-deep));
-  border-radius: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, transparent 45%), linear-gradient(90deg, #f3cf6a, var(--honey) 60%, var(--honey-deep));
+  transform-origin: left center;
+  animation: pour 900ms var(--ease) 200ms both;
+}
+@keyframes pour {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 .chip-status {
   display: inline-block;
@@ -314,33 +524,64 @@ textarea {
 }
 .spot {
   position: relative;
-  background: var(--paper);
+  background: var(--wax);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 22px 20px 18px;
+  border-radius: 16px;
+  padding: 20px 20px 18px;
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow: hidden;
+  isolation: isolate;
+  box-shadow: var(--shadow-rest);
+  transition: transform 220ms var(--ease), box-shadow 220ms var(--ease), border-color 220ms var(--ease);
+  animation: rise 480ms var(--ease) both;
+}
+.spot:nth-child(2) {
+  animation-delay: 80ms;
+}
+.spot:nth-child(3) {
+  animation-delay: 160ms;
+}
+.spot:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--comb);
 }
 .spot-1 {
-  background: linear-gradient(160deg, var(--comb-light), var(--paper) 70%);
+  background: linear-gradient(160deg, #fff0c4 0%, #fffdf6 62%);
   border-color: var(--honey);
+  box-shadow: var(--shadow-lift);
 }
-.spot-rank {
-  font-size: 56px;
-  line-height: 1;
-  color: var(--honey);
-  font-weight: 500;
+.spot-1::after {
+  content: "";
   position: absolute;
-  right: 16px;
-  top: 8px;
-  opacity: 0.55;
+  inset: 0;
+  background-image: var(--comb-tile);
+  opacity: 0.45;
+  -webkit-mask-image: radial-gradient(90% 70% at 100% 0%, #000 0%, transparent 72%);
+  mask-image: radial-gradient(90% 70% at 100% 0%, #000 0%, transparent 72%);
+  pointer-events: none;
+  z-index: -1;
+}
+.spot-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 2px;
 }
 .spot h2 {
   font-size: 21px;
+  line-height: 1.2;
   margin: 4px 0 0;
-  padding-right: 40px;
+}
+.spot-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0;
 }
 .spot h2 a {
   color: var(--ink);
@@ -360,12 +601,16 @@ textarea {
   display: grid;
   grid-template-columns: 44px 1fr;
   gap: 14px;
-  padding: 18px 0;
+  padding: 18px 12px;
+  margin: 0 -12px;
   border-top: 1px solid var(--line);
+  border-radius: 12px;
+  transition: background 200ms var(--ease);
+}
+.rank-row:hover {
+  background: rgba(255, 253, 246, 0.9);
 }
 .rank-num {
-  font-size: 24px;
-  color: var(--muted);
   padding-top: 2px;
 }
 .rank-head {
@@ -423,19 +668,42 @@ textarea {
   padding: 0;
   margin: 0;
 }
+/* The ladder is drawn as a climb: a cell per rung, joined by a line that is honey as far as you've got. */
 .rung {
-  display: flex;
-  justify-content: space-between;
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
   align-items: center;
   gap: 16px;
   padding: 14px 0;
-  border-bottom: 1px solid var(--line);
 }
-.rung.done strong::before {
-  content: "✓ ";
-  color: var(--honey-deep);
+.rung::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--line);
+  z-index: 0;
 }
-.rung.locked {
+.rung:first-child::before {
+  top: 50%;
+}
+.rung:last-child::before {
+  bottom: 50%;
+}
+.rung:only-child::before {
+  display: none;
+}
+.rung.done::before {
+  background: var(--honey);
+}
+.rung.current::before {
+  background: linear-gradient(180deg, var(--honey) 50%, var(--line) 50%);
+}
+.rung.locked > div,
+.rung.locked > span:last-child {
   opacity: 0.55;
 }
 .rung.current strong {
@@ -453,6 +721,7 @@ textarea {
   max-width: 760px;
 }
 .stage-tabs {
+  margin-left: auto;
   float: right;
   display: inline-flex;
   gap: 4px;
@@ -491,7 +760,8 @@ textarea {
 }
 .dot {
   flex: 1;
-  height: 4px;
+  height: 5px;
+  box-shadow: none;
   padding: 0;
   border: 0;
   border-radius: 2px;
@@ -504,13 +774,28 @@ textarea {
   background: var(--honey-deep);
 }
 .deck-stage {
-  background: var(--paper);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--wax);
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 18px;
   min-height: 460px;
   padding: 44px 48px;
-  box-shadow: 0 10px 30px -18px rgba(31, 27, 20, 0.25);
-  animation: slidein 240ms ease-out;
+  box-shadow: var(--shadow-lift);
+  animation: slidein 320ms var(--ease);
+}
+/* A lesson's first card carries the comb in its corner, like a cover. */
+.deck-stage:has(.slide.cover)::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 40%;
+  background-image: var(--comb-tile);
+  opacity: 0.5;
+  -webkit-mask-image: radial-gradient(110% 120% at 100% 100%, #000 0%, transparent 68%);
+  mask-image: radial-gradient(110% 120% at 100% 100%, #000 0%, transparent 68%);
+  pointer-events: none;
+  z-index: -1;
 }
 @keyframes slidein {
   from {
@@ -595,9 +880,12 @@ textarea {
   display: block;
   max-width: 100%;
   max-height: 380px;
-  margin: 0 auto 8px;
-  border-radius: 10px;
+  margin: 0 auto 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #fff;
   object-fit: contain;
+  box-shadow: var(--shadow-rest);
 }
 .img-missing {
   background: var(--bg);
@@ -609,9 +897,10 @@ textarea {
 }
 .slide.example blockquote {
   margin: 0 0 22px;
-  padding: 22px 26px;
-  background: var(--credit);
-  border-radius: 12px;
+  padding: 24px 28px;
+  background: linear-gradient(180deg, #fff8e2, var(--credit));
+  border-left: 4px solid var(--honey);
+  border-radius: 4px 14px 14px 4px;
   font-size: 22px;
   line-height: 1.45;
   font-style: italic;
@@ -644,9 +933,9 @@ textarea {
 .slide.steps li::before {
   content: counter(step);
   width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--comb);
+  height: 35px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: linear-gradient(180deg, #f6c34f, var(--honey));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -705,12 +994,13 @@ textarea {
   margin-top: 18px;
 }
 .q {
-  background: var(--paper);
+  background: var(--wax);
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 22px 26px;
   margin: 14px 0;
   position: relative;
+  box-shadow: var(--shadow-rest);
 }
 .q.right {
   border-color: var(--good);
@@ -764,9 +1054,12 @@ textarea {
 }
 .scorecard {
   margin-top: 24px;
-  padding: 26px 30px;
-  background: var(--credit);
-  border-radius: 14px;
+  padding: 28px 32px;
+  background: linear-gradient(135deg, #fff0c4 0%, #fffdf6 70%);
+  border: 1px solid var(--honey);
+  border-radius: 16px;
+  box-shadow: var(--shadow-lift);
+  animation: rise 420ms var(--ease) both;
 }
 .score {
   font-size: 40px;
@@ -796,21 +1089,37 @@ textarea {
   padding: 12px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 34px -16px rgba(31, 27, 20, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 30px 60px -24px rgba(122, 84, 10, 0.55), 0 8px 18px -10px rgba(31, 27, 20, 0.2);
   z-index: 5;
 }
-.tutor:not(.open) {
-  width: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+.tutor[hidden] {
+  display: none;
 }
-.tutor-toggle {
-  align-self: flex-end;
+.tutor.open {
+  animation: rise 260ms var(--ease) both;
+}
+.tutor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 2px 8px 6px;
+  border-bottom: 1px solid var(--line);
+}
+/* The one dark control on the page: it is the way to argue with the lesson. */
+.tab.pushback {
+  margin-left: 8px;
   background: var(--ink);
-  color: var(--comb);
   border-color: var(--ink);
+  color: var(--comb);
+}
+.tab.pushback:hover:not(:disabled) {
+  color: #fff;
+}
+.tab.pushback.on {
+  background: var(--honey-deep);
+  border-color: var(--honey-deep);
+  color: #fff;
 }
 .tutor-send {
   display: flex;
@@ -919,6 +1228,314 @@ textarea {
   margin: 6px 0 0;
 }
 
+/* ---------- the comb's pieces, used across pages (components/Hex.tsx) ---------- */
+.hexbadge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  filter: drop-shadow(0 3px 3px rgba(122, 84, 10, 0.22));
+}
+.hexbadge svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.hexbadge .hex-face,
+.hexbadge .hex-wall {
+  stroke-width: 4;
+  stroke-linejoin: round;
+}
+.hexbadge.wax .hex-face {
+  fill: #fff9e8;
+  stroke: #d9b95a;
+}
+.hexbadge.wax .hex-wall {
+  fill: #ead9a4;
+  stroke: #d9b95a;
+}
+.hexbadge.honey .hex-face {
+  fill: var(--honey);
+  stroke: var(--honey-deep);
+}
+.hexbadge.honey .hex-wall {
+  fill: var(--honey-deep);
+  stroke: #a9720a;
+}
+.hexbadge.ink .hex-face {
+  fill: var(--ink);
+  stroke: #000;
+}
+.hexbadge.ink .hex-wall {
+  fill: #000;
+  stroke: #000;
+}
+.hexbadge-n {
+  position: relative;
+  font-size: 17px;
+  line-height: 1;
+  margin-top: -7%;
+  color: var(--ink);
+  font-variant-numeric: lining-nums;
+}
+.hexbadge.honey .hexbadge-n {
+  color: #2a1e04;
+  font-weight: 600;
+}
+.hexbadge.ink .hexbadge-n {
+  color: var(--comb);
+}
+
+.hexlevels {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+.hexlevel .hex-face {
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+.hexlevel.done .hex-face {
+  fill: var(--honey);
+  stroke: var(--honey-deep);
+}
+.hexlevel.current .hex-face {
+  fill: #fff9e8;
+  stroke: none;
+}
+.hexlevel.current .hex-honey {
+  fill: var(--honey);
+}
+.hexlevel.current .hex-rim {
+  fill: none;
+  stroke: var(--honey-deep);
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+.hexlevel.ahead .hex-face {
+  fill: #fbf5e2;
+  stroke: #e2d3a4;
+}
+
+.hexnode {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  background: var(--bg);
+  border-radius: 50%;
+}
+.hexnode .hex-face {
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+.hexnode.done .hex-face {
+  fill: var(--honey);
+  stroke: var(--honey-deep);
+}
+.hexnode .hex-tick {
+  fill: none;
+  stroke: #2a1e04;
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.hexnode.current .hex-face {
+  fill: #fff9e8;
+  stroke: var(--honey-deep);
+}
+.hexnode.current .hex-core {
+  fill: var(--honey);
+}
+.hexnode.current {
+  filter: drop-shadow(0 0 6px rgba(233, 168, 37, 0.7));
+}
+.hexnode.locked .hex-face {
+  fill: #fbf5e2;
+  stroke: #e2d3a4;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 96px 0;
+  opacity: 0;
+  animation: appear 300ms ease 350ms forwards;
+}
+.loading-cells {
+  display: inline-flex;
+  gap: 5px;
+}
+.loading-cells svg {
+  animation: cellpulse 1.1s ease-in-out infinite;
+}
+.loading-cells polygon {
+  fill: var(--comb);
+  stroke: var(--honey-deep);
+  stroke-width: 6;
+  stroke-linejoin: round;
+}
+@keyframes appear {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes cellpulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  45% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+/* ---------- today: the day at a glance ---------- */
+.glance {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin: 0 0 22px;
+}
+.glance-tile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--wax);
+  box-shadow: var(--shadow-rest);
+  color: var(--ink);
+  transition: transform 200ms var(--ease), box-shadow 200ms var(--ease), border-color 200ms var(--ease);
+}
+a.glance-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--comb);
+  text-decoration: none;
+}
+.glance-tile strong {
+  display: block;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.glance-tile span.muted {
+  font-size: 14px;
+  line-height: 1.3;
+  display: block;
+}
+.due-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.due-list li {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  line-height: 1.5;
+}
+.due-list li:first-child {
+  border-top: 0;
+  padding-top: 2px;
+}
+.due-kind {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--honey-deep);
+  padding-top: 4px;
+}
+
+/* ---------- sparks & quotes ---------- */
+.said {
+  margin: 10px 0 14px;
+  padding: 4px 0 4px 14px;
+  border-left: 3px solid var(--comb);
+  color: var(--muted);
+  font-style: italic;
+  line-height: 1.5;
+}
+.spark-card h2 {
+  font-size: 24px;
+  letter-spacing: -0.005em;
+  margin: 2px 0 4px;
+}
+.spark-card .answer {
+  line-height: 1.65;
+  max-width: 66ch;
+  margin: 0 0 12px;
+}
+.card .quote {
+  line-height: 1.5;
+}
+.moment {
+  padding: 10px 0 10px 14px;
+  margin: 0;
+  border-left: 3px solid var(--line);
+}
+.moment + .moment {
+  margin-top: 8px;
+}
+.score-pill {
+  display: inline-block;
+  min-width: 42px;
+  text-align: center;
+  padding: 2px 9px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--comb);
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: lining-nums;
+}
+
+/* ---------- onboarding ---------- */
+.onboarding {
+  max-width: 640px;
+}
+.onboarding .ask h2 {
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+.onboarding .ask > .muted {
+  font-size: 18px;
+  line-height: 1.5;
+  margin-top: 0;
+}
+.choice {
+  border-radius: 12px;
+}
+.choice.on {
+  border-color: var(--honey);
+  background: linear-gradient(180deg, #fff6d9, var(--credit));
+  box-shadow: 0 0 0 3px rgba(233, 168, 37, 0.2), 0 8px 18px -12px rgba(122, 84, 10, 0.5);
+}
+.tab {
+  box-shadow: none;
+}
+.tab:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  color: var(--ink);
+}
+.tab.on {
+  box-shadow: 0 1px 2px rgba(122, 84, 10, 0.12);
+}
+.dot:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
 @media (max-width: 900px) {
   .frame {
     grid-template-columns: 1fr;
@@ -942,6 +1559,18 @@ textarea {
   }
   .side-foot {
     margin-top: 0;
+  }
+  .side {
+    background: linear-gradient(180deg, #fdf7e6, rgba(251, 248, 241, 0.6));
+  }
+  .side::after {
+    display: none;
+  }
+  .navlink {
+    padding: 6px 9px;
+  }
+  .navlink::before {
+    display: none;
   }
   .slide h1 {
     font-size: 27px;
@@ -993,5 +1622,42 @@ textarea {
   }
   .shell {
     padding: 32px 22px 96px;
+  }
+}
+
+@media (max-width: 600px) {
+  .glance {
+    grid-template-columns: 1fr;
+  }
+  .lesson-card {
+    padding: 22px 20px;
+  }
+  .lesson-card h2 {
+    font-size: 25px;
+  }
+  .deck-stage {
+    padding: 28px 22px;
+  }
+  .due-list li {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .onboarding .ask h2 {
+    font-size: 25px;
+  }
+  .letter:not(.muted)::first-letter {
+    font-size: 3em;
+  }
+}
+
+/* Motion is a nicety. Anyone who has asked their system for less gets none of it. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

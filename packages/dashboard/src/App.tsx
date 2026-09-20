@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, isPreview, type Profile } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { BrandMark } from "./components/Hex";
 import { Board } from "./pages/Board";
 import { Honeycomb } from "./pages/Honeycomb";
 import { LessonPage } from "./pages/Lesson";
@@ -51,7 +52,7 @@ export function App() {
       )}
       <nav className="side">
         <Link to="/" className="brand">
-          <span className="mark">🐝</span> Rhubarb
+          <BrandMark /> Rhubarb
         </Link>
         {NAV.map(([to, label]) => (
           <Link key={to} to={to} className={route.path === to ? "navlink active" : "navlink"}>

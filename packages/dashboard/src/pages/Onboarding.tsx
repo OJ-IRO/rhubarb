@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { HexLevels } from "../components/Hex";
 import { api, type Profile } from "../api";
 
 const STYLES: Array<{ id: Profile["style"]; name: string; blurb: string }> = [
@@ -95,7 +96,10 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
   return (
     <div className="onboarding">
       <p className="eyebrow">
-        {step + 1} of {steps.length}
+        <HexLevels level={step} total={steps.length} size={15} />
+        <span>
+          {step + 1} of {steps.length}
+        </span>
       </p>
       {steps[step]}
       <div className="actions">

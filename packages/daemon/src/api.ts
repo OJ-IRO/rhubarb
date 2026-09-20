@@ -85,6 +85,10 @@ export function todaysLesson(db: RhubarbDb): { lesson: Lesson; skill: Skill } | 
   return null;
 }
 
+function withLadderLength(db: RhubarbDb, t: { lesson: Lesson; skill: Skill } | null) {
+  return t ? { ...t, ladderLength: db.ladderFor(t.skill.id).length } : null;
+}
+
 export function startApi(deps: ApiDeps, port: number): Server {
   const { db, log, actions } = deps;
 
@@ -136,7 +140,7 @@ export function startApi(deps: ApiDeps, port: number): Server {
             profile: db.getProfile(),
             letter: db.getKv("today_letter"),
             letterDate: db.getKv("today_letter_date"),
-            lesson: todaysLesson(db),
+            lesson: withLadderLength(db, todaysLesson(db)),
             duePractice: db.openPractice().filter((p) => p.scheduledFor <= now),
             dueCards: db.dueCards(now, 10).map((d) => ({ ...d, card: db.getCard(d.cardId) })),
             proposed: db.skillsByStatus(["proposed"]).length,

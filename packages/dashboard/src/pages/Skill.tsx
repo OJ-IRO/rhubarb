@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, when, type SkillDetail } from "../api";
+import { HexLevels, HexNode, Loading } from "../components/Hex";
 import { Link } from "../router";
 
 export function SkillPage({ id }: { id: number }) {
@@ -7,7 +8,7 @@ export function SkillPage({ id }: { id: number }) {
   useEffect(() => {
     api.skill(id).then(setD);
   }, [id]);
-  if (!d) return null;
+  if (!d) return <Loading />;
   const { skill, ladder, evidence, lessons, practice, fieldEvidence } = d;
 
   return (
@@ -16,6 +17,12 @@ export function SkillPage({ id }: { id: number }) {
         <Link to="/board">Board</Link> / skill
       </p>
       <h1 className="title">{skill.name}</h1>
+      {ladder.length > 0 && (
+        <p className="lesson-meta">
+          <HexLevels level={skill.level} total={ladder.length} mastered={skill.status === "mastered"} size={18} />
+          <span>{skill.status === "mastered" ? "Every level passed" : `Level ${Math.min(skill.level + 1, ladder.length)} of ${ladder.length}`}</span>
+        </p>
+      )}
       <p className="brief">{skill.brief}</p>
 
       <section>
@@ -25,6 +32,7 @@ export function SkillPage({ id }: { id: number }) {
             const lesson = lessons.find((x) => x.levelIdx === l.idx);
             return (
               <li key={l.id} className={`rung ${l.status}`}>
+                <HexNode state={l.status === "done" ? "done" : l.status === "current" ? "current" : "locked"} />
                 <div>
                   <strong>{l.title}</strong>
                   <p className="muted">{l.outcome}</p>
@@ -69,12 +77,13 @@ export function SkillPage({ id }: { id: number }) {
             return (
               <article key={p.id} className="card">
                 <p>
-                  <strong>{p.kind}</strong> · {p.prompt}
+                  <strong>{p.kind === "teachback" ? "Teach it back" : p.kind === "mission" ? "Mission" : p.kind === "quiz" ? "Quiz" : "Recall"}</strong> · {p.prompt}
                 </p>
                 {p.answerText && <p className="quote">"{p.answerText}"</p>}
                 {g ? (
                   <p>
-                    <strong>{g.score}/5.</strong> {g.feedback}
+                    <span className="score-pill">{g.score} of 5</span>
+                    {g.feedback}
                   </p>
                 ) : (
                   <p className="muted">{p.status}</p>

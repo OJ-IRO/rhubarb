@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { api, type SkillRow } from "../api";
 import type { CombCell } from "../components/Comb3D";
+import { Loading } from "../components/Hex";
 import { hexSpiral, wrapLabel } from "../lib/hexLayout";
 import { go } from "../router";
 
@@ -97,7 +98,7 @@ export function Honeycomb() {
     return hexSpiral(full, 1).slice(ordered.length);
   }, [ordered.length]);
 
-  if (!skills) return null;
+  if (!skills) return <Loading />;
   const pointed = hover === null ? null : byId.get(hover) ?? null;
   const flatComb = <FlatComb cells={cells} skills={byId} onHover={setHover} />;
 

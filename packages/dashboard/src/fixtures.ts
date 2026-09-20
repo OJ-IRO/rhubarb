@@ -284,7 +284,7 @@ export const today: Today = {
   letter:
     "Jay, your week has mostly been about Thursday. Kubernetes came up again yesterday, and you handled the readiness question with Sam better than you think, so level two is closer than the board suggests. The salary conversation is the other thing on your mind; you've mentioned it three times and decided nothing, which is exactly when a plan helps. Today: ten minutes on the rolling deployment lesson, then leave the rest.",
   letterDate: new Date().toDateString(),
-  lesson: { lesson, skill: skills[0] },
+  lesson: { lesson, skill: skills[0], ladderLength: ladder.length },
   duePractice: [],
   dueCards: [{ cardId: 1, dueAt: now - h, card: cards[0].card }],
   proposed: 4,
