@@ -53,8 +53,8 @@ export function Privacy() {
 
   return (
     <div className="privacy">
-      <h1 className="title">Privacy</h1>
-      <p className="muted lead">What Rhubarb is holding, where your words go, and how to make it forget.</p>
+      <h1 className="title">Privacy and safety</h1>
+      <p className="muted lead">What Rhubarb is holding, where your words go, what it refuses to learn from, and how to make it forget.</p>
 
       <section>
         <p className="eyebrow">Where your words go</p>
@@ -79,6 +79,27 @@ export function Privacy() {
         <p className="muted">
           Topics you never want turned into lessons are set in <Link to="/welcome">Settings</Link>. Rhubarb drops anything that touches them.
         </p>
+      </section>
+
+      <section>
+        <p className="eyebrow">What Rhubarb won't touch</p>
+        <div className="where">
+          <article className="card">
+            <h3>It never has your voice</h3>
+            <p>Rhubarb receives text from your Bee, never sound. There is no audio here to store, leak or replay, of you or of anyone near you.</p>
+          </article>
+          <article className="card">
+            <h3>Private moments are left alone</h3>
+            <p>
+              A hard moment, something about your health, your own legal or family matters, a password or card number read aloud: Rhubarb drops these on arrival. The words aren't kept, no lesson is built on them, and no AI model ever sees them.
+            </p>
+          </article>
+          <article className="card">
+            <h3>It knows what it isn't</h3>
+            <p>Rhubarb teaches skills. It is not a therapist, a doctor, a lawyer or an emergency service, and it won't act like one. If you or someone near you is in danger, call your local emergency number.</p>
+          </article>
+        </div>
+        <p className="muted">It also won't put words in your mouth. Every quote from your week in a lesson is checked against what was actually heard, and cut if it can't be found.</p>
       </section>
 
       <section>

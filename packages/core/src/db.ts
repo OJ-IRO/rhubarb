@@ -21,7 +21,9 @@ import type {
   PracticeStatus,
   Profile,
   Skill,
+  LearningProgress,
   PrivacySummary,
+  ProgressPoint,
   SkillStatus,
 } from "./types.js";
 
@@ -191,8 +193,16 @@ export class RhubarbDb {
     const cols = (this.db.prepare("PRAGMA table_info(lessons)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!cols.includes("deck")) this.db.exec("ALTER TABLE lessons ADD COLUMN deck TEXT NOT NULL DEFAULT '{}'");
     if (!cols.includes("quiz")) this.db.exec("ALTER TABLE lessons ADD COLUMN quiz TEXT NOT NULL DEFAULT '{\"questions\":[]}'");
+    if (!cols.includes("review")) this.db.exec("ALTER TABLE lessons ADD COLUMN review TEXT");
+    const ccols = (this.db.prepare("PRAGMA table_info(cards)").all() as Array<{ name: string }>).map((c) => c.name);
+    if (!ccols.includes("guess")) {
+      this.db.exec("ALTER TABLE cards ADD COLUMN guess TEXT");
+      this.db.exec("ALTER TABLE cards ADD COLUMN guess_close INTEGER");
+      this.db.exec("ALTER TABLE cards ADD COLUMN guess_note TEXT");
+    }
     const ucols = (this.db.prepare("PRAGMA table_info(utterances)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!ucols.includes("echo")) this.db.exec("ALTER TABLE utterances ADD COLUMN echo INTEGER NOT NULL DEFAULT 0");
+    if (!ucols.includes("private")) this.db.exec("ALTER TABLE utterances ADD COLUMN private INTEGER NOT NULL DEFAULT 0");
   }
 
   close(): void {
@@ -266,11 +276,19 @@ export class RhubarbDb {
   /** Neighbouring utterances in the same conversation, for classifier context and lesson examples. */
   conversationWindow(conversationUuid: string, aroundUtteranceId: number, radius = 4): Array<{ id: number; text: string; speaker: string | null; spoken_at: string }> {
     const all = this.db
-      .prepare("SELECT id, text, speaker, spoken_at FROM utterances WHERE conversation_uuid = ? ORDER BY id")
+      .prepare("SELECT id, text, speaker, spoken_at FROM utterances WHERE conversation_uuid = ? AND private = 0 ORDER BY id")
       .all(conversationUuid) as Array<{ id: number; text: string; speaker: string | null; spoken_at: string }>;
     const at = all.findIndex((u) => u.id === aroundUtteranceId);
     if (at < 0) return all.slice(-radius);
     return all.slice(Math.max(0, at - radius), at + radius + 1);
+  }
+
+  /**
+   * A private disclosure (see sensitive.ts). The text is blanked where it is stored, and the row
+   * is kept only so the same line is not processed twice. It never appears in a context window.
+   */
+  markUtterancePrivate(id: number): void {
+    this.db.prepare("UPDATE utterances SET private = 1, text = '' WHERE id = ?").run(id);
   }
 
   /** A voice note heard again through the ambient channel. It is practice, not real-world use. */
@@ -281,7 +299,7 @@ export class RhubarbDb {
   /** Recent ambient speech, leaving out echoes of the wearer's own voice notes. */
   recentUtterances(sinceMs: number): Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }> {
     return this.db
-      .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE received_at >= ? AND echo = 0 ORDER BY id")
+      .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE received_at >= ? AND echo = 0 AND private = 0 ORDER BY id")
       .all(sinceMs) as Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }>;
   }
 
@@ -731,6 +749,86 @@ export class RhubarbDb {
     return Number(res.lastInsertRowid);
   }
 
+  /** Record what the learner guessed before the answer was shown. An empty guess means they skipped. */
+  setCardGuess(id: number, guess: string, verdict: { close: boolean; note: string } | null): void {
+    this.db.prepare("UPDATE cards SET guess = ?, guess_close = ?, guess_note = ? WHERE id = ?").run(guess, verdict ? (verdict.close ? 1 : 0) : null, verdict?.note ?? null, id);
+  }
+
+  setLessonReview(id: number, review: object): void {
+    this.db.prepare("UPDATE lessons SET review = ? WHERE id = ?").run(JSON.stringify(review), id);
+  }
+
+  /**
+   * Numbers about learning, and only numbers: no speech, no quotes, no names. It is what the
+   * Evidence page draws, and it is safe to hand to a researcher as it stands.
+   */
+  learningProgress(): LearningProgress {
+    const graded = this.db.prepare("SELECT kind, skill_id, grade, created_at FROM practice WHERE grade IS NOT NULL ORDER BY created_at").all() as Array<{ kind: string; skill_id: number | null; grade: string; created_at: number }>;
+    const teachbacks: ProgressPoint[] = [];
+    const quizzes: ProgressPoint[] = [];
+    const recall = { asked: 0, remembered: 0 };
+    for (const p of graded) {
+      let g: { score?: number; total?: number };
+      try {
+        g = JSON.parse(p.grade) as { score?: number; total?: number };
+      } catch {
+        continue;
+      }
+      if (typeof g.score !== "number") continue;
+      if (p.kind === "quiz") quizzes.push({ at: p.created_at, score: g.total ? g.score / g.total : 0, skillId: p.skill_id });
+      else if (p.kind === "recall") {
+        recall.asked++;
+        if (g.score >= 3) recall.remembered++;
+      } else teachbacks.push({ at: p.created_at, score: g.score, skillId: p.skill_id });
+    }
+
+    const n = (sql: string) => (this.db.prepare(sql).get() as { n: number }).n;
+    const credits = this.db.prepare("SELECT skill_id, spoken_at FROM field_evidence WHERE credited = 1 ORDER BY spoken_at").all() as Array<{ skill_id: number; spoken_at: string }>;
+    const weeks = new Map<string, number>();
+    for (const c of credits) {
+      const d = new Date(c.spoken_at);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // back to Monday
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      weeks.set(key, (weeks.get(key) ?? 0) + 1);
+    }
+
+    const firstSeen = this.db.prepare("SELECT skill_id, MIN(spoken_at) AS at FROM evidence WHERE skill_id > 0 GROUP BY skill_id").all() as Array<{ skill_id: number; at: string }>;
+    const transfer: Array<{ skillId: number; days: number }> = [];
+    for (const f of firstSeen) {
+      const used = credits.find((c) => c.skill_id === f.skill_id && c.spoken_at > f.at);
+      if (used) transfer.push({ skillId: f.skill_id, days: Math.max(0, Math.round((Date.parse(used.spoken_at) - Date.parse(f.at)) / 86_400_000)) });
+    }
+
+    const reviews = (this.db.prepare("SELECT review FROM lessons WHERE review IS NOT NULL").all() as Array<{ review: string }>).map((r) => {
+      try {
+        return JSON.parse(r.review) as { checks?: Array<{ ok: boolean }> };
+      } catch {
+        return {};
+      }
+    });
+
+    return {
+      teachbacks,
+      quizzes,
+      recall,
+      guesses: {
+        made: n("SELECT COUNT(*) AS n FROM cards WHERE guess IS NOT NULL AND guess != ''"),
+        close: n("SELECT COUNT(*) AS n FROM cards WHERE guess_close = 1"),
+        skipped: n("SELECT COUNT(*) AS n FROM cards WHERE guess = ''"),
+      },
+      field: { heard: n("SELECT COUNT(*) AS n FROM field_evidence WHERE verdict IS NOT NULL"), credited: credits.length, byWeek: [...weeks].map(([weekStart, credited]) => ({ weekStart, credited })) },
+      levels: { passed: n("SELECT COUNT(*) AS n FROM ladder_levels WHERE status = 'done'"), mastered: n("SELECT COUNT(*) AS n FROM skills WHERE status = 'mastered'"), active: n("SELECT COUNT(*) AS n FROM skills WHERE status = 'active'") },
+      transfer,
+      lessons: {
+        written: n("SELECT COUNT(*) AS n FROM lessons"),
+        finished: n("SELECT COUNT(*) AS n FROM lessons WHERE status = 'done'"),
+        reviewed: reviews.length,
+        passedEveryCheck: reviews.filter((r) => (r.checks ?? []).length > 0 && (r.checks ?? []).every((c) => c.ok)).length,
+      },
+    };
+  }
+
   getCard(id: number): Card | null {
     const r = this.db.prepare("SELECT * FROM cards WHERE id = ?").get(id) as Row | undefined;
     return r ? rowToCard(r) : null;
@@ -739,12 +837,12 @@ export class RhubarbDb {
   cardsWithItems(limit = 50): Array<{ card: Card; item: Item }> {
     const rows = this.db
       .prepare(
-        `SELECT c.id AS c_id, c.item_id, c.title, c.answer_md, c.citations, c.created_at AS c_created_at, i.*
+        `SELECT c.id AS c_id, c.item_id, c.title, c.answer_md, c.citations, c.created_at AS c_created_at, c.guess, c.guess_close, c.guess_note, i.*
          FROM cards c JOIN items i ON i.id = c.item_id ORDER BY c.id DESC LIMIT ?`
       )
       .all(limit) as Row[];
     return rows.map((r) => ({
-      card: { id: r.c_id as number, itemId: r.item_id as number, title: r.title as string, answerMd: r.answer_md as string, citations: r.citations as string, createdAt: r.c_created_at as number },
+      card: rowToCard({ ...r, id: r.c_id, created_at: r.c_created_at }),
       item: rowToItem(r),
     }));
   }
@@ -825,6 +923,7 @@ function rowToLesson(r: Row): Lesson {
     status: r.status as Lesson["status"],
     createdAt: r.created_at as number,
     completedAt: (r.completed_at as number) ?? null,
+    review: (r.review as string) ?? null,
   };
 }
 
@@ -887,5 +986,8 @@ function rowToCard(r: Row): Card {
     answerMd: r.answer_md as string,
     citations: r.citations as string,
     createdAt: r.created_at as number,
+    guess: (r.guess as string) ?? null,
+    guessClose: r.guess_close === null || r.guess_close === undefined ? null : Boolean(r.guess_close),
+    guessNote: (r.guess_note as string) ?? null,
   };
 }

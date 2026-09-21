@@ -155,8 +155,45 @@ export function LessonPage({ id }: { id: number }) {
         )}
       </article>
 
+      <Checked review={lesson.review} />
+
       <Tutor lessonId={id} initial={view.session ? (JSON.parse(view.session.tutor) as Msg[]) : []} open={tutorOpen} onClose={() => setTutorOpen(false)} />
     </div>
+  );
+}
+
+interface Review {
+  checks: Array<{ id: string; ok: boolean; detail: string }>;
+}
+
+/** What this lesson was held to before it was shown. Quiet when all is well, plain when it isn't. */
+function Checked({ review }: { review: string | null }) {
+  if (!review) return null;
+  let r: Review;
+  try {
+    r = JSON.parse(review) as Review;
+  } catch {
+    return null;
+  }
+  if (!r.checks?.length) return null;
+  const failed = r.checks.filter((c) => !c.ok).length;
+  return (
+    <details className="checked">
+      <summary className="muted small">
+        {failed === 0 ? `What was checked: all ${r.checks.length} passed` : `What was checked: ${failed} of ${r.checks.length} need a look`}
+      </summary>
+      <ul>
+        {r.checks.map((c) => (
+          <li key={c.id} className={c.ok ? "ok" : "not"}>
+            <span aria-hidden="true">{c.ok ? "✓" : "!"}</span>
+            <span>
+              <span className="visually-hidden">{c.ok ? "Passed: " : "Needs a look: "}</span>
+              {c.detail}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

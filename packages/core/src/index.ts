@@ -2,6 +2,8 @@ export * from "./types.js";
 export * from "./db.js";
 export * from "./bee.js";
 export * from "./detect.js";
+export * from "./sensitive.js";
+export * from "./lessonChecks.js";
 export * from "./scheduling.js";
 export * from "./llm.js";
 export * from "./voice.js";

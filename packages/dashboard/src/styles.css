@@ -1455,6 +1455,172 @@ button.linklike:hover:not(:disabled) {
   padding-top: 16px;
 }
 
+/* ---------- charts (components/Charts.tsx) ---------- */
+:root {
+  /* One step darker than --honey-deep: that one measured 2.9:1 on a card, under the 3:1 a chart mark needs. */
+  --chart: #b87c0b;
+}
+.chart {
+  position: relative;
+  margin: 10px 0 4px;
+}
+.chart svg {
+  display: block;
+  overflow: visible;
+}
+.chart-grid {
+  stroke: #ece3cd;
+  stroke-width: 1;
+}
+.chart-axis {
+  font-size: 12px;
+  fill: var(--muted);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.chart-value {
+  font-size: 14px;
+  font-weight: 600;
+  fill: var(--ink);
+  font-variant-numeric: lining-nums;
+}
+.chart-line {
+  fill: none;
+  stroke: var(--chart);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.chart-dot {
+  fill: var(--chart);
+  stroke: #fffdf8;
+  stroke-width: 2;
+}
+.chart-bar {
+  fill: var(--chart);
+}
+.chart [tabindex]:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.chart-tip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: #fdf6e3;
+  font-size: 13px;
+  line-height: 1.3;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 10px 20px -10px rgba(31, 27, 20, 0.6);
+}
+.chart-tip strong {
+  display: block;
+  font-size: 14px;
+}
+.chart-table {
+  margin-top: 4px;
+}
+.chart-table summary {
+  cursor: pointer;
+}
+.chart-table table {
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-size: 15px;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.chart-table th,
+.chart-table td {
+  text-align: left;
+  padding: 5px 22px 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.chart-table th {
+  font-weight: 500;
+  color: var(--muted);
+}
+.evidence section h2 {
+  font-size: 21px;
+  margin: 0 0 6px;
+}
+.meters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 22px 28px;
+}
+.meters h3 {
+  font-size: 17px;
+}
+.research {
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--wax);
+}
+.research > p:not(.eyebrow) {
+  line-height: 1.6;
+  max-width: 68ch;
+}
+
+/* ---------- sparks: guess first ---------- */
+.guess label {
+  display: block;
+  font-size: 18px;
+  margin-top: 4px;
+}
+.guess .actions .muted {
+  flex-basis: 100%;
+}
+.reveal {
+  animation: rise 380ms var(--ease) both;
+}
+.reveal .feedback {
+  margin: 0 0 14px;
+}
+
+/* ---------- lesson: what was checked ---------- */
+.checked {
+  max-width: 760px;
+  margin-top: 26px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.checked summary {
+  cursor: pointer;
+}
+.checked ul {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.checked li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 6px;
+}
+.checked li.ok > span:first-child {
+  color: var(--good);
+}
+.checked li.not > span:first-child {
+  color: var(--bad);
+  font-weight: 700;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* ---------- when the service isn't running ---------- */
 .offline {
   max-width: 640px;

@@ -86,9 +86,11 @@ Status as of September 20. Items 3, 4 and 6 from the original list are done.
 5. Smaller backend items: the spark queue is in memory and lost on restart; a voice note is matched to a practice by timing alone; nothing schedules recall practice for due spark cards.
 6. The demo video (script is in `docs/PLAN.md`) and the Devpost submission, including the placeholders still in `FEEDBACK.md`.
 
+Also done: Sparks that ask for a guess before showing the answer; an Evidence page with a speech-free research copy; every lesson checked before it is shown, with made-up quotes cut (`docs/HOW-WE-KNOW.md`); a filter that drops private disclosures on arrival (`docs/SAFETY.md`). Not yet run against a real model: the second-reader lesson review and the guess judge.
+
 Also done: a listening light, a privacy page with forget controls, undo for setting a skill aside, a first-run look-around, and the person's name removed from everywhere but settings.
 
-Done since the first handoff: `rhubarb-skill/SKILL.md`; 36 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
+Done since the first handoff: `rhubarb-skill/SKILL.md`; 47 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
 
 ## House rules
 

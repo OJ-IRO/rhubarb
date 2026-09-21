@@ -50,6 +50,8 @@ export interface Status {
   listening: Listening | null;
 }
 
+export type { LearningProgress } from "@rhubarb/core";
+
 export interface PrivacyView {
   summary: { utterances: number; moments: number; voiceNotes: number; skills: number; lessons: number; since: string | null };
   days: Array<{ day: string; utterances: number; moments: number }>;
@@ -78,6 +80,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 interface PreviewState {
   rows: SkillRow[];
   privacy: PrivacyView;
+  cards: Array<{ card: Card; item: Item }>;
 }
 let pv: PreviewState | null = null;
 
@@ -87,7 +90,7 @@ let pv: PreviewState | null = null;
  * Reloading the page puts the sample content back.
  */
 function previewState(f: typeof import("./fixtures")): PreviewState {
-  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy) };
+  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy), cards: structuredClone(f.cards) };
   return pv;
 }
 
@@ -138,7 +141,22 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   }
   if (path === "/today") return as(f.today);
   if (path === "/profile") return as(f.profile);
-  if (path === "/sparks") return as(f.cards);
+  if (path === "/sparks") return as(st.cards);
+  if (path === "/progress") return as(f.progress);
+  if ((m = path.match(/^\/sparks\/(\d+)\/guess$/))) {
+    const row = st.cards.find((c) => c.card.id === Number(m![1]));
+    const text = body ? String((JSON.parse(String(body)) as { text?: string }).text ?? "").trim() : "";
+    if (row) {
+      await new Promise((r) => setTimeout(r, text ? 700 : 0));
+      const close = /stress|corner|crack|pressur|fatigue/i.test(text);
+      Object.assign(row.card, {
+        guess: text,
+        guessClose: text ? close : null,
+        guessNote: text ? (close ? "That's the heart of it. The corners are where the stress gathers, and that's what the real answer turns on." : "Not quite, and most people land there. The real answer turns on where stress collects in a shape, not on how it looks or flies.") : null,
+      });
+    }
+    return as(row?.card ?? null);
+  }
   if (/^\/skills\/\d+$/.test(path)) return as(f.skillDetail);
   if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
   if (/^\/lessons\/\d+\/session$/.test(path)) return as({ id: 1, lessonId: 1, startedAt: Date.now(), completedAt: null, responses: "{}", tutor: "[]" });
@@ -173,6 +191,8 @@ export const api = {
   restoreSkill: (id: number) => call<Skill>(`/skills/${id}/restore`, { method: "POST" }),
   dismissedSkills: () => call<Skill[]>("/skills/dismissed"),
   status: () => call<Status>("/status"),
+  guess: (cardId: number, text: string) => call<Card>(`/sparks/${cardId}/guess`, { method: "POST", body: JSON.stringify({ text }) }),
+  progress: () => call<import("@rhubarb/core").LearningProgress>("/progress"),
   privacy: () => call<PrivacyView>("/privacy"),
   forgetMoment: (id: number) => call<PrivacyView>(`/privacy/moments/${id}`, { method: "DELETE" }),
   forgetDay: (day: string) => call<PrivacyView>(`/privacy/days/${day}`, { method: "DELETE" }),

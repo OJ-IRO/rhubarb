@@ -53,3 +53,52 @@ test("a voice note is only ever the answer to one practice", () => {
   assert.equal(db.practiceHasJournal("journal-1"), true);
   assert.equal(db.practiceHasJournal("journal-2"), false);
 });
+
+test("a private line is blanked where it is stored and never appears as context for its neighbours", () => {
+  const db = new RhubarbDb(":memory:");
+  db.insertUtterance(utterance(1, "so how does a rolling deployment work"));
+  db.insertUtterance(utterance(2, "my doctor put me on medication last month"));
+  db.insertUtterance(utterance(3, "i need to get better at explaining that"));
+  db.markUtterancePrivate(2);
+
+  assert.deepEqual(db.windowAroundUtterance(3)?.map((u) => u.id), [1, 3]);
+  assert.deepEqual(db.recentUtterances(0).map((u) => u.id), [1, 3]);
+  const stored = db.db.prepare("SELECT text FROM utterances WHERE id = 2").get() as { text: string };
+  assert.equal(stored.text, "", "the words themselves are not kept");
+  assert.equal(db.insertUtterance(utterance(2, "my doctor put me on medication last month")), false, "and the sweep does not bring them back");
+});
+
+test("learning progress is numbers only, and counts what happened", () => {
+  const db = new RhubarbDb(":memory:");
+  const skillId = db.insertSkill({ name: "Rolling deployments", domain: null, competentLooksLike: "narrates a rollout", terms: ["rollout"], priority: 90, brief: "It came up three times." });
+  const day = (n: number) => new Date(2026, 8, n, 10).toISOString();
+
+  db.insertUtterance({ ...utterance(1, "what does halfway through the pods mean"), spokenAt: day(1) });
+  const ev = db.insertEvidence({ kind: "struggle", text: "what does halfway through the pods mean", context: null, spokenAt: day(1), utteranceId: 1, conversationUuid: "conv-1", speakerLabel: null, source: "stream" });
+  db.assignEvidenceToSkill([ev], skillId);
+
+  for (const [kind, grade] of [["teachback", { score: 2 }], ["teachback", { score: 4 }], ["quiz", { score: 4, total: 5 }], ["recall", { score: 4 }], ["recall", { score: 1 }]] as const) {
+    const id = db.insertPractice({ skillId, lessonId: null, cardId: null, kind, prompt: "p", rubric: null, marker: "m", scheduledFor: Date.now(), beeTodoId: null });
+    db.gradePractice(id, grade);
+  }
+
+  db.insertUtterance({ ...utterance(9, "the new pods just haven't passed readiness yet"), spokenAt: day(8) });
+  db.insertFieldCandidate({ skillId, utteranceId: 9, text: "the new pods just haven't passed readiness yet", context: null, spokenAt: day(8) });
+  const fe = db.unjudgedFieldEvidence()[0];
+  db.setFieldVerdict(fe.id, { used: true, correct: true, level: 1, note: "" }, true);
+
+  const itemId = db.insertItem({ kind: "question", sourceText: "i wonder how bees make honey", utteranceId: null, conversationUuid: null, spokenAt: day(2) });
+  const cardId = db.insertCard({ itemId, title: "How bees make honey", answerMd: "Enzymes and fanning.", citations: [] });
+  db.setCardGuess(cardId, "they chew it?", { close: false, note: "Not quite." });
+  assert.equal(db.getCard(cardId)?.guessClose, false);
+  assert.equal(db.cardsWithItems()[0].card.guess, "they chew it?");
+
+  const p = db.learningProgress();
+  assert.deepEqual(p.teachbacks.map((t) => t.score), [2, 4], "oldest first, so a rise reads left to right");
+  assert.deepEqual(p.quizzes.map((q) => q.score), [0.8]);
+  assert.deepEqual(p.recall, { asked: 2, remembered: 1 });
+  assert.deepEqual(p.guesses, { made: 1, close: 0, skipped: 0 });
+  assert.equal(p.field.credited, 1);
+  assert.deepEqual(p.transfer, [{ skillId, days: 7 }], "a week from first not following it to using it for real");
+  assert.equal(JSON.stringify(p).includes("pods"), false, "no speech leaks into the numbers");
+});

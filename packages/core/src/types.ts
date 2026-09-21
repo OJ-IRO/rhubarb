@@ -172,6 +172,8 @@ export interface Lesson {
   status: LessonStatus;
   createdAt: number;
   completedAt: number | null;
+  /** JSON LessonReview (see lessonChecks.ts), or null for lessons written before reviews existed */
+  review: string | null;
 }
 
 export interface LessonSession {
@@ -261,6 +263,34 @@ export interface Card {
   answerMd: string;
   citations: string;
   createdAt: number;
+  /** What the learner guessed before seeing the answer. "" means they chose to skip. Null means not yet asked. */
+  guess: string | null;
+  /** Whether the guess was close, and a sentence about it. Null until a guess is judged. */
+  guessClose: boolean | null;
+  guessNote: string | null;
+}
+
+// --- Evidence that it is working ---
+
+export interface ProgressPoint {
+  at: number;
+  /** 0..5 for spoken answers, 0..1 for quizzes */
+  score: number;
+  skillId: number | null;
+}
+
+export interface LearningProgress {
+  /** spoken teach-backs, oldest first */
+  teachbacks: ProgressPoint[];
+  quizzes: ProgressPoint[];
+  recall: { asked: number; remembered: number };
+  guesses: { made: number; close: number; skipped: number };
+  /** real conversations where a skill came up, and how many were judged a correct use */
+  field: { heard: number; credited: number; byWeek: Array<{ weekStart: string; credited: number }> };
+  levels: { passed: number; mastered: number; active: number };
+  /** per skill: days from the first moment it showed up to the first time it was used for real */
+  transfer: Array<{ skillId: number; days: number }>;
+  lessons: { written: number; finished: number; reviewed: number; passedEveryCheck: number };
 }
 
 // --- Privacy ---

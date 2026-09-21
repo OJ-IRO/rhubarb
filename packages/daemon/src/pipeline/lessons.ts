@@ -12,6 +12,11 @@ import {
   type Skill,
   type Slide,
   type RhubarbDb,
+  checkLesson,
+  withoutInventedQuotes,
+  judge,
+  type LessonCheck,
+  type LessonReview,
 } from "@rhubarb/core";
 import { z } from "zod";
 import { resolveImage, sanitizeMermaid, urlAlive } from "./images.js";
@@ -226,7 +231,12 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     out = await research(lint.issues.map((i) => `${i.rule}: ${i.detail}`));
   }
 
-  const deck = await finishDeck(out.deck as Deck, log);
+  // Everything the writer was shown from the learner's life. A quoted moment must trace back to it.
+  const heard = evidence.flatMap((e) => [e.text, e.context ?? ""]).filter(Boolean);
+  const review = checkLesson(out.deck as Deck, out.quiz as Quiz, heard);
+  if (review.inventedQuotes.length > 0) log(`lesson for #${skill.id} L${levelIdx}: cut ${review.inventedQuotes.length} quoted moment(s) that were never said`);
+
+  const deck = await finishDeck(withoutInventedQuotes(out.deck as Deck, review), log);
   const citations = [];
   for (const c of out.citations) if (await urlAlive(c.url)) citations.push(c);
 
@@ -240,6 +250,10 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     beats: out.beats as LessonBeat[],
     citations,
   });
+  db.setLessonReview(lessonId, review);
+  // A second reader checks what code can't: is it true, and is it pitched at this level? It runs
+  // after the lesson is usable, so a slow or failed review never holds a lesson back.
+  void secondOpinion(deps, lessonId, skill, level, out.bodyMd, review).catch((e: Error) => log(`lesson #${lessonId} second opinion skipped: ${e.message}`));
   db.setLevelStatus(skill.id, levelIdx, "current");
   log(`lesson #${lessonId} ready: ${skill.name} / ${level.title} (${deck.slides.length} cards, ${out.quiz.questions.length} questions)`);
 
@@ -248,6 +262,26 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   await bee.createTodo(nudge, at.toISOString()).catch((e: Error) => log(`lesson nudge failed: ${e.message}`));
   log(`lesson nudge scheduled for ${at.toISOString()}`);
   return lessonId;
+}
+
+const Opinion = z.object({
+  accurate: z.boolean().describe("every factual claim in the lesson is correct as stated"),
+  accuracyNote: z.string().describe("one plain sentence to the learner: what is wrong, or that the facts hold up"),
+  rightLevel: z.boolean().describe("the lesson teaches this level's outcome: not the level below, not the one above"),
+  levelNote: z.string().describe("one plain sentence to the learner about the pitch of the lesson"),
+});
+
+const OPINION_ROLE = `You are the second reader of a lesson another writer produced. You are checking two things only, and you are hard to please. First, is every factual claim correct as stated? A confident error is the worst thing a lesson can contain. Second, does it teach the outcome named for this level, rather than re-teaching the level below or skipping ahead? Say what you found in one plain sentence each, addressed to the learner.`;
+
+async function secondOpinion(deps: LessonDeps, lessonId: number, skill: Skill, level: { title: string; outcome: string }, bodyMd: string, review: LessonReview): Promise<void> {
+  const v = await judge({
+    system: systemBlocks(voiceGuide(), OPINION_ROLE),
+    user: `Skill: ${skill.name}\nThis level: ${level.title}. Outcome: ${level.outcome}\n\nThe lesson:\n${bodyMd}`,
+    schema: Opinion,
+  });
+  const checks: LessonCheck[] = [...review.checks, { id: "accurate", ok: v.accurate, detail: v.accuracyNote }, { id: "right-level", ok: v.rightLevel, detail: v.levelNote }];
+  deps.db.setLessonReview(lessonId, { ...review, checks });
+  if (!v.accurate) deps.log(`lesson #${lessonId}: second reader doubts the facts: ${v.accuracyNote}`);
 }
 
 const writing = new Set<number>();

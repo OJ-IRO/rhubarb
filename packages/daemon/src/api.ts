@@ -1,7 +1,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
-import type { Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
+import type { Card, Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 export interface ApiDeps {
@@ -16,6 +16,8 @@ export interface ApiDeps {
     acceptSkill: (id: number) => Promise<void>;
     dismissSkill: (id: number) => Promise<void>;
     restoreSkill?: (id: number) => Promise<void>;
+    /** How close was a guess to the answer on the card? Optional so tests need not fake a model. */
+    judgeGuess?: (card: Card, guess: string) => Promise<{ close: boolean; note: string }>;
     saveProfile: (p: Profile) => Promise<void>;
     answerBeat: (lesson: Lesson, beat: LessonBeat, idx: number, text: string) => Promise<{ feedback: string; score?: number }>;
     teachbackToPendant: (lesson: Lesson, beat: LessonBeat) => Promise<void>;
@@ -254,7 +256,31 @@ export function startApi(deps: ApiDeps, port: number): Server {
         }
 
         // ---- sparks / practice
-        if (head === "sparks" && method === "GET") return json(res, 200, db.cardsWithItems(100));
+        if (head === "sparks" && method === "GET" && !idStr) return json(res, 200, db.cardsWithItems(100));
+        // Guess first, then see the answer. An empty guess means "just show me", and is recorded as a skip.
+        if (head === "sparks" && idStr && tail === "guess" && method === "POST") {
+          const card = db.getCard(id);
+          if (!card) return json(res, 404, { error: "not found" });
+          const body = await readBody<{ text?: unknown } | null>(req);
+          const guess = typeof body?.text === "string" ? body.text.trim().slice(0, 600) : "";
+          let verdict: { close: boolean; note: string } | null = null;
+          if (guess && actions.judgeGuess) {
+            verdict = await actions.judgeGuess(card, guess).catch((e: Error) => {
+              log(`guess not judged: ${e.message}`);
+              return null;
+            });
+          }
+          db.setCardGuess(id, guess, verdict);
+          return json(res, 200, db.getCard(id));
+        }
+
+        // ---- evidence that it is working: numbers only, never speech
+        if (head === "progress" && method === "GET" && !idStr) return json(res, 200, db.learningProgress());
+        if (head === "progress" && idStr === "research-copy" && method === "GET") {
+          const copy = { about: "Rhubarb learning record. Counts, scores and dates only. It contains no speech, no quotes, no names and no skill titles.", schema: 1, exportedAt: new Date().toISOString(), ...db.learningProgress() };
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Content-Disposition": 'attachment; filename="rhubarb-learning-record.json"' });
+          return void res.end(JSON.stringify(copy, null, 2));
+        }
         if (head === "practice" && method === "GET") return json(res, 200, db.openPractice());
 
         // ---- lessons

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@rhubarb/core";
+import { classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
@@ -200,6 +200,8 @@ async function completeLesson(lesson: import("@rhubarb/core").Lesson): Promise<v
   advanceAndContinue(skill.id, maybeAdvance(db, skill, { teachbackScore: bestScoreFor(lesson.id, skill.id), fieldLevel: bestFieldRung(db, skill.id) }));
 }
 
+const GuessVerdict = z.object({ close: z.boolean(), note: z.string().describe("one sentence to the learner about their guess, in the house voice") });
+
 const ShortVerdict = z.object({
   correct: z.boolean(),
   note: z.string().describe("one or two sentences to the learner about this answer, in the house voice"),
@@ -310,6 +312,13 @@ startApi(
         void startSkill(lessonDeps, id).catch((e: Error) => log(`startSkill ${id} failed: ${e.message}`));
       },
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
+      judgeGuess: (card, guess) =>
+        classify({
+          system: systemBlocks(voiceGuide(), "Someone guessed the answer to a question before being shown it. Say whether the guess was close to the real answer, and give one warm, honest sentence about it. If they were wrong, name the one thing the real answer turns on. Never say 'great guess'."),
+          user: `Question: ${card.title}\n\nThe real answer:\n${card.answerMd}\n\nTheir guess: "${guess}"`,
+          schema: GuessVerdict,
+          maxTokens: 400,
+        }),
       saveProfile: async (p) => {
         db.setProfile(p);
         const slots = await parseLearningWindows(p.learningWindows).catch((e: Error) => {

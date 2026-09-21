@@ -1,4 +1,4 @@
-import { stage1Detect, textContainment, type BeeStreamEvent, type RhubarbDb } from "@rhubarb/core";
+import { sensitiveReason, stage1Detect, textContainment, type BeeStreamEvent, type RhubarbDb } from "@rhubarb/core";
 
 // Voice notes echo into ambient capture as near-duplicate utterances ~20s later
 // (docs/spike-results.md), so utterances are checked against recent journal texts.
@@ -43,6 +43,16 @@ export function handleUtterance(
     // practice answer in the ambient feed and credits it as real-world use.
     db.markUtteranceEcho(u.id);
     db.markUtterancesProcessed([u.id]);
+    return;
+  }
+
+  // Private disclosures stop here. No evidence is written and no model ever sees the line.
+  // The log records the reason and never the words.
+  const sensitive = sensitiveReason(u.text);
+  if (sensitive) {
+    db.markUtterancePrivate(u.id); // blanks the stored words and keeps it out of every context window
+    db.markUtterancesProcessed([u.id]);
+    log(`left alone: a ${sensitive} line`);
     return;
   }
 

@@ -3,6 +3,7 @@
  * UI can be judged without a daemon or a Bee. Never shown as real data: the banner says so.
  */
 import { localDay, type PrivacyView } from "./api";
+import type { LearningProgress } from "@rhubarb/core";
 import type { Card, Deck, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, Practice, Profile, Quiz, Skill } from "@rhubarb/core";
 import type { SkillRow, Today, SkillDetail, LessonView } from "./api";
 
@@ -253,6 +254,21 @@ export const lesson: Lesson = {
   status: "ready",
   createdAt: now - 2 * h,
   completedAt: null,
+  review: JSON.stringify({
+    checkedAt: now - 2 * d,
+    inventedQuotes: [],
+    checks: [
+      { id: "own-words", ok: true, detail: "Every quote from your week matches something Rhubarb actually heard." },
+      { id: "uses-a-moment", ok: true, detail: "It teaches from a moment in your own week." },
+      { id: "length", ok: true, detail: "9 cards. A lesson should be 6 to 14." },
+      { id: "one-idea-a-card", ok: true, detail: "No card tries to carry more than one idea's worth of text." },
+      { id: "quiz", ok: true, detail: "5 questions, each with one answer that can be marked." },
+      { id: "sources", ok: true, detail: "3 further-reading links, all real addresses." },
+      { id: "diagram", ok: true, detail: "The diagram is small enough to read at a glance." },
+      { id: "accurate", ok: true, detail: "The facts hold up, including the 25% default for maxUnavailable." },
+      { id: "right-level", ok: true, detail: "It stays on narrating a rollout, which is level two, and leaves the trade-offs for level three." },
+    ],
+  }),
 };
 
 export const evidence: Evidence[] = [
@@ -271,11 +287,11 @@ export const fieldEvidence: FieldEvidence[] = [
 
 export const cards: Array<{ card: Card; item: Item }> = [
   {
-    card: { id: 1, itemId: 1, title: "How honeybees turn nectar into honey", answerMd: "Honey starts as nectar, which is mostly water and sucrose, and the bee's job is to strip out the water and split the sugar. A forager carries it home in a second stomach where an enzyme starts breaking sucrose into glucose and fructose, then house bees pass it around and fan it until the water drops from about seventy percent to under twenty. That dryness is the whole trick: nothing can grow in it, which is why sealed jars keep for years. The number worth keeping is the exchange rate, about two million flower visits for one pound.", citations: "[]", createdAt: now - 4 * d },
+    card: { id: 1, itemId: 1, title: "How honeybees turn nectar into honey", answerMd: "Honey starts as nectar, which is mostly water and sucrose, and the bee's job is to strip out the water and split the sugar. A forager carries it home in a second stomach where an enzyme starts breaking sucrose into glucose and fructose, then house bees pass it around and fan it until the water drops from about seventy percent to under twenty. That dryness is the whole trick: nothing can grow in it, which is why sealed jars keep for years. The number worth keeping is the exchange rate, about two million flower visits for one pound.", citations: "[]", createdAt: now - 4 * d , guess: "They chew the pollen into it somehow?", guessClose: false, guessNote: "Not pollen: it starts as nectar. The part worth holding onto is that the whole job is getting water out."},
     item: { id: 1, kind: "question", sourceText: "I wonder how honeybees actually make honey.", topic: "how honeybees make honey", status: "researched", confidence: 0.8, utteranceId: 5, conversationUuid: "c5", spokenAt: iso(4 * d), createdAt: now - 4 * d, place: "Golden Gate Park", speakerLabel: "you" },
   },
   {
-    card: { id: 2, itemId: 2, title: "Why airplane windows are round", answerMd: "Square windows concentrate stress at their corners, and on a pressurised fuselage that flexes every flight, those corners are where cracks start. Two de Havilland Comets broke apart in 1954 for roughly this reason, and the investigation changed the rules. Rounded corners spread the load around the opening instead of focusing it on a point. The detail worth keeping: it isn't about aerodynamics at all, it's about metal fatigue.", citations: "[]", createdAt: now - 2 * d },
+    card: { id: 2, itemId: 2, title: "Why airplane windows are round", answerMd: "Square windows concentrate stress at their corners, and on a pressurised fuselage that flexes every flight, those corners are where cracks start. Two de Havilland Comets broke apart in 1954 for roughly this reason, and the investigation changed the rules. Rounded corners spread the load around the opening instead of focusing it on a point. The detail worth keeping: it isn't about aerodynamics at all, it's about metal fatigue.", citations: "[]", createdAt: now - 2 * d , guess: null, guessClose: null, guessNote: null},
     item: { id: 2, kind: "question", sourceText: "Man, I wonder why airplane windows are always round.", topic: "why airplane windows are round", status: "researched", confidence: 0.8, utteranceId: 6, conversationUuid: "c6", spokenAt: iso(2 * d), createdAt: now - 2 * d, place: "SFO", speakerLabel: "you" },
   },
 ];
@@ -302,4 +318,21 @@ export const privacy: PrivacyView = {
   summary: { utterances: 1284, moments: 23, voiceNotes: 6, skills: skills.length, lessons: 3, since: new Date(now - 9 * d).toISOString() },
   days: momentDays.map((day, i) => ({ day, utterances: [212, 164, 97][i] ?? 80, moments: evidence.filter((e) => localDay(e.spokenAt) === day).length })),
   moments: [...evidence].sort((a, b) => b.spokenAt.localeCompare(a.spokenAt)),
+};
+
+const wk = (weeksAgo: number) => {
+  const m = new Date(now - weeksAgo * 7 * d);
+  m.setHours(0, 0, 0, 0);
+  m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+  return localDay(m.getTime());
+};
+export const progress: LearningProgress = {
+  teachbacks: [2, 2, 3, 3, 2, 4, 3, 4, 4, 5].map((score, i) => ({ at: now - (27 - i * 3) * d, score, skillId: i % 3 === 2 ? 4 : 1 })),
+  quizzes: [0.4, 0.6, 0.8, 0.8].map((score, i) => ({ at: now - (24 - i * 7) * d, score, skillId: 1 })),
+  recall: { asked: 14, remembered: 11 },
+  guesses: { made: 9, close: 4, skipped: 2 },
+  field: { heard: 17, credited: 6, byWeek: [{ weekStart: wk(3), credited: 0 }, { weekStart: wk(2), credited: 1 }, { weekStart: wk(1), credited: 2 }, { weekStart: wk(0), credited: 3 }] },
+  levels: { passed: 3, mastered: 1, active: 2 },
+  transfer: [{ skillId: 1, days: 9 }, { skillId: 5, days: 4 }],
+  lessons: { written: 5, finished: 3, reviewed: 5, passedEveryCheck: 4 },
 };

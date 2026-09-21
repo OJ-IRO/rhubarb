@@ -201,3 +201,45 @@ test("a web search may name the subject, but never repeat what the wearer said",
   assert.equal(queryLeaksPrompt("Understand how our deploys work before thursday!", shown), true, "case and punctuation don't hide it");
   assert.equal(queryLeaksPrompt("x ".repeat(80), shown), true, "and a query is never an essay");
 });
+
+// ---- guess before the answer; evidence as numbers only
+
+test("a guess is recorded before the answer, a skip is recorded as a skip, and the research copy holds no speech", async () => {
+  const port = 45_000 + Math.floor(Math.random() * 5_000);
+  const db = new RhubarbDb(":memory:");
+  const itemId = db.insertItem({ kind: "question", sourceText: "i wonder why airplane windows are round", utteranceId: null, conversationUuid: null, spokenAt: new Date().toISOString() });
+  const cardA = db.insertCard({ itemId, title: "Why airplane windows are round", answerMd: "Square corners concentrate stress.", citations: [] });
+  const cardB = db.insertCard({ itemId, title: "How honeybees make honey", answerMd: "Enzymes and fanning.", citations: [] });
+  const judged: string[] = [];
+  const actions = {
+    judgeGuess: async (_c: unknown, guess: string) => {
+      judged.push(guess);
+      return { close: true, note: "That's the heart of it." };
+    },
+  } as never;
+  const server = startApi({ db, log: () => {}, actions }, port);
+  await new Promise((r) => setTimeout(r, 150));
+  try {
+    const guessed = await call(port, "POST", `/api/sparks/${cardA}/guess`, { text: "  something about pressure at the corners  " });
+    assert.equal(guessed.json.guess, "something about pressure at the corners");
+    assert.equal(guessed.json.guessClose, true);
+    assert.deepEqual(judged, ["something about pressure at the corners"]);
+
+    const skipped = await call(port, "POST", `/api/sparks/${cardB}/guess`, { text: "" });
+    assert.equal(skipped.json.guess, "", "a skip is recorded, so the card is not asked again");
+    assert.equal(skipped.json.guessClose, null);
+    assert.equal(judged.length, 1, "no model call is spent on a skip");
+    assert.equal((await call(port, "POST", "/api/sparks/999/guess", { text: "x" })).status, 404);
+
+    const progress = (await call(port, "GET", "/api/progress")).json;
+    assert.deepEqual(progress.guesses, { made: 1, close: 1, skipped: 1 });
+
+    const copy = await call(port, "GET", "/api/progress/research-copy");
+    assert.equal(copy.status, 200);
+    const text = JSON.stringify(copy.json);
+    assert.equal(/airplane|honey|pressure/i.test(text), false, "no question, answer or guess text in the research copy");
+    assert.equal(copy.json.schema, 1);
+  } finally {
+    server.close();
+  }
+});

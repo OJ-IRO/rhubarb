@@ -13,7 +13,7 @@ const STEPS: Step[] = [
   { target: "listening", title: "It listens through your Bee", body: "This light tells you whether Rhubarb can hear your Bee right now. If it ever says it can't, nothing is being captured." },
   { target: "nav-board", title: "You decide what's worth learning", body: "The board ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
   { target: "nav-today", title: "A lesson, then out loud", body: "Lessons are built from your own conversations. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
-  { target: "nav-honeycomb", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. The comb fills as you climb." },
+  { target: "nav-evidence", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. The Evidence page keeps the score, in numbers you can check." },
   { target: "nav-privacy", title: "Yours to forget", body: "Everything stays on this computer. The privacy page shows what's held and lets you forget a moment, a day, or all of it." },
 ];
 
