@@ -113,3 +113,91 @@ test("an answered practice is not matched a second time", () => {
   db.attachPracticeAnswer(id, "journal-1", "it swaps pods a few at a time");
   assert.equal(matchPractice(db, now), null);
 });
+
+// ---- setting a skill aside and bringing it back; forgetting things
+
+function call(port: number, method: string, path: string, body?: unknown): Promise<{ status: number; json: any }> {
+  return new Promise((resolve, reject) => {
+    const payload = body === undefined ? undefined : JSON.stringify(body);
+    const headers: Record<string, string> = payload ? { "Content-Type": "application/json", "Content-Length": String(Buffer.byteLength(payload)) } : {};
+    const req = request({ host: "127.0.0.1", port, path, method, headers }, (res) => {
+      let text = "";
+      res.on("data", (c) => (text += c));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, json: text ? JSON.parse(text) : null }));
+    });
+    req.on("error", reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
+test("a skill that was set aside can be brought back, and reports where Rhubarb stands on listening", async () => {
+  const port = 45_000 + Math.floor(Math.random() * 5_000);
+  const db = new RhubarbDb(":memory:");
+  const id = db.insertSkill({ name: "Salary negotiation", domain: null, competentLooksLike: "names a number first", terms: ["salary"], priority: 80, brief: "You said you'd take whatever they offer." });
+  const actions = { dismissSkill: async (sid: number) => db.updateSkill(sid, { status: "dismissed" }) } as never;
+  const server = startApi({ db, log: () => {}, actions, listening: () => ({ state: "connected", lastHeardAt: 1234, since: 1000 }) }, port);
+  await new Promise((r) => setTimeout(r, 150));
+  try {
+    assert.deepEqual((await call(port, "GET", "/api/status")).json.listening, { state: "connected", lastHeardAt: 1234, since: 1000 });
+
+    assert.equal((await call(port, "POST", `/api/skills/${id}/dismiss`)).status, 200);
+    assert.deepEqual((await call(port, "GET", "/api/skills")).json, [], "gone from the board");
+    assert.deepEqual((await call(port, "GET", "/api/skills/dismissed")).json.map((s: { id: number }) => s.id), [id]);
+
+    const back = await call(port, "POST", `/api/skills/${id}/restore`);
+    assert.equal(back.json.status, "proposed");
+    assert.equal((await call(port, "GET", "/api/skills")).json.length, 1);
+    assert.equal((await call(port, "POST", "/api/skills/999/restore")).status, 404);
+  } finally {
+    server.close();
+  }
+});
+
+test("privacy: moments and days can be forgotten, and erasing everything needs a deliberate second signal", async () => {
+  const port = 45_000 + Math.floor(Math.random() * 5_000);
+  const db = new RhubarbDb(":memory:");
+  const at = new Date(2026, 8, 17, 14).toISOString();
+  db.insertUtterance({ id: 1, conversationUuid: "c1", text: "i wonder how honeybees make honey", spokenAt: at, source: "stream" });
+  db.insertUtterance({ id: 2, conversationUuid: "c1", text: "i need to get better at negotiating", spokenAt: at, source: "stream" });
+  const ev = db.insertEvidence({ kind: "question", text: "i wonder how honeybees make honey", context: null, spokenAt: at, utteranceId: 1, conversationUuid: "c1", speakerLabel: null, source: "stream" });
+  const server = startApi({ db, log: () => {}, actions: {} as never }, port);
+  await new Promise((r) => setTimeout(r, 150));
+  try {
+    const first = await call(port, "GET", "/api/privacy");
+    assert.equal(first.json.summary.utterances, 2);
+    assert.equal(first.json.moments.length, 1);
+
+    const afterOne = await call(port, "DELETE", `/api/privacy/moments/${ev}`);
+    assert.equal(afterOne.json.summary.utterances, 1, "the reply is the fresh picture");
+    assert.equal((await call(port, "DELETE", `/api/privacy/moments/${ev}`)).status, 404);
+
+    assert.equal((await call(port, "DELETE", "/api/privacy/days/yesterday")).status, 400);
+
+    assert.equal((await call(port, "DELETE", "/api/privacy/everything")).status, 400, "no body, no erase");
+    assert.equal((await call(port, "DELETE", "/api/privacy/everything", { confirm: "yes" })).status, 400);
+    assert.equal(db.privacySummary().utterances, 1, "nothing was erased by the refused requests");
+
+    const wiped = await call(port, "DELETE", "/api/privacy/everything", { confirm: "erase everything" });
+    assert.equal(wiped.status, 200);
+    assert.equal(wiped.json.summary.utterances, 0);
+  } finally {
+    server.close();
+  }
+});
+
+
+// ---- what may leave for a search engine
+
+import { queryLeaksPrompt } from "./pipeline/research.js";
+
+test("a web search may name the subject, but never repeat what the wearer said", () => {
+  const shown = `## Skill\nKubernetes rolling deployments\n\n## Moments\n- "I really need to actually understand how our deploys work before Thursday."\n- "Wait, what does halfway through the pods actually mean?"`;
+
+  assert.equal(queryLeaksPrompt("kubernetes rolling deployment readiness probe", shown), false);
+  assert.equal(queryLeaksPrompt("Kubernetes rolling deployments maxUnavailable maxSurge explained", shown), false, "the skill's own name is a subject, not speech");
+
+  assert.equal(queryLeaksPrompt("what does halfway through the pods actually mean", shown), true);
+  assert.equal(queryLeaksPrompt("Understand how our deploys work before thursday!", shown), true, "case and punctuation don't hide it");
+  assert.equal(queryLeaksPrompt("x ".repeat(80), shown), true, "and a query is never an essay");
+});

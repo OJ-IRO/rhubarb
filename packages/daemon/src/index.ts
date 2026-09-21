@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@rhubarb/core";
 import { z } from "zod";
-import { startApi } from "./api.js";
+import { startApi, type Listening } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
@@ -268,7 +268,22 @@ const me = await bee.me().catch((e: Error) => {
 });
 log(`connected as ${me.first_name} ${me.last_name}; data dir ${DATA_DIR}`);
 
-const consumer = new BeeStreamConsumer({ onEvent: (ev) => handleStreamEvent(captureDeps, ev), onStatus: log });
+// What the dashboard's "listening" light reads. The last-heard time starts from the database,
+// so a restart doesn't make it look as if Rhubarb has never heard anything.
+const listening: Listening = { state: "connecting", lastHeardAt: db.lastHeardAt(), since: Date.now() };
+
+const consumer = new BeeStreamConsumer({
+  onEvent: (ev) => {
+    if (ev.type === "new-utterance") listening.lastHeardAt = Date.now();
+    handleStreamEvent(captureDeps, ev);
+  },
+  onState: (state) => {
+    if (state === listening.state) return;
+    listening.state = state;
+    listening.since = Date.now();
+  },
+  onStatus: log,
+});
 consumer.start();
 
 const timers = [
@@ -287,6 +302,7 @@ startApi(
     db,
     log,
     staticDir: existsSync(DASHBOARD_DIST) ? DASHBOARD_DIST : undefined,
+    listening: () => ({ ...listening }),
     actions: {
       reflectNow,
       acceptSkill: async (id) => {

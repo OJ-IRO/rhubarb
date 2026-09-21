@@ -24,9 +24,31 @@ export async function tavilySearch(query: string): Promise<TavilyResult[]> {
   return (data.results ?? []).map((r) => ({ title: r.title, url: r.url, content: r.content.slice(0, 1500) }));
 }
 
+const RUN = 5;
+const MAX_QUERY_CHARS = 120;
+
+/**
+ * A web search is the one place the wearer's speech could leave for a third party, because the
+ * model writes the query with their quoted words in front of it. So a query is refused if it is
+ * long, or if any run of five words in it appears word for word in what we showed the model.
+ * A topic ("kubernetes readiness probe") passes. A sentence someone said does not.
+ */
+export function queryLeaksPrompt(query: string, shown: string): boolean {
+  if (query.length > MAX_QUERY_CHARS) return true;
+  const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  const q = words(query);
+  if (q.length < RUN) return false;
+  const hay = ` ${words(shown).join(" ")} `;
+  for (let i = 0; i + RUN <= q.length; i++) {
+    if (hay.includes(` ${q.slice(i, i + RUN).join(" ")} `)) return true;
+  }
+  return false;
+}
+
 const SEARCH_TOOL: Anthropic.Tool = {
   name: "search_web",
-  description: "Search the web for sources. Use sparingly, then produce the result.",
+  description:
+    "Search the web for sources. Use sparingly, then produce the result. Queries go to an outside search service, so write them about the subject in general terms. Never put in the reader's own words, anyone's name, a workplace, or a place.",
   input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
 };
 
@@ -94,7 +116,11 @@ export async function researchThenEmit<T>(opts: ResearchOptions<T>): Promise<T> 
     for (const call of calls) {
       if (call.name === "search_web") {
         searches++;
-        const q = (call.input as { query: string }).query;
+        const q = String((call.input as { query?: unknown }).query ?? "");
+        if (queryLeaksPrompt(q, opts.ask)) {
+          results.push({ type: "tool_result", tool_use_id: call.id, is_error: true, content: "Search refused: the query repeats the reader's own words. Search for the subject in general terms instead." });
+          continue;
+        }
         const hits = await tavilySearch(q).catch((e: Error) => [{ title: "search failed", url: "", content: e.message }]);
         results.push({ type: "tool_result", tool_use_id: call.id, content: JSON.stringify(hits) });
       } else {

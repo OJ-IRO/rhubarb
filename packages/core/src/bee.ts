@@ -72,10 +72,14 @@ export class BeeClient {
   }
 }
 
+export type StreamState = "connecting" | "connected" | "down";
+
 export interface StreamConsumerOptions {
   /** Called for every typed event. */
   onEvent: (ev: BeeStreamEvent) => void;
   onStatus?: (msg: string) => void;
+  /** Connection state, for showing the wearer whether Rhubarb can hear their Bee. */
+  onState?: (state: StreamState) => void;
   /** Restart backoff cap in ms. */
   maxBackoffMs?: number;
 }
@@ -106,6 +110,7 @@ export class BeeStreamConsumer {
   private spawnOnce(): void {
     if (this.stopped) return;
     this.opts.onStatus?.("spawning bee stream");
+    this.opts.onState?.("connecting");
     const child = spawn("bee", ["stream", "--json"], { stdio: ["ignore", "pipe", "pipe"] });
     this.child = child;
 
@@ -124,6 +129,7 @@ export class BeeStreamConsumer {
         // connect handshake ({timestamp}) — reset backoff, nothing to emit
         this.backoffMs = 1_000;
         this.opts.onStatus?.("stream connected");
+        this.opts.onState?.("connected");
         return;
       }
       // One malformed event, or a database hiccup while handling it, must not take the daemon down.
@@ -144,6 +150,7 @@ export class BeeStreamConsumer {
       if (this.stopped || restarted) return;
       restarted = true;
       if (this.child === child) this.child = null;
+      this.opts.onState?.("down");
       this.opts.onStatus?.(`bee stream ${why}; restarting in ${this.backoffMs}ms`);
       setTimeout(() => this.spawnOnce(), this.backoffMs);
       this.backoffMs = Math.min(this.backoffMs * 2, this.opts.maxBackoffMs ?? 60_000);

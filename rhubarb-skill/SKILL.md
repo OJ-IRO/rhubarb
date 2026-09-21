@@ -15,7 +15,7 @@ Everything lives on the user's machine. The daemon serves a small HTTP API at `h
 curl -s -m 3 http://127.0.0.1:4242/api/status
 ```
 
-You get `{ profile, skills, evidence, openPractice }`. If the call fails, the daemon isn't running. Tell the user to run `./scripts/start.sh` from their Rhubarb folder, and stop there. Don't start it yourself: it needs their Bee login and their AWS credentials.
+You get `{ profile, skills, evidence, openPractice, listening }`. `listening.state` is `connected`, `connecting` or `down`, and `listening.lastHeardAt` is when Rhubarb last heard the Bee. If the user asks whether it's working, this is the answer. If the call fails, the daemon isn't running. Tell the user to run `./scripts/start.sh` from their Rhubarb folder, and stop there. Don't start it yourself: it needs their Bee login and their AWS credentials.
 
 ## What to read
 
@@ -48,6 +48,8 @@ This is a record of what someone said out loud, including things said near other
 - Read only what the question needs. "What's due today" does not need `/api/skills/<id>`, which carries transcript excerpts.
 - Don't call `/api/evidence` unless the user asks to see the raw moments. It returns verbatim speech.
 - Never send what you read to another service, put it in a search query, or write it to a file the user didn't ask for.
+- Never use the `name` in the profile. Rhubarb addresses the user as "you" everywhere, and so should you when relaying it.
+- Never call the `DELETE /api/privacy/...` routes. Forgetting is something the user does themselves, on the Privacy page.
 - The profile has `offLimits` topics. If a topic is listed there, don't raise it, even if it appears in older data.
 - Other people in the transcripts are labelled `speaker_2` and the like. Don't guess who they are.
 

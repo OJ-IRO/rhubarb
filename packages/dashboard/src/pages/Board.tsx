@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api, type SkillRow } from "../api";
+import { api, type Skill, type SkillRow } from "../api";
 import { HexBadge, HexLevels, Loading } from "../components/Hex";
 import { Meter, StatusChip } from "../components/Meter";
+import { Toast, type ToastState } from "../components/Toast";
 import { Link } from "../router";
 
 function firstSentence(s: string): string {
@@ -35,7 +36,11 @@ export function Board() {
   const [busy, setBusy] = useState<number | null>(null);
   const [open, setOpen] = useState<number | null>(null);
 
-  const load = () => api.skills().then(setSkills);
+  const [aside, setAsideList] = useState<Skill[]>([]);
+  const [showAside, setShowAside] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+
+  const load = () => Promise.all([api.skills().then(setSkills), api.dismissedSkills().then(setAsideList)]);
   useEffect(() => {
     void load();
     const t = setInterval(load, 20_000);
@@ -46,6 +51,18 @@ export function Board() {
   const ranked = skills.filter((s) => s.status !== "dismissed").sort((a, b) => b.priority - a.priority);
   const top = ranked.slice(0, 3);
   const rest = ranked.slice(3);
+
+  async function bringBack(id: number) {
+    await api.restoreSkill(id);
+    await load();
+  }
+
+  // One click should never be the end of something. Setting a skill aside can be taken straight
+  // back from the toast, or later from the list at the foot of the board.
+  async function setAside(s: SkillRow) {
+    await act(s.id, () => api.dismissSkill(s.id));
+    setToast({ message: `Set aside: ${s.name}.`, actionLabel: "Undo", onAction: () => void bringBack(s.id) });
+  }
 
   async function act(id: number, fn: () => Promise<unknown>) {
     setBusy(id);
@@ -85,7 +102,7 @@ export function Board() {
               <div className="actions">
                 <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
                 {s.status === "proposed" && (
-                  <button className="ghost small" disabled={busy === s.id} onClick={() => act(s.id, () => api.dismissSkill(s.id))}>
+                  <button className="ghost small" disabled={busy === s.id} onClick={() => setAside(s)}>
                     Not this
                   </button>
                 )}
@@ -121,7 +138,7 @@ export function Board() {
                   <div className="actions compact">
                     <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
                     {s.status === "proposed" && (
-                      <button className="ghost small" disabled={busy === s.id} onClick={() => act(s.id, () => api.dismissSkill(s.id))}>
+                      <button className="ghost small" disabled={busy === s.id} onClick={() => setAside(s)}>
                         Not this
                       </button>
                     )}
@@ -139,6 +156,31 @@ export function Board() {
           })}
         </section>
       )}
+
+      {aside.length > 0 && (
+        <section className="set-aside">
+          <button className="ghost small" aria-expanded={showAside} onClick={() => setShowAside(!showAside)}>
+            {showAside ? "Hide" : "Show"} what you've set aside ({aside.length})
+          </button>
+          {showAside && (
+            <ul className="forget-list">
+              {aside.map((s) => (
+                <li key={s.id}>
+                  <span>
+                    <strong>{s.name}</strong>
+                    <span className="muted small"> · {firstSentence(s.brief)}</span>
+                  </span>
+                  <button className="ghost small" onClick={() => void bringBack(s.id)}>
+                    Bring it back
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      <Toast toast={toast} onDone={() => setToast(null)} />
     </div>
   );
 }

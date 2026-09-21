@@ -46,9 +46,9 @@ export function go(path: string): void {
   window.location.hash = href(path).slice(1);
 }
 
-export function Link({ to, children, className }: { to: string; children: React.ReactNode; className?: string }) {
+export function Link({ to, children, className, tour }: { to: string; children: React.ReactNode; className?: string; tour?: string }) {
   return (
-    <a href={href(to)} className={className}>
+    <a href={href(to)} className={className} data-tour={tour}>
       {children}
     </a>
   );

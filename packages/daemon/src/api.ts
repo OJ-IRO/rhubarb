@@ -9,10 +9,13 @@ export interface ApiDeps {
   log: (msg: string) => void;
   /** absolute path to the built dashboard (index.html + assets); optional in dev */
   staticDir?: string;
+  /** Whether Rhubarb can hear the Bee right now. Optional so tests need not fake a stream. */
+  listening?: () => Listening;
   actions: {
     reflectNow: () => Promise<void>;
     acceptSkill: (id: number) => Promise<void>;
     dismissSkill: (id: number) => Promise<void>;
+    restoreSkill?: (id: number) => Promise<void>;
     saveProfile: (p: Profile) => Promise<void>;
     answerBeat: (lesson: Lesson, beat: LessonBeat, idx: number, text: string) => Promise<{ feedback: string; score?: number }>;
     teachbackToPendant: (lesson: Lesson, beat: LessonBeat) => Promise<void>;
@@ -21,6 +24,15 @@ export interface ApiDeps {
     gradeQuiz: (lesson: Lesson, answers: Array<number | string | null>) => Promise<QuizResult>;
     tutor: (lesson: Lesson, history: Array<{ role: "user" | "assistant"; content: string }>, onText: (t: string) => void) => Promise<string>;
   };
+}
+
+export interface Listening {
+  /** connecting: starting up. connected: the stream is open. down: it dropped and is being restarted. */
+  state: "connecting" | "connected" | "down";
+  /** epoch ms of the last line of speech received, or null if nothing has been heard yet */
+  lastHeardAt: number | null;
+  /** epoch ms the current state began */
+  since: number;
 }
 
 export interface QuizResult {
@@ -132,6 +144,7 @@ export function startApi(deps: ApiDeps, port: number): Server {
             skills: db.skillsByStatus(["proposed", "active"]).length,
             evidence: db.evidenceByStage("classified", 1000).length,
             openPractice: db.openPractice().length,
+            listening: deps.listening?.() ?? null,
           });
         }
         if (head === "today" && method === "GET") {
@@ -174,6 +187,42 @@ export function startApi(deps: ApiDeps, port: number): Server {
           }));
           return json(res, 200, skills);
         }
+        // ---- skills set aside, and bringing one back
+        if (head === "skills" && idStr === "dismissed" && method === "GET") {
+          return json(res, 200, db.skillsByStatus(["dismissed"]));
+        }
+        if (head === "skills" && idStr && tail === "restore" && method === "POST") {
+          const skill = db.getSkill(id);
+          if (!skill) return json(res, 404, { error: "not found" });
+          if (skill.status === "dismissed") db.updateSkill(id, { status: "proposed" });
+          return json(res, 200, db.getSkill(id));
+        }
+
+        // ---- privacy: what is held here, and forgetting it
+        if (head === "privacy") {
+          const snapshot = () => ({ summary: db.privacySummary(), days: db.capturedDays(), moments: db.recentMoments() });
+          if (method === "GET" && !idStr) return json(res, 200, snapshot());
+          if (method === "DELETE" && idStr === "moments" && tail) {
+            if (!db.forgetMoment(Number(tail))) return json(res, 404, { error: "not found" });
+            log(`privacy: forgot one moment`);
+            return json(res, 200, snapshot());
+          }
+          if (method === "DELETE" && idStr === "days" && tail) {
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(tail)) return json(res, 400, { error: "day must look like 2026-09-17" });
+            const n = db.forgetDay(tail);
+            log(`privacy: forgot ${tail} (${n} lines)`);
+            return json(res, 200, snapshot());
+          }
+          if (method === "DELETE" && idStr === "everything") {
+            // A second, deliberate signal. One stray request must not be able to wipe a month of work.
+            const body = await readBody<{ confirm?: string } | null>(req).catch(() => null);
+            if (body?.confirm !== "erase everything") return json(res, 400, { error: 'send { "confirm": "erase everything" }' });
+            db.eraseEverything();
+            log("privacy: erased everything");
+            return json(res, 200, snapshot());
+          }
+        }
+
         if (head === "skills" && idStr && method === "GET") {
           const skill = db.getSkill(id);
           if (!skill) return json(res, 404, { error: "not found" });

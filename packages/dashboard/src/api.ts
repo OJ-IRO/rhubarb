@@ -37,6 +37,25 @@ export interface LessonView {
   session: LessonSession | null;
 }
 
+export interface Listening {
+  state: "connecting" | "connected" | "down";
+  lastHeardAt: number | null;
+  since: number;
+}
+
+export interface Status {
+  skills: number;
+  evidence: number;
+  openPractice: number;
+  listening: Listening | null;
+}
+
+export interface PrivacyView {
+  summary: { utterances: number; moments: number; voiceNotes: number; skills: number; lessons: number; since: string | null };
+  days: Array<{ day: string; utterances: number; moments: number }>;
+  moments: Evidence[];
+}
+
 export interface QuizResult {
   score: number;
   total: number;
@@ -56,13 +75,69 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+interface PreviewState {
+  rows: SkillRow[];
+  privacy: PrivacyView;
+}
+let pv: PreviewState | null = null;
+
+/**
+ * Preview mode keeps a little state of its own. Without it every button was a dead end: you could
+ * press "Not this" on the sample board and nothing happened, which reads as a broken app.
+ * Reloading the page puts the sample content back.
+ */
+function previewState(f: typeof import("./fixtures")): PreviewState {
+  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy) };
+  return pv;
+}
+
 async function previewCall<T>(path: string, method: string, body?: BodyInit | null): Promise<T> {
   const f = await import("./fixtures");
   await new Promise((r) => setTimeout(r, 120));
   const as = (v: unknown) => v as T;
+  const st = previewState(f);
+  let m: RegExpMatchArray | null;
+
+  if (path === "/status") return as({ skills: st.rows.length, evidence: 14, openPractice: 1, listening: { state: "connected", lastHeardAt: Date.now() - 2 * 60_000, since: Date.now() - 3 * 3600_000 } });
+  if (path === "/skills" && method === "GET") return as(st.rows.filter((s) => s.status !== "dismissed"));
+  if (path === "/skills/dismissed") return as(st.rows.filter((s) => s.status === "dismissed"));
+  if ((m = path.match(/^\/skills\/(\d+)\/(accept|dismiss|restore|priority)$/))) {
+    const row = st.rows.find((s) => s.id === Number(m![1]));
+    if (row) {
+      if (m[2] === "dismiss") row.status = "dismissed";
+      if (m[2] === "restore") row.status = "proposed";
+      if (m[2] === "accept") Object.assign(row, { status: "active", ladderLength: row.ladderLength || 4, lessonReady: true, lessonId: 1 });
+      if (m[2] === "priority" && body) row.priority = (JSON.parse(String(body)) as { priority: number }).priority;
+    }
+    return as(row ?? null);
+  }
+  if (path === "/privacy" && method === "GET") return as(st.privacy);
+  if ((m = path.match(/^\/privacy\/moments\/(\d+)$/))) {
+    const gone = st.privacy.moments.find((e) => e.id === Number(m![1]));
+    st.privacy.moments = st.privacy.moments.filter((e) => e !== gone);
+    if (gone) {
+      st.privacy.summary.moments--;
+      st.privacy.summary.utterances--;
+    }
+    return as(st.privacy);
+  }
+  if ((m = path.match(/^\/privacy\/days\/(\d{4}-\d{2}-\d{2})$/))) {
+    const day = st.privacy.days.find((d) => d.day === m![1]);
+    if (day) {
+      st.privacy.summary.utterances -= day.utterances;
+      st.privacy.summary.moments -= day.moments;
+      st.privacy.days = st.privacy.days.filter((d) => d !== day);
+      st.privacy.moments = st.privacy.moments.filter((e) => localDay(e.spokenAt) !== day.day);
+    }
+    return as(st.privacy);
+  }
+  if (path === "/privacy/everything") {
+    st.privacy = { summary: { utterances: 0, moments: 0, voiceNotes: 0, skills: 0, lessons: 0, since: null }, days: [], moments: [] };
+    st.rows = [];
+    return as(st.privacy);
+  }
   if (path === "/today") return as(f.today);
   if (path === "/profile") return as(f.profile);
-  if (path === "/skills") return as(f.skillRows);
   if (path === "/sparks") return as(f.cards);
   if (/^\/skills\/\d+$/.test(path)) return as(f.skillDetail);
   if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
@@ -95,6 +170,13 @@ export const api = {
   skill: (id: number) => call<SkillDetail>(`/skills/${id}`),
   acceptSkill: (id: number) => call<Skill>(`/skills/${id}/accept`, { method: "POST" }),
   dismissSkill: (id: number) => call<Skill>(`/skills/${id}/dismiss`, { method: "POST" }),
+  restoreSkill: (id: number) => call<Skill>(`/skills/${id}/restore`, { method: "POST" }),
+  dismissedSkills: () => call<Skill[]>("/skills/dismissed"),
+  status: () => call<Status>("/status"),
+  privacy: () => call<PrivacyView>("/privacy"),
+  forgetMoment: (id: number) => call<PrivacyView>(`/privacy/moments/${id}`, { method: "DELETE" }),
+  forgetDay: (day: string) => call<PrivacyView>(`/privacy/days/${day}`, { method: "DELETE" }),
+  eraseEverything: () => call<PrivacyView>("/privacy/everything", { method: "DELETE", body: JSON.stringify({ confirm: "erase everything" }) }),
   setPriority: (id: number, priority: number) => call<Skill>(`/skills/${id}/priority`, { method: "PUT", body: JSON.stringify({ priority }) }),
   reflect: () => call<{ ok: boolean }>("/reflect", { method: "POST" }),
   sparks: () => call<Array<{ card: Card; item: Item }>>("/sparks"),
@@ -129,6 +211,12 @@ export const api = {
     }
   },
 };
+
+/** YYYY-MM-DD on the reader's own calendar, matching how the daemon groups days. */
+export function localDay(iso: string | number): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 export function when(iso: string | number): string {
   const d = new Date(iso);

@@ -18,6 +18,16 @@ Passing curiosity ("I wonder how bees make honey") takes a lighter path: a one-p
 
 Everything Rhubarb writes follows [`VOICE.md`](VOICE.md) and is checked against it before you see it.
 
+## Yours to see, and to forget
+
+A product that listens has to earn it, so three things are always on screen or one click away.
+
+- **A listening light.** The sidebar says whether Rhubarb can hear your Bee right now, when it last heard you, and says so plainly when it can't.
+- **A privacy page.** It shows what is held on your machine and what leaves it, and lets you forget a moment, a day, or everything. Forgotten lines stay forgotten, even when the nightly sweep finds them on Bee's servers again.
+- **A guard on web searches.** Searches are the one place your speech could reach a third party, because a model writes the query with your words in front of it. Any query that repeats five words in a row of what you said is refused in code, not by instruction.
+
+Your name is shown on the settings page and nowhere else, and it is never sent to a model.
+
 ## Architecture
 
 ```
@@ -45,7 +55,7 @@ To keep Rhubarb running across reboots on macOS, use `./scripts/install-launchd.
 
 ## Tests
 
-`npm test` runs 28 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, and the API's handling of hostile requests.
+`npm test` runs 36 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, and the API's handling of hostile requests.
 
 ## For agents
 

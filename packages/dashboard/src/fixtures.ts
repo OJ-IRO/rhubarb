@@ -2,6 +2,7 @@
  * Sample content for preview mode (#/preview/...). Hand-written in the house voice so the
  * UI can be judged without a daemon or a Bee. Never shown as real data: the banner says so.
  */
+import { localDay, type PrivacyView } from "./api";
 import type { Card, Deck, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, Practice, Profile, Quiz, Skill } from "@rhubarb/core";
 import type { SkillRow, Today, SkillDetail, LessonView } from "./api";
 
@@ -295,3 +296,10 @@ export const today: Today = {
 export const skillDetail: SkillDetail = { skill: skills[0], ladder, evidence, lessons: [lesson], practice, fieldEvidence };
 
 export const lessonView: LessonView = { lesson, skill: skills[0], ladder, session: null };
+
+const momentDays = [...new Set(evidence.map((e) => localDay(e.spokenAt)))].sort().reverse();
+export const privacy: PrivacyView = {
+  summary: { utterances: 1284, moments: 23, voiceNotes: 6, skills: skills.length, lessons: 3, since: new Date(now - 9 * d).toISOString() },
+  days: momentDays.map((day, i) => ({ day, utterances: [212, 164, 97][i] ?? 80, moments: evidence.filter((e) => localDay(e.spokenAt) === day).length })),
+  moments: [...evidence].sort((a, b) => b.spokenAt.localeCompare(a.spokenAt)),
+};

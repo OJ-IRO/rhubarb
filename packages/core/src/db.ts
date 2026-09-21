@@ -21,6 +21,7 @@ import type {
   PracticeStatus,
   Profile,
   Skill,
+  PrivacySummary,
   SkillStatus,
 } from "./types.js";
 
@@ -157,6 +158,9 @@ CREATE TABLE IF NOT EXISTS fsrs_state (
   due_at INTEGER NOT NULL,
   fsrs_card TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS forgotten_utterances (
+  id INTEGER PRIMARY KEY
+);
 CREATE TABLE IF NOT EXISTS kv (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -231,6 +235,9 @@ export class RhubarbDb {
     source: "stream" | "sweep";
     speaker?: string | null;
   }): boolean {
+    // Something the wearer asked us to forget stays forgotten, even when the nightly sweep
+    // finds the same conversation on Bee's servers again.
+    if (this.db.prepare("SELECT 1 FROM forgotten_utterances WHERE id = ?").get(u.id)) return false;
     const res = this.db
       .prepare(
         "INSERT OR IGNORE INTO utterances (id, conversation_uuid, text, spoken_at, received_at, source, speaker) VALUES (?, ?, ?, ?, ?, ?, ?)"
@@ -276,6 +283,105 @@ export class RhubarbDb {
     return this.db
       .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE received_at >= ? AND echo = 0 ORDER BY id")
       .all(sinceMs) as Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }>;
+  }
+
+  /** When Rhubarb last heard anything at all, in epoch ms. Null if it never has. */
+  lastHeardAt(): number | null {
+    const row = this.db.prepare("SELECT MAX(received_at) AS at FROM utterances").get() as { at: number | null };
+    return row.at ?? null;
+  }
+
+  // ------------------------------------------------------------------ privacy
+  /** What is on this machine right now, in numbers. */
+  privacySummary(): PrivacySummary {
+    const n = (sql: string) => (this.db.prepare(sql).get() as { n: number }).n;
+    const first = this.db.prepare("SELECT MIN(spoken_at) AS at FROM utterances").get() as { at: string | null };
+    return {
+      utterances: n("SELECT COUNT(*) AS n FROM utterances"),
+      moments: n("SELECT COUNT(*) AS n FROM evidence WHERE source != 'calendar'"),
+      voiceNotes: n("SELECT COUNT(*) AS n FROM journals"),
+      skills: n("SELECT COUNT(*) AS n FROM skills"),
+      lessons: n("SELECT COUNT(*) AS n FROM lessons"),
+      since: first.at,
+    };
+  }
+
+  /** Days Rhubarb holds speech from, newest first, by the wearer's own calendar. */
+  capturedDays(limit = 60): Array<{ day: string; utterances: number; moments: number }> {
+    return this.db
+      .prepare(
+        `SELECT date(u.spoken_at, 'localtime') AS day, COUNT(*) AS utterances,
+                (SELECT COUNT(*) FROM evidence e WHERE e.source != 'calendar' AND date(e.spoken_at, 'localtime') = date(u.spoken_at, 'localtime')) AS moments
+         FROM utterances u GROUP BY day ORDER BY day DESC LIMIT ?`
+      )
+      .all(limit) as Array<{ day: string; utterances: number; moments: number }>;
+  }
+
+  /** The most recent things Rhubarb took note of, whatever became of them. */
+  recentMoments(limit = 40): Evidence[] {
+    return (this.db.prepare("SELECT * FROM evidence WHERE source != 'calendar' ORDER BY spoken_at DESC, id DESC LIMIT ?").all(limit) as Row[]).map(rowToEvidence);
+  }
+
+  /** Remove utterances and everything drawn from them, and remember their ids so they stay gone. */
+  private forgetUtterances(ids: number[]): void {
+    const tomb = this.db.prepare("INSERT OR IGNORE INTO forgotten_utterances (id) VALUES (?)");
+    const cards = this.db.prepare("SELECT c.id FROM cards c JOIN items i ON i.id = c.item_id WHERE i.utterance_id = ?");
+    const stmts = [
+      "DELETE FROM evidence WHERE utterance_id = ?",
+      "DELETE FROM field_evidence WHERE utterance_id = ?",
+      "DELETE FROM items WHERE utterance_id = ?",
+      "DELETE FROM utterances WHERE id = ?",
+    ].map((sql) => this.db.prepare(sql));
+    const dropState = this.db.prepare("DELETE FROM fsrs_state WHERE card_id = ?");
+    const clearPractice = this.db.prepare("UPDATE practice SET card_id = NULL WHERE card_id = ?");
+    const dropCard = this.db.prepare("DELETE FROM cards WHERE id = ?");
+    for (const id of ids) {
+      for (const c of cards.all(id) as Array<{ id: number }>) {
+        dropState.run(c.id);
+        clearPractice.run(c.id);
+        dropCard.run(c.id);
+      }
+      for (const s of stmts) s.run(id);
+      tomb.run(id);
+    }
+  }
+
+  /** Forget one moment: the note Rhubarb made, the words behind it, and anything built on them. */
+  forgetMoment(evidenceId: number): boolean {
+    const row = this.db.prepare("SELECT utterance_id FROM evidence WHERE id = ?").get(evidenceId) as { utterance_id: number | null } | undefined;
+    if (!row) return false;
+    this.db.transaction(() => {
+      if (row.utterance_id !== null) this.forgetUtterances([row.utterance_id]);
+      this.db.prepare("DELETE FROM evidence WHERE id = ?").run(evidenceId);
+    })();
+    return true;
+  }
+
+  /** Forget everything heard on one day (YYYY-MM-DD, the wearer's calendar). Returns how many lines went. */
+  forgetDay(day: string): number {
+    const ids = (this.db.prepare("SELECT id FROM utterances WHERE date(spoken_at, 'localtime') = ?").all(day) as Array<{ id: number }>).map((r) => r.id);
+    this.db.transaction(() => {
+      this.forgetUtterances(ids);
+      this.db.prepare("DELETE FROM evidence WHERE source != 'calendar' AND date(spoken_at, 'localtime') = ?").run(day);
+      this.db.prepare("DELETE FROM journals WHERE date(created_at / 1000, 'unixepoch', 'localtime') = ?").run(day);
+      this.db.prepare("UPDATE practice SET answer_text = NULL WHERE answer_text IS NOT NULL AND date(created_at / 1000, 'unixepoch', 'localtime') = ?").run(day);
+    })();
+    return ids.length;
+  }
+
+  /**
+   * Erase everything Rhubarb has heard or made from it: speech, moments, voice notes, skills,
+   * ladders, lessons, practice and answer cards. The profile and its off-limits list are kept,
+   * and so is the list of forgotten ids, so none of it comes back with the next sweep.
+   */
+  eraseEverything(): void {
+    this.db.transaction(() => {
+      this.db.exec("INSERT OR IGNORE INTO forgotten_utterances (id) SELECT id FROM utterances");
+      for (const t of ["fsrs_state", "cards", "items", "field_evidence", "practice", "lesson_sessions", "lessons", "ladder_levels", "evidence", "skills", "journals", "utterances"]) {
+        this.db.exec(`DELETE FROM ${t}`);
+      }
+      this.db.prepare("DELETE FROM kv WHERE key IN ('today_letter', 'today_letter_date', 'stakes_seen')").run();
+    })();
   }
 
   // ------------------------------------------------------------------ journals

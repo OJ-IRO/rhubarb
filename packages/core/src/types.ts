@@ -262,3 +262,17 @@ export interface Card {
   citations: string;
   createdAt: number;
 }
+
+// --- Privacy ---
+
+export interface PrivacySummary {
+  /** lines of speech held */
+  utterances: number;
+  /** things Rhubarb took note of */
+  moments: number;
+  voiceNotes: number;
+  skills: number;
+  lessons: number;
+  /** ISO time of the oldest line held, or null if there is none */
+  since: string | null;
+}

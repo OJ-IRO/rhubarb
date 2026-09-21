@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { api, isPreview, type Profile } from "./api";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandMark, Loading } from "./components/Hex";
+import { ListeningLight } from "./components/Listening";
+import { Tour, resetTour, tourSeen } from "./components/Tour";
 import { Board } from "./pages/Board";
 import { Honeycomb } from "./pages/Honeycomb";
 import { LessonPage } from "./pages/Lesson";
 import { Onboarding } from "./pages/Onboarding";
+import { Privacy } from "./pages/Privacy";
 import { SkillPage } from "./pages/Skill";
 import { Sparks } from "./pages/Sparks";
 import { Today } from "./pages/Today";
@@ -23,6 +26,7 @@ function titleFor(path: string): string {
   if (path === "/sparks") return "Sparks";
   if (path === "/honeycomb") return "Honeycomb";
   if (path === "/welcome") return "Settings";
+  if (path === "/privacy") return "Privacy";
   if (path.startsWith("/lessons")) return "Lesson";
   if (path.startsWith("/skills")) return "Skill";
   return "Today";
@@ -64,6 +68,11 @@ export function App() {
   // as a missing profile used to send people into onboarding, which then could not save.
   const [offline, setOffline] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // The look-around runs once, for someone who has a profile (or is in the preview) and hasn't seen it.
+  const [touring, setTouring] = useState(false);
+  useEffect(() => {
+    if ((preview || profile) && !tourSeen()) setTouring(true);
+  }, [preview, profile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +118,7 @@ export function App() {
   else if (route.path === "/board") page = <Board />;
   else if (route.path === "/sparks") page = <Sparks />;
   else if (route.path === "/honeycomb") page = <Honeycomb />;
+  else if (route.path === "/privacy") page = <Privacy />;
   else if ((params = match("/skills/:id", route.path))) page = <SkillPage id={Number(params.id)} />;
   else if ((params = match("/lessons/:id", route.path))) page = <LessonPage id={Number(params.id)} />;
   else page = <Today />;
@@ -125,7 +135,7 @@ export function App() {
           <BrandMark /> Rhubarb
         </Link>
         {NAV.map(([to, label]) => (
-          <Link key={to} to={to} className={route.path === to ? "navlink active" : "navlink"}>
+          <Link key={to} to={to} className={route.path === to ? "navlink active" : "navlink"} tour={`nav-${label.toLowerCase()}`}>
             {label}
           </Link>
         ))}
@@ -133,9 +143,22 @@ export function App() {
           {preview ? "Sample lesson" : "Current lesson"}
         </Link>
         <div className="side-foot">
-          <Link to="/welcome" className="navlink small">
+          <ListeningLight />
+          <Link to="/privacy" className={route.path === "/privacy" ? "navlink active small" : "navlink small"} tour="nav-privacy">
+            Privacy
+          </Link>
+          <Link to="/welcome" className={route.path === "/welcome" ? "navlink active small" : "navlink small"}>
             {profile ? "Settings" : "Set up"}
           </Link>
+          <button
+            className="navlink small linklike"
+            onClick={() => {
+              resetTour();
+              setTouring(true);
+            }}
+          >
+            Show me around
+          </button>
           {!preview && (
             <a href="#/preview/board" className="navlink small">
               Design preview
@@ -146,6 +169,7 @@ export function App() {
       <main className="shell">
         <ErrorBoundary key={route.path}>{page}</ErrorBoundary>
       </main>
+      {touring && route.path !== "/welcome" && <Tour onClose={() => setTouring(false)} />}
     </div>
   );
 }

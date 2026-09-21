@@ -63,6 +63,8 @@ async function commonsImage(query: string): Promise<ResolvedImage | null> {
 /** Tavily image search when a key is present (usually better topical matches than Commons). */
 async function tavilyImage(query: string): Promise<ResolvedImage | null> {
   if (!process.env.TAVILY_API_KEY) return null;
+  // Image queries come from the model too. A picture subject is a few words; anything longer is not one.
+  if (query.length > 80) return null;
   try {
     const res = await withTimeout(
       fetch("https://api.tavily.com/search", {
