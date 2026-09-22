@@ -40,6 +40,9 @@ export function resetTour(): void {
 export function Tour({ onClose }: { onClose: () => void }) {
   const [i, setI] = useState(0);
   const [box, setBox] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  // The ring glides when the step changes and snaps while you scroll. Gliding during a scroll
+  // makes it lag its target and wobble.
+  const [gliding, setGliding] = useState(true);
   const step = STEPS[i];
 
   const finish = useCallback(() => {
@@ -63,9 +66,17 @@ export function Tour({ onClose }: { onClose: () => void }) {
       const r = el?.getBoundingClientRect();
       setBox(r && r.width > 0 ? { top: r.top, left: r.left, width: r.width, height: r.height } : null);
     };
+    setGliding(true);
     place();
+    let settle: ReturnType<typeof setTimeout> | undefined;
+    const onScroll = () => {
+      setGliding(false);
+      place();
+      clearTimeout(settle);
+      settle = setTimeout(() => setGliding(true), 200);
+    };
     window.addEventListener("resize", place);
-    window.addEventListener("scroll", place, true);
+    window.addEventListener("scroll", onScroll, true);
     // The thing being pointed at can change size after we measure it: the listening light starts
     // as "Checking on your Bee" and then becomes a longer line. Follow it.
     const ro = new ResizeObserver(place);
@@ -78,7 +89,8 @@ export function Tour({ onClose }: { onClose: () => void }) {
       again.forEach(clearTimeout);
       ro.disconnect();
       window.removeEventListener("resize", place);
-      window.removeEventListener("scroll", place, true);
+      window.removeEventListener("scroll", onScroll, true);
+      clearTimeout(settle);
     };
   }, [step.target]);
 
@@ -93,7 +105,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
   const last = i === STEPS.length - 1;
   return (
     <>
-      {box && <div className="tour-ring" style={{ top: box.top - 5, left: box.left - 5, width: box.width + 10, height: box.height + 10 }} aria-hidden="true" />}
+      {box && <div className={gliding ? "tour-ring" : "tour-ring snap"} style={{ top: box.top - 5, left: box.left - 5, width: box.width + 10, height: box.height + 10 }} aria-hidden="true" />}
       <aside className="tour" role="dialog" aria-label="A quick look around">
         <p className="eyebrow">
           <span>

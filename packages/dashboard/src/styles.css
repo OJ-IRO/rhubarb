@@ -1429,6 +1429,9 @@ button.linklike:hover:not(:disabled) {
   pointer-events: none;
   transition: top 260ms var(--ease), left 260ms var(--ease), width 260ms var(--ease), height 260ms var(--ease);
 }
+.tour-ring.snap {
+  transition: none;
+}
 
 /* ---------- privacy ---------- */
 .where {
