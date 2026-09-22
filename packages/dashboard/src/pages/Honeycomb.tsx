@@ -5,8 +5,15 @@ import { Loading } from "../components/Hex";
 import { hexSpiral, wrapLabel } from "../lib/hexLayout";
 import { go } from "../router";
 
-// three.js is only fetched when someone opens this page.
-const Comb3D = lazy(() => import("../components/Comb3D"));
+// three.js is only fetched when someone opens this page. The import is started as soon as the
+// app loads so it is usually cached by the time anyone clicks; and while it is still on its way
+// the page shows the loader, not the flat comb, so the comb never appears to change shape.
+const load3D = () => import("../components/Comb3D");
+const Comb3D = lazy(load3D);
+if (typeof window !== "undefined") {
+  const idle = (window as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1500));
+  idle(() => void load3D().catch(() => undefined));
+}
 
 const R = 52; // hex radius of the flat comb, in SVG units
 
@@ -113,7 +120,7 @@ export function Honeycomb() {
           {flat ? (
             flatComb
           ) : (
-            <Suspense fallback={flatComb}>
+            <Suspense fallback={<Loading label="Building your comb" />}>
               <Comb3D cells={cells} ghosts={ghosts} hovered={hover} onHover={setHover} onOpen={(id) => go(`/skills/${id}`)} onFail={() => setFlat(true)} />
             </Suspense>
           )}
