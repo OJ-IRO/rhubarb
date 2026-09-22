@@ -143,9 +143,11 @@ export function App() {
             {label}
           </Link>
         ))}
-        <Link to="/lessons/1" className={route.path.startsWith("/lessons") ? "navlink active small" : "navlink small"}>
-          {preview ? "Sample lesson" : "Current lesson"}
-        </Link>
+        {(preview || route.path.startsWith("/lessons")) && (
+          <Link to={preview ? "/lessons/1" : route.path} className={route.path.startsWith("/lessons") ? "navlink active small" : "navlink small"}>
+            {preview ? "Sample lesson" : "This lesson"}
+          </Link>
+        )}
         <div className="side-foot">
           <ListeningLight />
           <Link to="/privacy" className={route.path === "/privacy" ? "navlink active small" : "navlink small"} tour="nav-privacy">
@@ -173,7 +175,7 @@ export function App() {
       <main className="shell">
         <ErrorBoundary key={route.path}>{page}</ErrorBoundary>
       </main>
-      {touring && route.path !== "/welcome" && <Tour onClose={() => setTouring(false)} />}
+      {touring && <Tour onClose={() => setTouring(false)} />}
     </div>
   );
 }

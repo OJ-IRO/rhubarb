@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { go } from "../router";
 
 const KEY = "rhubarb.tour.v1";
 
@@ -13,7 +12,7 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { path: "/", target: "listening", title: "It listens through your Bee", body: "This light tells you whether Rhubarb can hear your Bee right now. If it ever says it can't, nothing is being captured." },
+  { path: "/", target: "listening", title: "It listens through your Bee", body: "What you're about to see is sample content: one made-up week, so you can see what a full Rhubarb looks like. Yours fills in as it hears you. This light says whether it can hear your Bee right now." },
   { path: "/board", target: "board-top", title: "You decide what's worth learning", body: "This is the board. It ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
   { path: "/lessons/1", target: "lesson-stage", title: "A lesson, then out loud", body: "Lessons are built from your own conversations, a card at a time. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
   { path: "/evidence", target: "evidence-top", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. This page keeps the score, in numbers you can check." },
@@ -39,6 +38,7 @@ export function resetTour(): void {
 /** A five-card walk through the loop for someone opening Rhubarb cold. Skippable, and it never blocks the page. */
 export function Tour({ onClose }: { onClose: () => void }) {
   const [i, setI] = useState(0);
+  const [from] = useState(() => window.location.hash || "#/");
   const [box, setBox] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   // The ring glides when the step changes and snaps while you scroll. Gliding during a scroll
   // makes it lag its target and wobble.
@@ -52,12 +52,14 @@ export function Tour({ onClose }: { onClose: () => void }) {
       /* fine */
     }
     onClose();
-    go("/"); // leave them where the day starts
-  }, [onClose]);
+    // Back to where they were: their own app, or the preview's Today if they were already looking around.
+    window.location.hash = from.startsWith("#/preview") ? "#/preview/" : "#/";
+  }, [onClose, from]);
 
-  // Each step opens the page it describes.
+  // Each step opens the page it describes, in the sample content. Pointing at a real app that is
+  // still empty taught nothing, and pointed at a lesson that did not exist yet.
   useEffect(() => {
-    go(step.path);
+    window.location.hash = `#/preview${step.path === "/" ? "/" : step.path}`;
   }, [step.path]);
 
   useLayoutEffect(() => {

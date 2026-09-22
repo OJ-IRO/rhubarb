@@ -14,21 +14,36 @@ export function LessonPage({ id }: { id: number }) {
   const [quizResult, setQuizResult] = useState<QuizResult | null>(null);
   const [sentToPendant, setSentToPendant] = useState(false);
   const [tutorOpen, setTutorOpen] = useState(false);
+  const [missing, setMissing] = useState(false);
   const [missionAt, setMissionAt] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    api.lesson(id).then(async (v) => {
-      setView(v);
-      await api.startSession(id);
-      window.scrollTo(0, 0);
-    });
+    setMissing(false);
+    api
+      .lesson(id)
+      .then(async (v) => {
+        setView(v);
+        await api.startSession(id);
+        window.scrollTo(0, 0);
+      })
+      .catch(() => setMissing(true));
   }, [id]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [stage]);
 
+  if (missing)
+    return (
+      <div>
+        <h1 className="title">No lesson here yet.</h1>
+        <p className="muted lead">Lessons are written when you say yes to a skill on the board. The first one takes a few minutes.</p>
+        <Link to="/board" className="button primary">
+          Go to the board
+        </Link>
+      </div>
+    );
   if (!view) return <Loading label="Opening your lesson" />;
   const { lesson, skill, ladder } = view;
   const deck = JSON.parse(lesson.deck) as Deck;
