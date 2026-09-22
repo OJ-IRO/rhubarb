@@ -141,7 +141,7 @@ export function DeckViewer({ deck, onFinish }: { deck: Deck; onFinish: () => voi
           <button key={j} className={j === i ? "dot on" : j < i ? "dot done" : "dot"} onClick={() => setI(j)} title={`${j + 1}: ${s.kind}`} />
         ))}
       </div>
-      <div className="deck-stage" key={i}>
+      <div className="deck-stage" data-tour="lesson-stage" key={i}>
         <SlideView s={deck.slides[i]} />
       </div>
       <div className="deck-nav">

@@ -81,7 +81,7 @@ export function Board() {
       )}
 
       {top.length > 0 && (
-        <section className="spotlight">
+        <section className="spotlight" data-tour="board-top">
           {top.map((s, i) => (
             <article key={s.id} className={`spot spot-${i + 1}`}>
               <div className="spot-top">

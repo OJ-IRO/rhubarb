@@ -83,7 +83,7 @@ export function Privacy() {
 
       <section>
         <p className="eyebrow">What Rhubarb won't touch</p>
-        <div className="where">
+        <div className="where" data-tour="privacy-top">
           <article className="card">
             <h3>It never has your voice</h3>
             <p>Rhubarb receives text from your Bee, never sound. There is no audio here to store, leak or replay, of you or of anyone near you.</p>

@@ -1,20 +1,23 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { go } from "../router";
 
 const KEY = "rhubarb.tour.v1";
 
 interface Step {
-  /** matches a data-tour attribute; the step points at that element when it is on screen */
+  /** the page this step is about; the tour opens it */
+  path: string;
+  /** matches a data-tour attribute on that page; the ring points at it when it is on screen */
   target: string;
   title: string;
   body: string;
 }
 
 const STEPS: Step[] = [
-  { target: "listening", title: "It listens through your Bee", body: "This light tells you whether Rhubarb can hear your Bee right now. If it ever says it can't, nothing is being captured." },
-  { target: "nav-board", title: "You decide what's worth learning", body: "The board ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
-  { target: "nav-today", title: "A lesson, then out loud", body: "Lessons are built from your own conversations. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
-  { target: "nav-evidence", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. The Evidence page keeps the score, in numbers you can check." },
-  { target: "nav-privacy", title: "Yours to forget", body: "Everything stays on this computer. The privacy page shows what's held and lets you forget a moment, a day, or all of it." },
+  { path: "/", target: "listening", title: "It listens through your Bee", body: "This light tells you whether Rhubarb can hear your Bee right now. If it ever says it can't, nothing is being captured." },
+  { path: "/board", target: "board-top", title: "You decide what's worth learning", body: "This is the board. It ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
+  { path: "/lessons/1", target: "lesson-stage", title: "A lesson, then out loud", body: "Lessons are built from your own conversations, a card at a time. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
+  { path: "/evidence", target: "evidence-top", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. This page keeps the score, in numbers you can check." },
+  { path: "/privacy", target: "privacy-top", title: "Yours to forget", body: "Everything stays on this computer. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
 ];
 
 export function tourSeen(): boolean {
@@ -46,7 +49,13 @@ export function Tour({ onClose }: { onClose: () => void }) {
       /* fine */
     }
     onClose();
+    go("/"); // leave them where the day starts
   }, [onClose]);
+
+  // Each step opens the page it describes.
+  useEffect(() => {
+    go(step.path);
+  }, [step.path]);
 
   useLayoutEffect(() => {
     const place = () => {
@@ -63,7 +72,10 @@ export function Tour({ onClose }: { onClose: () => void }) {
     const target = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
     if (target) ro.observe(target);
     ro.observe(document.body);
+    // The page is still arriving when the step changes, so look again for a moment after.
+    const again = [150, 400, 900].map((ms) => setTimeout(place, ms));
     return () => {
+      again.forEach(clearTimeout);
       ro.disconnect();
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);

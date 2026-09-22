@@ -50,7 +50,7 @@ export function Evidence() {
         <p className="muted">Nothing to show yet. It fills in as you answer out loud, take a check, and use what you've learned in real conversations.</p>
       ) : (
         <>
-          <div className="glance">
+          <div className="glance" data-tour="evidence-top">
             <div className="glance-tile">
               <HexBadge n={p.field.credited} tone="honey" size={44} />
               <span>
