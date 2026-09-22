@@ -658,9 +658,59 @@ textarea {
   margin-top: 8px;
 }
 .chip {
-  font-size: 14px;
-  padding: 5px 11px;
+  font-size: 15px;
+  padding: 7px 14px;
   border-radius: 999px;
+}
+.chip.on {
+  background: var(--comb);
+  border-color: var(--honey-deep);
+  color: var(--ink);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+.chip.on::before {
+  content: "✓ ";
+  color: var(--honey-deep);
+}
+.chips.added {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.chips.added .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+.chips.added .chip::before {
+  content: none;
+}
+.chip-x {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0 2px;
+  font-size: 17px;
+  line-height: 1;
+  color: var(--muted);
+  cursor: pointer;
+}
+.chip-x:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  color: var(--bad);
+}
+.listinput-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+.listinput-row input {
+  flex: 1;
+}
+.listinput-row button {
+  margin-top: 8px;
 }
 
 /* ---------- ladder ---------- */

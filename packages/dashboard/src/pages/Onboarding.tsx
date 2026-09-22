@@ -11,15 +11,73 @@ const STYLES: Array<{ id: Profile["style"]; name: string; blurb: string }> = [
 ];
 
 const WINDOWS = ["weekday mornings on the commute", "over lunch", "evenings after dinner", "Sunday mornings"];
+const OTHER = "other";
+
+/** The saved value is plain text ("over lunch, Sunday mornings, Fridays at 4"). Split it back into picks and an "other" part. */
+function splitWindows(saved: string): { picks: string[]; other: string } {
+  const parts = saved.split(",").map((s) => s.trim()).filter(Boolean);
+  const picks = parts.filter((p) => WINDOWS.includes(p));
+  const other = parts.filter((p) => !WINDOWS.includes(p)).join(", ");
+  return { picks, other };
+}
+
+/** A short list you build one entry at a time. Enter or Add puts it in; each entry has its own remove. */
+function ListInput({ items, onChange, placeholder, addLabel }: { items: string[]; onChange: (v: string[]) => void; placeholder: string; addLabel: string }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const v = draft.trim();
+    if (!v) return;
+    if (!items.some((x) => x.toLowerCase() === v.toLowerCase())) onChange([...items, v]);
+    setDraft("");
+  };
+  return (
+    <div className="listinput">
+      {items.length > 0 && (
+        <ul className="chips added" aria-label="Added so far">
+          {items.map((it) => (
+            <li key={it} className="chip on">
+              <span>{it}</span>
+              <button type="button" className="chip-x" aria-label={`Remove ${it}`} onClick={() => onChange(items.filter((x) => x !== it))}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="listinput-row">
+        <input
+          value={draft}
+          autoFocus
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          placeholder={placeholder}
+          aria-label={placeholder}
+        />
+        <button type="button" disabled={!draft.trim()} onClick={add}>
+          {addLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; initial: Profile | null }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(initial?.name ?? "");
   const [style, setStyle] = useState<Profile["style"]>(initial?.style ?? "story");
   const [minutes, setMinutes] = useState<Profile["sessionMinutes"]>(initial?.sessionMinutes ?? 10);
-  const [windows, setWindows] = useState(initial?.learningWindows ?? "");
-  const [goals, setGoals] = useState((initial?.goals ?? []).join("\n"));
-  const [offLimits, setOffLimits] = useState((initial?.offLimits ?? []).join("\n"));
+  const saved = splitWindows(initial?.learningWindows ?? "");
+  const [picks, setPicks] = useState<string[]>(saved.picks);
+  const [otherOn, setOtherOn] = useState(saved.other.length > 0);
+  const [other, setOther] = useState(saved.other);
+  const windows = [...picks, ...(otherOn ? [other.trim()] : [])].filter(Boolean).join(", ");
+  const [goals, setGoals] = useState<string[]>(initial?.goals ?? []);
+  const [offLimits, setOffLimits] = useState<string[]>(initial?.offLimits ?? []);
   const [saving, setSaving] = useState(false);
 
   async function finish() {
@@ -29,8 +87,8 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
       style,
       sessionMinutes: minutes,
       learningWindows: windows,
-      goals: goals.split("\n").map((s) => s.trim()).filter(Boolean),
-      offLimits: offLimits.split("\n").map((s) => s.trim()).filter(Boolean),
+      goals,
+      offLimits,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       onboardedAt: initial?.onboardedAt ?? null,
     };
@@ -71,24 +129,31 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
     <section key="when" className="ask">
       <h2>When do you actually have the time?</h2>
       <p className="muted">Lesson nudges land then, not in the middle of a meeting. Say it however you'd say it to a person.</p>
-      <div className="chips">
-        {WINDOWS.map((w) => (
-          <button key={w} className="chip" onClick={() => setWindows((v) => (v ? `${v}, ${w}` : w))}>
-            {w}
-          </button>
-        ))}
+      <div className="chips" role="group" aria-label="When you have time">
+        {WINDOWS.map((w) => {
+          const on = picks.includes(w);
+          return (
+            <button key={w} className={on ? "chip on" : "chip"} aria-pressed={on} onClick={() => setPicks((v) => (on ? v.filter((x) => x !== w) : [...v, w]))}>
+              {w}
+            </button>
+          );
+        })}
+        <button className={otherOn ? "chip on" : "chip"} aria-pressed={otherOn} onClick={() => setOtherOn(!otherOn)}>
+          {OTHER}
+        </button>
       </div>
-      <textarea value={windows} onChange={(e) => setWindows(e.target.value)} placeholder="weekday evenings after 8, and Sunday mornings" rows={2} />
+      {otherOn && <textarea autoFocus value={other} onChange={(e) => setOther(e.target.value)} placeholder="Fridays at 4, or whenever the kids are down" rows={2} aria-label="Other times" />}
+      {!windows && <p className="muted small">Pick nothing and nudges come whenever a lesson is ready.</p>}
     </section>,
     <section key="goals" className="ask">
       <h2>Anything you already know you want to get better at?</h2>
-      <p className="muted">One per line. Rhubarb will listen for these specifically. Leave it empty and it will work from what it hears.</p>
-      <textarea value={goals} onChange={(e) => setGoals(e.target.value)} placeholder={"public speaking\nSpanish\nreading a balance sheet"} rows={4} />
+      <p className="muted">Rhubarb will listen for these specifically. Leave it empty and it will work from what it hears.</p>
+      <ListInput items={goals} onChange={setGoals} placeholder="public speaking, or reading a balance sheet" addLabel="Add" />
     </section>,
     <section key="off" className="ask">
       <h2>Anything Rhubarb should never touch?</h2>
-      <p className="muted">Topics it hears but must not turn into lessons or keep notes about. One per line.</p>
-      <textarea value={offLimits} onChange={(e) => setOffLimits(e.target.value)} placeholder={"my health\nfamily finances"} rows={3} />
+      <p className="muted">Topics it hears but must not turn into lessons or keep notes about.</p>
+      <ListInput items={offLimits} onChange={setOffLimits} placeholder="my health, or family finances" addLabel="Add" />
     </section>,
   ];
 
