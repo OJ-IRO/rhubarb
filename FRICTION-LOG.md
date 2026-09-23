@@ -85,3 +85,30 @@ Format per hackathon guidance: task, steps, expected vs. actual, severity, worka
 - **Severity:** major (the changefeed is the documented recovery path for the at-most-once stream; when it fails too, there is no second backstop)
 - **Workaround:** keep the old cursor on failure and retry on the next run; never advance the cursor unless the call succeeds.
 - **Suggestion:** return JSON errors with a request id from the API, and document retry guidance and cursor lifetime for `/v1/changes`.
+
+### 2026-09-22 — Pairing a new Bee Pioneer to iPhone fails after the Bluetooth step
+- **Task:** Pair a new, charged Bee Pioneer to an iPhone in the Bee iOS app for the first time.
+- **Steps:** Open the app, add a device, hold the bracelet next to the phone. Bracelet blinks blue. Pairing completes. Repeated with the five-press reset (light flashes green), after forgetting the device in iOS Bluetooth settings, after an app reinstall, and on cellular instead of Wi-Fi.
+- **Expected:** Device added and listening.
+- **Actual:** "Something went wrong", and the app asks to remove the Bee from the phone. Every attempt over two days. It succeeded on the third day with no change on our side, which points at the registration step on Bee's servers rather than Bluetooth.
+- **Severity:** blocker (two days without a device, and the error gives no hint whether the fault is the bracelet, the phone or the account)
+- **Workaround:** none found; it started working by itself.
+- **Suggestion:** distinguish a Bluetooth failure from a server-side registration failure in the error, and say which one it was. A "try again later, our side" message would have saved two days of resets.
+
+### 2026-09-23 — Developer Mode: the docs say "the Version row in Settings", but Version is inside About
+- **Task:** Enable Developer Mode so `bee login` can be approved, following docs.bee.computer/docs/developer-mode.
+- **Steps:** Settings → looked for a Version row. Found the device firmware version (v0.6.5) on the Your Bee screen and tapped that, which does nothing. Scrolled Settings to the bottom: no Version row. It is inside Settings → About.
+- **Expected:** A Version row in Settings, as documented, or a "Developer" entry.
+- **Actual:** Ten minutes of tapping the wrong version number. The `bee login` link expired (5 minutes) before Developer Mode was on, so the login had to be restarted.
+- **Severity:** minor
+- **Workaround:** Settings → About → tap the app version five times.
+- **Suggestion:** update the doc to "Settings → About → Version", and make the login link valid for longer than five minutes, since the first thing a new developer does after seeing it is go and find Developer Mode.
+
+### 2026-09-23 — `bee` is not on the PATH of a fresh login shell after `npm i -g`
+- **Task:** Run `bee login` from a terminal.
+- **Steps:** `npm i -g @beeai/cli` under nvm's Node 24, then open a new terminal tab and run `bee login`.
+- **Expected:** The CLI runs.
+- **Actual:** `zsh: command not found: bee`, then with the full path `env: node: No such file or directory`, because the shell had not loaded nvm. Worked with `PATH="$HOME/.nvm/versions/node/v24.19.0/bin:$PATH" bee login`.
+- **Severity:** papercut (an nvm quirk, not Bee's, but it is the first thing every nvm user will hit)
+- **Workaround:** put nvm's bin directory on PATH for the command.
+- **Suggestion:** a one-line note in the install docs for nvm users, or offer a Homebrew formula.
