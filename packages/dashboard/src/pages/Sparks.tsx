@@ -104,7 +104,13 @@ export function Sparks() {
     <div>
       <h1 className="title">Sparks</h1>
       <p className="muted lead">Things you wondered out loud. Have a guess, then see the answer. Rhubarb will ask you about them again in a few days.</p>
-      {rows.length === 0 && <p className="muted">None yet. Wonder something out loud.</p>}
+      {rows.length === 0 && (
+        <div className="empty">
+          <p>
+            <strong>None yet.</strong> The next time you wonder something out loud near your Bee, "I wonder how…" or "why do they…", it shows up here within a few minutes, with a place to guess before you see the answer.
+          </p>
+        </div>
+      )}
       {rows.map((row) => (
         <Spark key={row.card.id} row={row} onChange={(card) => setRows((all) => (all ?? []).map((r) => (r.card.id === card.id ? { ...r, card } : r)))} />
       ))}

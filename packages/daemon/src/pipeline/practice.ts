@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import {
+import { ALL_NUDGES,
   judge,
   lintProse,
   recordReview,
@@ -110,7 +110,7 @@ export async function gradeAnswer(deps: PracticeDeps, p: Practice, journalId: st
   if (p.beeTodoId) await bee.completeTodo(p.beeTodoId).catch(() => undefined);
 
   // Feedback reaches the phone the same way the prompt did: a short alarm a minute out.
-  if (notify) {
+  if (notify && (db.getProfile()?.nudges ?? ALL_NUDGES).feedback !== false) {
     const line = `${grade.score}/5. ${grade.feedback}`.slice(0, 1900);
     await bee.createTodo(line, new Date(Date.now() + 60_000).toISOString()).catch((e: Error) => log(`feedback nudge failed: ${e.message}`));
   }

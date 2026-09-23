@@ -47,7 +47,11 @@ export function Evidence() {
       <p className="muted lead">Whether any of this is working, in numbers. Every figure here comes from something you did, not from how long you spent in the app.</p>
 
       {nothing ? (
-        <p className="muted">Nothing to show yet. It fills in as you answer out loud, take a check, and use what you've learned in real conversations.</p>
+        <div className="empty">
+          <p>
+            <strong>Nothing to show yet.</strong> The first figure appears the first time you explain something out loud at the end of a lesson. The one that matters most, using a skill in a real conversation, usually takes a week or two.
+          </p>
+        </div>
       ) : (
         <>
           <div className="glance" data-tour="evidence-top">

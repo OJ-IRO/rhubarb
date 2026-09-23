@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice } from "@rhubarb/core";
+import { classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
@@ -32,6 +32,11 @@ const DASHBOARD_DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "..",
 
 const db = new RhubarbDb(join(DATA_DIR, "rhubarb.db"));
 const bee = new BeeClient();
+
+/** The wearer chooses which alarms reach their phone. Anything unset is on. */
+function nudgeOn(db: RhubarbDb, kind: keyof NudgePrefs): boolean {
+  return (db.getProfile()?.nudges ?? ALL_NUDGES)[kind] !== false;
+}
 
 function log(msg: string): void {
   console.log(`[rhubarb ${new Date().toISOString()}] ${msg}`);
@@ -135,7 +140,7 @@ const reflectNow = guarded("reflect", async () => {
   if (touched.length > 0 && proposed.length > 0) {
     const top = proposed[0];
     const line = `Your learning brief is ready. ${proposed.length === 1 ? "One skill" : `${proposed.length} skills`} worth a look, starting with ${top.name}.`;
-    await bee.createTodo(line, afterQuietHours(new Date(Date.now() + 2 * 60_000)).toISOString()).catch((e: Error) => log(`brief nudge failed: ${e.message}`));
+    if (nudgeOn(db, "brief")) await bee.createTodo(line, afterQuietHours(new Date(Date.now() + 2 * 60_000)).toISOString()).catch((e: Error) => log(`brief nudge failed: ${e.message}`));
   }
   await writeTodayLetter(db, log);
 });
@@ -305,6 +310,7 @@ startApi(
     log,
     staticDir: existsSync(DASHBOARD_DIST) ? DASHBOARD_DIST : undefined,
     listening: () => ({ ...listening }),
+    nextSlot: () => nextLearningSlot(db),
     actions: {
       reflectNow,
       acceptSkill: async (id) => {

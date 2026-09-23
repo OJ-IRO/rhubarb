@@ -41,7 +41,7 @@ Your name is shown on the settings page and nowhere else, and it is never sent t
 ```
 packages/core      — types, SQLite store, Bee client + stream consumer, detectors, FSRS scheduling, Bedrock LLM layer, voice lint
 packages/daemon    — capture → classify → reflect → lessons → practice → field evidence; HTTP API; serves the dashboard
-packages/dashboard — local web app (Vite + React): Today, Board, Skill, Lesson decks + quiz + tutor, Sparks, a three.js Honeycomb, Evidence, Privacy and safety, preview mode
+packages/dashboard — local web app (Vite + React): Today, Board, Skill, Lesson decks + quiz + tutor, Sparks, a three.js Honeycomb, Evidence, Looking back, Settings, Privacy and safety, preview mode
 rhubarb-skill/      — an Agent Skill that reads your learning state from the local API
 docs/              — Bee capability research, the plan, hardware spike results, a real captured event log for replay
 ```
@@ -63,7 +63,7 @@ To keep Rhubarb running across reboots on macOS, use `./scripts/install-launchd.
 
 ## Tests
 
-`npm test` runs 47 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, and the API's handling of hostile requests.
+`npm test` runs 48 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, and the API's handling of hostile requests.
 
 ## For agents
 

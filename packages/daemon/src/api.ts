@@ -11,6 +11,8 @@ export interface ApiDeps {
   staticDir?: string;
   /** Whether Rhubarb can hear the Bee right now. Optional so tests need not fake a stream. */
   listening?: () => Listening;
+  /** The next time the wearer said they have time to learn. */
+  nextSlot?: () => Date;
   actions: {
     reflectNow: () => Promise<void>;
     acceptSkill: (id: number) => Promise<void>;
@@ -63,6 +65,7 @@ const ProfileIn = z.object({
   offLimits: z.array(z.string().max(200)).max(30).default([]),
   timezone: z.string().max(80).default(() => Intl.DateTimeFormat().resolvedOptions().timeZone),
   onboardedAt: z.number().nullable().default(null),
+  nudges: z.object({ lessons: z.boolean(), feedback: z.boolean(), credits: z.boolean(), brief: z.boolean() }).optional(),
 });
 
 function json(res: ServerResponse, status: number, body: unknown): void {
@@ -161,8 +164,12 @@ export function startApi(deps: ApiDeps, port: number): Server {
             proposed: db.skillsByStatus(["proposed"]).length,
             active: db.skillsByStatus(["active"]).length,
             sparks: db.cardsWithItems(5),
+            // What is on its way, like a schedule: alarms not yet fired, and tonight's reflection.
+            upcoming: db.openPractice().filter((p) => p.scheduledFor > now).sort((a, b) => a.scheduledFor - b.scheduledFor).slice(0, 6),
+            nextSlot: deps.nextSlot?.()?.toISOString() ?? null,
           });
         }
+        if (head === "history" && method === "GET") return json(res, 200, db.history());
         if (head === "profile" && method === "GET") return json(res, 200, db.getProfile());
         if (head === "profile" && method === "PUT") {
           // Reflection and lesson writing call goals.join() and friends on every run, so a

@@ -102,3 +102,23 @@ test("learning progress is numbers only, and counts what happened", () => {
   assert.deepEqual(p.transfer, [{ skillId, days: 7 }], "a week from first not following it to using it for real");
   assert.equal(JSON.stringify(p).includes("pods"), false, "no speech leaks into the numbers");
 });
+
+test("history lists what happened, newest first, in plain words", () => {
+  const db = new RhubarbDb(":memory:");
+  const skillId = db.insertSkill({ name: "Salary negotiation", domain: null, competentLooksLike: "names a number first", terms: ["salary"], priority: 80, brief: "b" });
+  const day = (n: number) => new Date(2026, 8, n, 12).getTime();
+
+  const p = db.insertPractice({ skillId, lessonId: null, cardId: null, kind: "teachback", prompt: "Explain anchoring.", rubric: null, marker: "m", scheduledFor: day(3), beeTodoId: null });
+  db.gradePractice(p, { score: 4, feedback: "You named the number first." });
+  db.db.prepare("UPDATE practice SET created_at = ? WHERE id = ?").run(day(3), p);
+
+  db.insertUtterance({ id: 1, conversationUuid: "c", text: "i'd want to start from ninety", spokenAt: new Date(day(5)).toISOString(), source: "stream" });
+  db.insertFieldCandidate({ skillId, utteranceId: 1, text: "i'd want to start from ninety", context: null, spokenAt: new Date(day(5)).toISOString() });
+  db.setFieldVerdict(db.unjudgedFieldEvidence()[0].id, { used: true, correct: true, level: 2, note: "You anchored first." }, true);
+
+  const h = db.history();
+  assert.deepEqual(h.map((e) => e.kind), ["credit", "answer"]);
+  assert.equal(h[0].title, "Used it for real: Salary negotiation");
+  assert.equal(h[1].detail, "4 of 5. You named the number first.");
+  assert.equal(h[1].score, 4);
+});

@@ -19,6 +19,10 @@ export interface Today {
   proposed: number;
   active: number;
   sparks: Array<{ card: Card; item: Item }>;
+  /** alarms not yet fired, soonest first */
+  upcoming: Practice[];
+  /** ISO time of the next learning window, or null if none is set */
+  nextSlot: string | null;
 }
 
 export interface SkillDetail {
@@ -50,7 +54,7 @@ export interface Status {
   listening: Listening | null;
 }
 
-export type { LearningProgress } from "@rhubarb/core";
+export type { LearningProgress, HistoryEntry, NudgePrefs } from "@rhubarb/core";
 
 export interface PrivacyView {
   summary: { utterances: number; moments: number; voiceNotes: number; skills: number; lessons: number; since: string | null };
@@ -81,6 +85,7 @@ interface PreviewState {
   rows: SkillRow[];
   privacy: PrivacyView;
   cards: Array<{ card: Card; item: Item }>;
+  profile: Profile;
 }
 let pv: PreviewState | null = null;
 
@@ -90,7 +95,7 @@ let pv: PreviewState | null = null;
  * Reloading the page puts the sample content back.
  */
 function previewState(f: typeof import("./fixtures")): PreviewState {
-  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy), cards: structuredClone(f.cards) };
+  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy), cards: structuredClone(f.cards), profile: structuredClone(f.profile) };
   return pv;
 }
 
@@ -139,10 +144,14 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     st.rows = [];
     return as(st.privacy);
   }
-  if (path === "/today") return as(f.today);
-  if (path === "/profile") return as(f.profile);
+  if (path === "/today") return as({ ...f.today, profile: st.profile });
+  if (path === "/profile") {
+    if (method === "PUT" && body) st.profile = { ...st.profile, ...(JSON.parse(String(body)) as Partial<Profile>) };
+    return as(st.profile);
+  }
   if (path === "/sparks") return as(st.cards);
   if (path === "/progress") return as(f.progress);
+  if (path === "/history") return as(f.history);
   if ((m = path.match(/^\/sparks\/(\d+)\/guess$/))) {
     const row = st.cards.find((c) => c.card.id === Number(m![1]));
     const text = body ? String((JSON.parse(String(body)) as { text?: string }).text ?? "").trim() : "";
@@ -193,6 +202,7 @@ export const api = {
   status: () => call<Status>("/status"),
   guess: (cardId: number, text: string) => call<Card>(`/sparks/${cardId}/guess`, { method: "POST", body: JSON.stringify({ text }) }),
   progress: () => call<import("@rhubarb/core").LearningProgress>("/progress"),
+  history: () => call<import("@rhubarb/core").HistoryEntry[]>("/history"),
   privacy: () => call<PrivacyView>("/privacy"),
   forgetMoment: (id: number) => call<PrivacyView>(`/privacy/moments/${id}`, { method: "DELETE" }),
   forgetDay: (day: string) => call<PrivacyView>(`/privacy/days/${day}`, { method: "DELETE" }),

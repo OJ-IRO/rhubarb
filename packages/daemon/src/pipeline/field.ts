@@ -1,4 +1,4 @@
-import { judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type FieldEvidence, type RhubarbDb } from "@rhubarb/core";
+import { ALL_NUDGES, judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type FieldEvidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 import { renderContext } from "./capture.js";
 import { afterQuietHours } from "./schedule.js";
@@ -93,7 +93,9 @@ async function judgeOne(deps: FieldDeps, fe: FieldEvidence): Promise<boolean> {
     db.setFieldVerdict(fe.id, v, ok);
     if (!ok) return false;
     log(`field: credited ${skill.name} at level ${v.level}: "${fe.text.slice(0, 60)}"`);
-    await bee.createTodo(`Heard you use ${skill.name} today. ${v.note}`.slice(0, 1900), afterQuietHours(new Date(Date.now() + 60_000)).toISOString()).catch((e: Error) => log(`field nudge failed: ${e.message}`));
+    if ((db.getProfile()?.nudges ?? ALL_NUDGES).credits !== false) {
+      await bee.createTodo(`Heard you use ${skill.name} today. ${v.note}`.slice(0, 1900), afterQuietHours(new Date(Date.now() + 60_000)).toISOString()).catch((e: Error) => log(`field nudge failed: ${e.message}`));
+    }
     deps.onCredited?.(skill.id, v.level);
     return true;
   }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { api, when, type Today as TodayData } from "../api";
+import { api, isPreview, when, type Today as TodayData } from "../api";
+import { GettingStarted } from "../components/GettingStarted";
 import { HexBadge, HexLevels, Loading } from "../components/Hex";
 import { Link } from "../router";
 
@@ -14,6 +15,15 @@ export function Today() {
     return () => clearInterval(t);
   }, []);
 
+  async function reflect() {
+    setReflecting(true);
+    await api.reflect();
+    setTimeout(() => {
+      setReflecting(false);
+      void load();
+    }, isPreview() ? 1500 : 45_000);
+  }
+
   if (!data) return <Loading />;
   const due = data.duePractice.length + data.dueCards.length;
   const hour = new Date().getHours();
@@ -27,12 +37,10 @@ export function Today() {
 
       {data.letter ? (
         <p className="letter">{data.letter}</p>
+      ) : data.active + data.proposed === 0 ? (
+        <GettingStarted profile={data.profile} onReflect={reflect} reflecting={reflecting} onGoalsSaved={() => void load()} />
       ) : (
-        <p className="letter muted">
-          {data.active + data.proposed === 0
-            ? "Nothing on the board yet. Wear the Bee through a normal day and let it hear what your week is asking of you. If you'd rather not wait, reflect now on what it has heard so far."
-            : "No letter for today yet. Tonight's reflection writes one."}
-        </p>
+        <p className="letter muted">No letter for today yet. Tonight's reflection writes one.</p>
       )}
 
       {data.active + data.proposed > 0 && (
@@ -121,22 +129,46 @@ export function Today() {
         </section>
       )}
 
-      <div className="actions">
-        <button
-          className="ghost"
-          disabled={reflecting}
-          onClick={async () => {
-            setReflecting(true);
-            await api.reflect();
-            setTimeout(() => {
-              setReflecting(false);
-              void load();
-            }, 45_000);
-          }}
-        >
-          {reflecting ? "Thinking about your week…" : "Reflect now"}
-        </button>
-      </div>
+      {((data.upcoming ?? []).length > 0 || data.nextSlot) && (
+        <section className="card">
+          <p className="eyebrow">Coming up</p>
+          <ul className="due-list">
+            {(data.upcoming ?? []).map((p) => (
+              <li key={p.id}>
+                <span className="due-kind">{p.kind === "mission" ? "Mission" : p.kind === "teachback" ? "Teach it back" : "Recall"}</span>
+                <span>
+                  {p.prompt}
+                  <span className="muted"> · your phone buzzes {when(p.scheduledFor)}</span>
+                </span>
+              </li>
+            ))}
+            {data.nextSlot && (
+              <li>
+                <span className="due-kind">Next slot</span>
+                <span>
+                  {when(data.nextSlot)}
+                  <span className="muted"> · when a new lesson would land. Change it in </span>
+                  <Link to="/settings">settings</Link>.
+                </span>
+              </li>
+            )}
+            <li>
+              <span className="due-kind">Tonight</span>
+              <span>
+                Rhubarb reflects on the day around 3am<span className="muted"> · new skills for the board, and tomorrow's letter.</span>
+              </span>
+            </li>
+          </ul>
+        </section>
+      )}
+
+      {data.active + data.proposed > 0 && (
+        <div className="actions">
+          <button className="ghost" disabled={reflecting} onClick={reflect}>
+            {reflecting ? "Thinking about your week…" : "Reflect now"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

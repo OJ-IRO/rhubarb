@@ -3,7 +3,7 @@
  * UI can be judged without a daemon or a Bee. Never shown as real data: the banner says so.
  */
 import { localDay, type PrivacyView } from "./api";
-import type { LearningProgress } from "@rhubarb/core";
+import type { HistoryEntry, LearningProgress } from "@rhubarb/core";
 import type { Card, Deck, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, Practice, Profile, Quiz, Skill } from "@rhubarb/core";
 import type { SkillRow, Today, SkillDetail, LessonView } from "./api";
 
@@ -307,6 +307,11 @@ export const today: Today = {
   proposed: 4,
   active: 2,
   sparks: cards,
+  upcoming: [
+    { id: 9, skillId: 1, lessonId: 1, cardId: null, kind: "mission", prompt: "In Thursday's sync, narrate the state of any rollout that's mentioned using the three sentences from the steps card.", rubric: null, beeTodoId: 9, marker: "m9", status: "scheduled", scheduledFor: now + 26 * h, journalId: null, answerText: null, grade: null, createdAt: now - h },
+    { id: 10, skillId: null, lessonId: null, cardId: 1, kind: "recall", prompt: "How do honeybees turn nectar into honey?", rubric: null, beeTodoId: 10, marker: "m10", status: "scheduled", scheduledFor: now + 3 * d, journalId: null, answerText: null, grade: null, createdAt: now - 2 * h },
+  ],
+  nextSlot: new Date(now + 6 * h).toISOString(),
 };
 
 export const skillDetail: SkillDetail = { skill: skills[0], ladder, evidence, lessons: [lesson], practice, fieldEvidence };
@@ -336,3 +341,13 @@ export const progress: LearningProgress = {
   transfer: [{ skillId: 1, days: 9 }, { skillId: 5, days: 4 }],
   lessons: { written: 5, finished: 3, reviewed: 5, passedEveryCheck: 4 },
 };
+
+export const history: HistoryEntry[] = [
+  { at: now - 5 * h, kind: "credit", title: "Used it for real: Kubernetes rolling deployments", detail: "That's the readiness gate explained correctly, unprompted, to someone who was worried. Level two is yours.", skillId: 1, lessonId: null, score: null },
+  { at: now - 1 * d, kind: "answer", title: "Explained it out loud: Kubernetes rolling deployments", detail: "4 of 5. You had the core right: a few at a time, readiness first, no gap. What you skipped is what happens when a pod never becomes ready.", skillId: 1, lessonId: 1, score: 4 },
+  { at: now - 1 * d - 2 * h, kind: "lesson", title: "Finished a lesson: Kubernetes rolling deployments", detail: "Level 1.", skillId: 1, lessonId: 1, score: null },
+  { at: now - 2 * d, kind: "spark", title: "Wondered: Why airplane windows are round", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
+  { at: now - 3 * d, kind: "answer", title: "Took the check: Kubernetes rolling deployments", detail: "4 of 5", skillId: 1, lessonId: 1, score: 0.8 },
+  { at: now - 4 * d, kind: "spark", title: "Wondered: How honeybees turn nectar into honey", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
+  { at: now - 6 * d, kind: "answer", title: "Explained it out loud: Conversational Japanese", detail: "2 of 5. The order was right and the politeness level was not. Say the verb last and you're most of the way there.", skillId: 4, lessonId: null, score: 2 },
+];

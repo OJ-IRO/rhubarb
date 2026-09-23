@@ -3,7 +3,7 @@ import { api, type SkillRow } from "../api";
 import type { CombCell } from "../components/Comb3D";
 import { Loading } from "../components/Hex";
 import { hexSpiral, wrapLabel } from "../lib/hexLayout";
-import { go } from "../router";
+import { Link, go } from "../router";
 
 // three.js is only fetched when someone opens this page. The import is started as soon as the
 // app loads so it is usually cached by the time anyone clicks; and while it is still on its way
@@ -114,7 +114,14 @@ export function Honeycomb() {
       <h1 className="title">Honeycomb</h1>
       <p className="muted lead">One cell per skill. It fills as you climb the ladder, and it fills faster when Rhubarb hears you use the skill for real.</p>
       {cells.length === 0 ? (
-        <p className="muted">Empty comb. It fills from the board.</p>
+        <div className="empty">
+          <p>
+            <strong>Empty comb.</strong> A cell appears for each skill you say yes to on the board, and fills with honey as you climb its levels. It fills faster when Rhubarb hears you use the skill for real.
+          </p>
+          <Link to="/board" className="button">
+            Go to the board
+          </Link>
+        </div>
       ) : (
         <>
           {flat ? (

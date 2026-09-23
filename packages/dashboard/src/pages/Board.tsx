@@ -77,7 +77,14 @@ export function Board() {
       <p className="muted lead">Everything your days have asked you to learn, in the order Rhubarb would take them.</p>
 
       {ranked.length === 0 && (
-        <p className="muted">Nothing here yet. It fills in after Rhubarb has heard a day or two, or when you reflect from the Today page.</p>
+        <div className="empty">
+          <p>
+            <strong>Nothing here yet.</strong> The board fills the first night after Rhubarb has heard you: every skill it thinks your week is asking for, ranked, each with the moments that put it there. You say yes or no to each one.
+          </p>
+          <Link to="/" className="button">
+            See how to get started
+          </Link>
+        </div>
       )}
 
       {top.length > 0 && (

@@ -21,6 +21,7 @@ import type {
   PracticeStatus,
   Profile,
   Skill,
+  HistoryEntry,
   LearningProgress,
   PrivacySummary,
   ProgressPoint,
@@ -827,6 +828,40 @@ export class RhubarbDb {
         passedEveryCheck: reviews.filter((r) => (r.checks ?? []).length > 0 && (r.checks ?? []).every((c) => c.ok)).length,
       },
     };
+  }
+
+  /** What has happened, newest first: lessons finished, answers graded, real-world credits, sparks, levels passed. */
+  history(limit = 60): HistoryEntry[] {
+    const skillName = new Map((this.db.prepare("SELECT id, name FROM skills").all() as Array<{ id: number; name: string }>).map((s) => [s.id, s.name]));
+    const out: HistoryEntry[] = [];
+    for (const l of this.db.prepare("SELECT id, skill_id, level_idx, completed_at FROM lessons WHERE status = 'done' AND completed_at IS NOT NULL").all() as Array<{ id: number; skill_id: number; level_idx: number; completed_at: number }>) {
+      out.push({ at: l.completed_at, kind: "lesson", title: `Finished a lesson: ${skillName.get(l.skill_id) ?? "a skill"}`, detail: `Level ${l.level_idx + 1}.`, skillId: l.skill_id, lessonId: l.id, score: null });
+    }
+    for (const p of this.db.prepare("SELECT id, skill_id, lesson_id, kind, prompt, grade, created_at FROM practice WHERE grade IS NOT NULL").all() as Array<{ id: number; skill_id: number | null; lesson_id: number | null; kind: string; prompt: string; grade: string; created_at: number }>) {
+      let g: { score?: number; total?: number; feedback?: string } = {};
+      try {
+        g = JSON.parse(p.grade);
+      } catch {
+        continue;
+      }
+      if (typeof g.score !== "number") continue;
+      const label = p.kind === "quiz" ? "Took the check" : p.kind === "recall" ? "Recalled" : p.kind === "mission" ? "Reported on a mission" : "Explained it out loud";
+      const scoreText = p.kind === "quiz" ? `${g.score} of ${g.total ?? "?"}` : `${g.score} of 5`;
+      out.push({ at: p.created_at, kind: "answer", title: `${label}: ${skillName.get(p.skill_id ?? -1) ?? p.prompt.slice(0, 60)}`, detail: g.feedback ? `${scoreText}. ${g.feedback}` : scoreText, skillId: p.skill_id, lessonId: p.lesson_id, score: p.kind === "quiz" ? (g.total ? g.score / g.total : null) : g.score });
+    }
+    for (const f of this.db.prepare("SELECT skill_id, spoken_at, verdict FROM field_evidence WHERE credited = 1").all() as Array<{ skill_id: number; spoken_at: string; verdict: string | null }>) {
+      let note = "";
+      try {
+        note = f.verdict ? String((JSON.parse(f.verdict) as { note?: string }).note ?? "") : "";
+      } catch {
+        /* no note */
+      }
+      out.push({ at: Date.parse(f.spoken_at), kind: "credit", title: `Used it for real: ${skillName.get(f.skill_id) ?? "a skill"}`, detail: note || "Heard in a real conversation, and it counted.", skillId: f.skill_id, lessonId: null, score: null });
+    }
+    for (const c of this.db.prepare("SELECT id, title, created_at FROM cards").all() as Array<{ id: number; title: string; created_at: number }>) {
+      out.push({ at: c.created_at, kind: "spark", title: `Wondered: ${c.title}`, detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null });
+    }
+    return out.sort((a, b) => b.at - a.at).slice(0, limit);
   }
 
   getCard(id: number): Card | null {

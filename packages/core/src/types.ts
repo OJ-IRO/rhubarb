@@ -234,6 +234,33 @@ export interface Profile {
   offLimits: string[];
   timezone: string;
   onboardedAt: number | null;
+  /** Which alarms Rhubarb may send to the phone. Missing means all on. */
+  nudges?: NudgePrefs;
+}
+
+export interface NudgePrefs {
+  /** "Your lesson is ready" */
+  lessons: boolean;
+  /** the score and feedback after a spoken answer */
+  feedback: boolean;
+  /** "Heard you use X today" */
+  credits: boolean;
+  /** the nightly learning brief */
+  brief: boolean;
+}
+
+export const ALL_NUDGES: NudgePrefs = { lessons: true, feedback: true, credits: true, brief: true };
+
+/** One thing that happened, for looking back. */
+export interface HistoryEntry {
+  at: number;
+  kind: "lesson" | "answer" | "credit" | "spark" | "level";
+  title: string;
+  /** one line of detail, in the house voice */
+  detail: string;
+  skillId: number | null;
+  lessonId: number | null;
+  score: number | null;
 }
 
 // --- Sparks lane (curiosity -> answer card -> optional recall) ---

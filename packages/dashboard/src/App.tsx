@@ -6,6 +6,8 @@ import { ListeningLight } from "./components/Listening";
 import { Tour, resetTour, tourSeen } from "./components/Tour";
 import { Board } from "./pages/Board";
 import { Evidence } from "./pages/Evidence";
+import { History } from "./pages/History";
+import { Settings } from "./pages/Settings";
 import { Honeycomb } from "./pages/Honeycomb";
 import { LessonPage } from "./pages/Lesson";
 import { Onboarding } from "./pages/Onboarding";
@@ -21,13 +23,16 @@ const NAV = [
   ["/sparks", "Sparks"],
   ["/honeycomb", "Honeycomb"],
   ["/evidence", "Evidence"],
+  ["/history", "Looking back"],
 ] as const;
 
 function titleFor(path: string): string {
   if (path === "/board") return "The board";
   if (path === "/sparks") return "Sparks";
   if (path === "/honeycomb") return "Honeycomb";
-  if (path === "/welcome") return "Settings";
+  if (path === "/welcome") return "Set up";
+  if (path === "/settings") return "Settings";
+  if (path === "/history") return "Looking back";
   if (path === "/privacy") return "Privacy and safety";
   if (path === "/evidence") return "Evidence";
   if (path.startsWith("/lessons")) return "Lesson";
@@ -123,6 +128,8 @@ export function App() {
   else if (route.path === "/honeycomb") page = <Honeycomb />;
   else if (route.path === "/privacy") page = <Privacy />;
   else if (route.path === "/evidence") page = <Evidence />;
+  else if (route.path === "/history") page = <History />;
+  else if (route.path === "/settings") page = <Settings />;
   else if ((params = match("/skills/:id", route.path))) page = <SkillPage id={Number(params.id)} />;
   else if ((params = match("/lessons/:id", route.path))) page = <LessonPage id={Number(params.id)} />;
   else page = <Today />;
@@ -153,18 +160,9 @@ export function App() {
           <Link to="/privacy" className={route.path === "/privacy" ? "navlink active small" : "navlink small"} tour="nav-privacy">
             Privacy
           </Link>
-          <Link to="/welcome" className={route.path === "/welcome" ? "navlink active small" : "navlink small"}>
+          <Link to={profile ? "/settings" : "/welcome"} className={route.path === "/settings" || route.path === "/welcome" ? "navlink active small" : "navlink small"}>
             {profile ? "Settings" : "Set up"}
           </Link>
-          <button
-            className="navlink small linklike"
-            onClick={() => {
-              resetTour();
-              setTouring(true);
-            }}
-          >
-            Show me around
-          </button>
           {!preview && (
             <a href="#/preview/board" className="navlink small">
               Design preview
@@ -176,6 +174,17 @@ export function App() {
         <ErrorBoundary key={route.path}>{page}</ErrorBoundary>
       </main>
       {touring && <Tour onClose={() => setTouring(false)} />}
+      {!touring && (
+        <button
+          className="help-tab"
+          onClick={() => {
+            resetTour();
+            setTouring(true);
+          }}
+        >
+          New here?
+        </button>
+      )}
     </div>
   );
 }

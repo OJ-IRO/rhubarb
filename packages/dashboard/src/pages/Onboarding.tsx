@@ -2,7 +2,7 @@ import { useState } from "react";
 import { HexLevels } from "../components/Hex";
 import { api, type Profile } from "../api";
 
-const STYLES: Array<{ id: Profile["style"]; name: string; blurb: string }> = [
+export const STYLES: Array<{ id: Profile["style"]; name: string; blurb: string }> = [
   { id: "story", name: "Tell me a story", blurb: "A situation unfolds, the idea becomes necessary, you watch it work." },
   { id: "hands-on", name: "Let me try it", blurb: "Short explanation, then something to do right away, then what to notice." },
   { id: "socratic", name: "Ask me questions", blurb: "You think first, then the answer. Builds from what you already half-know." },
@@ -10,11 +10,11 @@ const STYLES: Array<{ id: Profile["style"]; name: string; blurb: string }> = [
   { id: "analogy", name: "Compare it to something", blurb: "One strong analogy carried all the way through, then where it stops holding." },
 ];
 
-const WINDOWS = ["weekday mornings on the commute", "over lunch", "evenings after dinner", "Sunday mornings"];
+export const WINDOWS = ["weekday mornings on the commute", "over lunch", "evenings after dinner", "Sunday mornings"];
 const OTHER = "other";
 
 /** The saved value is plain text ("over lunch, Sunday mornings, Fridays at 4"). Split it back into picks and an "other" part. */
-function splitWindows(saved: string): { picks: string[]; other: string } {
+export function splitWindows(saved: string): { picks: string[]; other: string } {
   const parts = saved.split(",").map((s) => s.trim()).filter(Boolean);
   const picks = parts.filter((p) => WINDOWS.includes(p));
   const other = parts.filter((p) => !WINDOWS.includes(p)).join(", ");
@@ -22,7 +22,7 @@ function splitWindows(saved: string): { picks: string[]; other: string } {
 }
 
 /** A short list you build one entry at a time. Enter or Add puts it in; each entry has its own remove. */
-function ListInput({ items, onChange, placeholder, addLabel }: { items: string[]; onChange: (v: string[]) => void; placeholder: string; addLabel: string }) {
+export function ListInput({ items, onChange, placeholder, addLabel }: { items: string[]; onChange: (v: string[]) => void; placeholder: string; addLabel: string }) {
   const [draft, setDraft] = useState("");
   const add = () => {
     const v = draft.trim();

@@ -1,4 +1,5 @@
 import {
+  ALL_NUDGES,
   classify,
   lintProse,
   MODELS,
@@ -259,8 +260,10 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
 
   const nudge = `Your ${skill.name} lesson is ready. About ${deck.minutes} minutes, whenever you're at your desk.`;
   const at = nextLearningSlot(db);
-  await bee.createTodo(nudge, at.toISOString()).catch((e: Error) => log(`lesson nudge failed: ${e.message}`));
-  log(`lesson nudge scheduled for ${at.toISOString()}`);
+  if ((profile?.nudges ?? ALL_NUDGES).lessons !== false) {
+    await bee.createTodo(nudge, at.toISOString()).catch((e: Error) => log(`lesson nudge failed: ${e.message}`));
+    log(`lesson nudge scheduled for ${at.toISOString()}`);
+  }
   return lessonId;
 }
 
