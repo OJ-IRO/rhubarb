@@ -1,18 +1,28 @@
-import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
+import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk";
 import type Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
-/** Bedrock model ids (us-east-1). Opus writes and judges; Sonnet handles volume. */
+/**
+ * Bedrock model ids (us-east-1). The writer writes and judges; the worker handles volume.
+ *
+ * These are cross-region inference profiles on the classic Bedrock endpoint, not the newer
+ * Mantle one. A new AWS account is not allowed the newest models (Claude Opus 5, Sonnet 5,
+ * Opus 4.8, 4.7 all answer "not available for this account"), and the Mantle endpoint serves
+ * only those. Opus 4.6 and Sonnet 4.6 are the strongest models such an account can run, and
+ * support everything this code uses: adaptive thinking, effort, and cached system blocks.
+ * Override with RHUBARB_WRITER_MODEL / RHUBARB_WORKER_MODEL once the account is allowed more.
+ */
 export const MODELS = {
-  writer: "anthropic.claude-opus-5",
-  worker: "anthropic.claude-sonnet-5",
+  writer: process.env.RHUBARB_WRITER_MODEL ?? "us.anthropic.claude-opus-4-6-v1",
+  worker: process.env.RHUBARB_WORKER_MODEL ?? "global.anthropic.claude-sonnet-4-6",
 } as const;
 
-export type Effort = "low" | "medium" | "high" | "xhigh" | "max";
+/** Opus 4.6 and Sonnet 4.6 take low, medium, high and max. xhigh arrived with 4.7 and would be a 400 here. */
+export type Effort = "low" | "medium" | "high" | "max";
 
-let client: AnthropicBedrockMantle | null = null;
-export function llm(): AnthropicBedrockMantle {
-  client ??= new AnthropicBedrockMantle({ awsRegion: process.env.AWS_REGION ?? "us-east-1" });
+let client: AnthropicBedrock | null = null;
+export function llm(): AnthropicBedrock {
+  client ??= new AnthropicBedrock({ awsRegion: process.env.AWS_REGION ?? "us-east-1" });
   return client;
 }
 
@@ -34,8 +44,8 @@ export interface ClassifyOptions<T> {
 
 /**
  * Structured extraction/classification via a forced tool call, validated with zod.
- * Bedrock's Mantle endpoint rejects both `output_config.format` and `strict` tools,
- * so this is the portable path; a schema miss is retried once with the error attached.
+ * Bedrock rejects `output_config.format`, so a forced tool call is the portable path;
+ * a schema miss is retried once with the error attached.
  * Defaults to the worker model at low effort.
  */
 export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
