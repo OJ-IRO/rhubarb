@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
+import { llmRoute, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
 import { handleStreamEvent } from "./pipeline/capture.js";
@@ -274,6 +274,7 @@ const me = await bee.me().catch((e: Error) => {
   process.exit(1);
 });
 log(`connected as ${me.first_name} ${me.last_name}; data dir ${DATA_DIR}`);
+log(`claude via ${llmRoute()}`);
 
 // What the dashboard's "listening" light reads. The last-heard time starts from the database,
 // so a restart doesn't make it look as if Rhubarb has never heard anything.

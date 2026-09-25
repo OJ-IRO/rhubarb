@@ -1,5 +1,5 @@
 import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk";
-import type Anthropic from "@anthropic-ai/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 /**
@@ -12,18 +12,30 @@ import { z } from "zod";
  * support everything this code uses: adaptive thinking, effort, and cached system blocks.
  * Override with RHUBARB_WRITER_MODEL / RHUBARB_WORKER_MODEL once the account is allowed more.
  */
+/**
+ * Two ways to reach Claude. With ANTHROPIC_API_KEY set, Rhubarb talks to Anthropic directly and
+ * uses the current models. Otherwise it goes through Amazon Bedrock, where a new AWS account may
+ * be held to older models and a token quota that starts at zero until AWS Support raises it.
+ */
+export const DIRECT = Boolean(process.env.ANTHROPIC_API_KEY);
+
 export const MODELS = {
-  writer: process.env.RHUBARB_WRITER_MODEL ?? "us.anthropic.claude-opus-4-6-v1",
-  worker: process.env.RHUBARB_WORKER_MODEL ?? "global.anthropic.claude-sonnet-4-6",
+  writer: process.env.RHUBARB_WRITER_MODEL ?? (DIRECT ? "claude-opus-5" : "us.anthropic.claude-opus-4-6-v1"),
+  worker: process.env.RHUBARB_WORKER_MODEL ?? (DIRECT ? "claude-sonnet-5" : "global.anthropic.claude-sonnet-4-6"),
 } as const;
 
 /** Opus 4.6 and Sonnet 4.6 take low, medium, high and max. xhigh arrived with 4.7 and would be a 400 here. */
 export type Effort = "low" | "medium" | "high" | "max";
 
-let client: AnthropicBedrock | null = null;
-export function llm(): AnthropicBedrock {
-  client ??= new AnthropicBedrock({ awsRegion: process.env.AWS_REGION ?? "us-east-1" });
+let client: Anthropic | AnthropicBedrock | null = null;
+export function llm(): Anthropic | AnthropicBedrock {
+  client ??= DIRECT ? new Anthropic() : new AnthropicBedrock({ awsRegion: process.env.AWS_REGION ?? "us-east-1" });
   return client;
+}
+
+/** For logs and the dashboard: which way Claude is being reached. */
+export function llmRoute(): string {
+  return DIRECT ? `Anthropic API (${MODELS.writer}, ${MODELS.worker})` : `Amazon Bedrock ${process.env.AWS_REGION ?? "us-east-1"} (${MODELS.writer}, ${MODELS.worker})`;
 }
 
 /** System prompt as cacheable blocks: stable guide first (cached), then the volatile part. */
