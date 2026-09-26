@@ -97,6 +97,7 @@ export function LessonPage({ id }: { id: number }) {
               <QuizView
                 quiz={quiz}
                 result={quizResult}
+                onRetry={async (idx, text) => setQuizResult(await api.retryQuiz(id, idx, text))}
                 onSubmit={async (answers) => {
                   const r = await api.submitQuiz(id, answers);
                   setQuizResult(r);

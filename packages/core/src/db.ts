@@ -693,6 +693,12 @@ export class RhubarbDb {
     this.db.prepare("UPDATE practice SET grade = ?, status = 'graded' WHERE id = ?").run(JSON.stringify(grade), id);
   }
 
+  /** The most recent practice of one kind for a lesson, for example the quiz that was just taken. */
+  latestPracticeForLesson(lessonId: number, kind: PracticeKind): Practice | null {
+    const r = this.db.prepare("SELECT * FROM practice WHERE lesson_id = ? AND kind = ? ORDER BY id DESC LIMIT 1").get(lessonId, kind) as Row | undefined;
+    return r ? rowToPractice(r) : null;
+  }
+
   practiceForSkill(skillId: number): Practice[] {
     return (this.db.prepare("SELECT * FROM practice WHERE skill_id = ? ORDER BY created_at DESC").all(skillId) as Row[]).map(rowToPractice);
   }

@@ -918,6 +918,20 @@ textarea {
   max-width: 100%;
   height: auto;
 }
+/* A pale halo behind every diagram label, so text never sits on top of a line. */
+.mermaid-host .messageText,
+.mermaid-host .loopText,
+.mermaid-host .noteText,
+.mermaid-host .edgeLabel text,
+.mermaid-host text.actor {
+  paint-order: stroke fill;
+  stroke: #fffdf6;
+  stroke-width: 7px;
+  stroke-linejoin: round;
+}
+.mermaid-host .messageText {
+  font-size: 14px;
+}
 .caption {
   color: var(--muted);
   line-height: 1.55;
@@ -993,6 +1007,7 @@ textarea {
   font-size: 15px;
 }
 .slide.steps li p {
+  grid-column: 2;
   margin: 2px 0 0;
   color: var(--muted);
   line-height: 1.5;
@@ -1058,6 +1073,12 @@ textarea {
 }
 .q.wrong {
   border-color: var(--bad);
+}
+.q.nearly {
+  border-color: var(--honey);
+}
+.q .retry {
+  margin-top: 10px;
 }
 .q-num {
   position: absolute;

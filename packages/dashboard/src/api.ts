@@ -65,7 +65,7 @@ export interface PrivacyView {
 export interface QuizResult {
   score: number;
   total: number;
-  perQuestion: Array<{ correct: boolean; note?: string }>;
+  perQuestion: Array<{ correct: boolean; close?: boolean; note?: string }>;
   note: string;
 }
 
@@ -86,6 +86,7 @@ interface PreviewState {
   privacy: PrivacyView;
   cards: Array<{ card: Card; item: Item }>;
   profile: Profile;
+  lastQuiz?: QuizResult;
 }
 let pv: PreviewState | null = null;
 
@@ -172,7 +173,7 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the gate right. The part you'd add for level two is what happens when it never opens: the rollout stalls, it doesn't break.", score: 4 });
   if (/\/quiz$/.test(path)) {
     const answers = body ? (JSON.parse(String(body)) as { answers: Array<number | string> }).answers : [];
-    const per = f.quiz.questions.map((q, i) => (q.kind === "mcq" ? { correct: answers[i] === q.answer } : { correct: true, note: "Clear, and you named the stall as the safe failure. That's the level-two answer." }));
+    const per = f.quiz.questions.map((q, i) => (q.kind === "mcq" ? { correct: answers[i] === q.answer } : { correct: false, close: true, note: "You have the gate right. What is missing is what happens when it never opens: the rollout stalls, it does not break. Add that and you have it." }));
     const score = per.filter((p) => p.correct).length;
     const missed = per.length - score;
     const counts = ["None", "One", "Two", "Three", "Four", "Five"];
@@ -182,7 +183,15 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
         : score >= 4
           ? "That's a pass, and a comfortable one. The one you missed is about what the readiness gate does; the diagram card covers it."
           : `${counts[missed] ?? missed} of these tripped you up, mostly around what the readiness gate does. Reread the diagram card and try the quiz again tomorrow.`;
-    return as({ score, total: per.length, perQuestion: per, note });
+    pv!.lastQuiz = { score, total: per.length, perQuestion: per, note };
+    return as(pv!.lastQuiz);
+  }
+  if (/\/quiz\/retry$/.test(path)) {
+    const { idx } = JSON.parse(String(body)) as { idx: number; text: string };
+    const r: QuizResult = pv!.lastQuiz ?? { score: 0, total: f.quiz.questions.length, perQuestion: f.quiz.questions.map(() => ({ correct: false })), note: "" };
+    r.perQuestion[idx] = { correct: true, note: "That's it. The listener is what decides the form, and you named it." };
+    r.score = r.perQuestion.reduce((n, p) => n + (p.correct ? 1 : p.close ? 0.5 : 0), 0);
+    return as(r);
   }
   if (/\/mission$/.test(path)) return as({ at: new Date(Date.now() + 15 * 3600_000).toISOString() });
   if (method !== "GET") return as({ ok: true });
@@ -218,6 +227,7 @@ export const api = {
     call<{ feedback: string; score?: number }>(`/lessons/${id}/beat/${idx}/answer`, { method: "POST", body: JSON.stringify({ text }) }),
   submitQuiz: (id: number, answers: Array<number | string | null>) =>
     call<QuizResult>(`/lessons/${id}/quiz`, { method: "POST", body: JSON.stringify({ answers }) }),
+  retryQuiz: (id: number, idx: number, text: string) => call<QuizResult>(`/lessons/${id}/quiz/retry`, { method: "POST", body: JSON.stringify({ idx, text }) }),
   teachbackToPendant: (id: number) => call<{ ok: boolean }>(`/lessons/${id}/teachback/pendant`, { method: "POST" }),
   scheduleMission: (id: number) => call<{ at: string }>(`/lessons/${id}/mission`, { method: "POST" }),
   completeLesson: (id: number) => call<Lesson>(`/lessons/${id}/complete`, { method: "POST" }),

@@ -208,14 +208,25 @@ async function completeLesson(lesson: import("@rhubarb/core").Lesson): Promise<v
 const GuessVerdict = z.object({ close: z.boolean(), note: z.string().describe("one sentence to the learner about their guess, in the house voice") });
 
 const ShortVerdict = z.object({
-  correct: z.boolean(),
-  note: z.string().describe("one or two sentences to the learner about this answer, in the house voice"),
+  verdict: z.enum(["yes", "nearly", "no"]).describe("yes: the one idea the rubric asks for is there, in any words. nearly: they have the gist but a piece is missing or muddled. no: it is missing or wrong."),
+  note: z.string().describe("one or two plain sentences to the learner: what they got, and the one thing to add or fix. Plain text only: no markdown, no asterisks."),
 });
+const SHORT_GRADER =
+  "You grade one short written answer inside a lesson quiz. The learner just read the lesson and is answering from memory in their own words, so be generous about wording and strict only about the one idea the rubric names. If the idea is there, say yes. If they have the gist but a piece is missing, say nearly and name the piece. Say no only when it is missing or wrong.";
+
+function shortResult(v: z.infer<typeof ShortVerdict>): { correct: boolean; close?: boolean; note?: string } {
+  return { correct: v.verdict === "yes", close: v.verdict === "nearly", note: v.note.replace(/[*_`]/g, "") };
+}
+
+function quizScore(per: Array<{ correct: boolean; close?: boolean }>): number {
+  // a near miss is worth half, so one muddled sentence does not sink a check the learner mostly passed
+  return per.reduce((n, p) => n + (p.correct ? 1 : p.close ? 0.5 : 0), 0);
+}
 const ScoreNote = z.object({ note: z.string().describe("two or three sentences to the learner about how they did overall and what to do next, in the house voice") });
 
 async function gradeQuiz(lesson: import("@rhubarb/core").Lesson, answers: Array<number | string | null>) {
   const quiz = JSON.parse(lesson.quiz) as import("@rhubarb/core").Quiz;
-  const perQuestion: Array<{ correct: boolean; note?: string }> = [];
+  const perQuestion: Array<{ correct: boolean; close?: boolean; note?: string }> = [];
   for (let i = 0; i < quiz.questions.length; i++) {
     const q = quiz.questions[i];
     const a = answers[i];
@@ -223,21 +234,21 @@ async function gradeQuiz(lesson: import("@rhubarb/core").Lesson, answers: Array<
       perQuestion.push({ correct: a === q.answer });
     } else {
       const v = await judge({
-        system: systemBlocks(voiceGuide(), "You grade one short written answer inside a lesson quiz. Decide if it meets the rubric; be fair about wording, strict about substance."),
-        user: `Question: ${q.prompt}\nRubric: ${q.rubric}\nAnswer: "${String(a ?? "")}"`,
+        system: systemBlocks(voiceGuide(), SHORT_GRADER),
+        user: `Question: ${q.prompt}\nWhat a good answer contains: ${q.rubric}\nAnswer: "${String(a ?? "")}"`,
         schema: ShortVerdict,
         effort: "low",
       });
-      perQuestion.push(v);
+      perQuestion.push(shortResult(v));
     }
   }
-  const score = perQuestion.filter((p) => p.correct).length;
+  const score = quizScore(perQuestion);
   const total = perQuestion.length;
   const skill = db.getSkill(lesson.skillId);
   const { note } = await judge({
     system: systemBlocks(voiceGuide(), "You write the closing note of a lesson quiz."),
     user: `Skill: ${skill?.name ?? "?"}\nScore: ${score} of ${total}\nMissed: ${quiz.questions
-      .map((q, i) => (perQuestion[i].correct ? null : q.prompt))
+      .map((q, i) => (perQuestion[i].correct || perQuestion[i].close ? null : q.prompt))
       .filter(Boolean)
       .join(" | ") || "nothing"}`,
     schema: ScoreNote,
@@ -257,6 +268,29 @@ async function gradeQuiz(lesson: import("@rhubarb/core").Lesson, answers: Array<
   db.gradePractice(practiceId, { score, total, perQuestion });
   log(`quiz for lesson #${lesson.id}: ${score}/${total}`);
   return { score, total, perQuestion, note };
+}
+
+/** One more go at a written answer. The stored quiz is updated, so the better attempt is what counts. */
+async function retryQuizAnswer(lesson: import("@rhubarb/core").Lesson, idx: number, text: string) {
+  const quiz = JSON.parse(lesson.quiz) as import("@rhubarb/core").Quiz;
+  const q = quiz.questions[idx];
+  const row = db.latestPracticeForLesson(lesson.id, "quiz");
+  if (!q || q.kind !== "short" || !row?.grade) throw new Error("no written answer to retry");
+  const stored = JSON.parse(row.grade) as { score: number; total: number; perQuestion: Array<{ correct: boolean; close?: boolean; note?: string }>; note?: string };
+  const v = await judge({
+    system: systemBlocks(voiceGuide(), SHORT_GRADER),
+    user: `Question: ${q.prompt}\nWhat a good answer contains: ${q.rubric}\nAnswer: "${text}"`,
+    schema: ShortVerdict,
+    effort: "low",
+  });
+  const fresh = shortResult(v);
+  const was = stored.perQuestion[idx];
+  const better = fresh.correct || (fresh.close && !was?.correct) ? fresh : was?.correct || was?.close ? { ...was, note: fresh.note } : fresh;
+  stored.perQuestion[idx] = better;
+  const score = quizScore(stored.perQuestion);
+  db.gradePractice(row.id, { ...stored, score });
+  log(`quiz retry for lesson #${lesson.id} q${idx + 1}: ${v.verdict}; now ${score}/${stored.total}`);
+  return { score, total: stored.total, perQuestion: stored.perQuestion, note: stored.note ?? "" };
 }
 
 const nightly = guarded("nightly", async () => {
@@ -360,6 +394,7 @@ startApi(
       },
       completeLesson,
       gradeQuiz,
+      retryQuizAnswer,
       tutor: (lesson, history, onText) => tutorReply(db, lesson, history, onText),
     },
   },

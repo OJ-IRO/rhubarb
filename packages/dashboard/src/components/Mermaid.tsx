@@ -25,6 +25,9 @@ export function Mermaid({ code }: { code: string }) {
             fontFamily: "Iowan Old Style, Palatino, Georgia, serif",
             fontSize: "15px",
           },
+          // Wider lanes so a message label fits between lifelines, and no duplicate boxes at the foot.
+          sequence: { mirrorActors: false, actorMargin: 130, messageMargin: 44, width: 170, boxMargin: 12 },
+          flowchart: { htmlLabels: true, padding: 12 },
         });
         const { svg } = await mermaid.render(`rhubarb-diagram-${++counter}`, code.trim());
         if (!cancelled && ref.current) ref.current.innerHTML = svg;

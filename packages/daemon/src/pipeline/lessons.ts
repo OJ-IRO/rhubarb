@@ -65,7 +65,11 @@ const LessonOut = z.object({
       .array(
         z.discriminatedUnion("kind", [
           z.object({ kind: z.literal("mcq"), prompt: z.string(), choices: z.array(z.string()).length(4), answer: z.number().int().min(0).max(3), explanation: z.string() }),
-          z.object({ kind: z.literal("short"), prompt: z.string(), rubric: z.string().describe("what a good answer contains; never shown") }),
+          z.object({
+            kind: z.literal("short"),
+            prompt: z.string().describe("asks for exactly ONE idea that a card in this deck states outright, and says what to name, e.g. 'In a sentence: what is the one thing that decides whether a sentence was polite?'. Never a two-part question."),
+            rubric: z.string().describe("the one idea that must be present, in any wording; never shown to the learner"),
+          }),
         ])
       )
       .min(4)

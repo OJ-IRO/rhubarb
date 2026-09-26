@@ -26,6 +26,8 @@ export interface ApiDeps {
     scheduleMission: (lesson: Lesson, beat: LessonBeat) => Promise<Date>;
     completeLesson: (lesson: Lesson) => Promise<void>;
     gradeQuiz: (lesson: Lesson, answers: Array<number | string | null>) => Promise<QuizResult>;
+    /** One more go at a single written answer after seeing the feedback. */
+    retryQuizAnswer?: (lesson: Lesson, idx: number, text: string) => Promise<QuizResult>;
     tutor: (lesson: Lesson, history: Array<{ role: "user" | "assistant"; content: string }>, onText: (t: string) => void) => Promise<string>;
   };
 }
@@ -42,7 +44,7 @@ export interface Listening {
 export interface QuizResult {
   score: number;
   total: number;
-  perQuestion: Array<{ correct: boolean; note?: string }>;
+  perQuestion: Array<{ correct: boolean; close?: boolean; note?: string }>;
   note: string;
 }
 
@@ -340,9 +342,16 @@ export function startApi(deps: ApiDeps, port: number): Server {
             await actions.completeLesson(lesson);
             return json(res, 200, db.getLesson(id));
           }
-          if (tail === "quiz" && method === "POST") {
+          if (tail === "quiz" && !tail2 && method === "POST") {
             const { answers } = await readBody<{ answers: Array<number | string | null> }>(req);
             return json(res, 200, await actions.gradeQuiz(lesson, answers));
+          }
+          if (tail === "quiz" && tail2 === "retry" && method === "POST" && actions.retryQuizAnswer) {
+            const body = await readBody<{ idx?: unknown; text?: unknown }>(req);
+            const idx = Number(body?.idx);
+            const text = typeof body?.text === "string" ? body.text.trim().slice(0, 2000) : "";
+            if (!Number.isInteger(idx) || !text) return json(res, 400, { error: "idx and text are needed" });
+            return json(res, 200, await actions.retryQuizAnswer(lesson, idx, text));
           }
           if (tail === "tutor" && method === "POST") {
             const { history } = await readBody<{ history: Array<{ role: "user" | "assistant"; content: string }> }>(req);
