@@ -238,6 +238,10 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   if (review.inventedQuotes.length > 0) log(`lesson for #${skill.id} L${levelIdx}: cut ${review.inventedQuotes.length} quoted moment(s) that were never said`);
 
   const deck = await finishDeck(withoutInventedQuotes(out.deck as Deck, review), log);
+  // finishDeck can drop a card whose image never resolved, so re-count on the deck the learner
+  // actually gets. The own-words verdict is kept from the first pass, since the cut quotes are gone now.
+  const after = checkLesson(deck, out.quiz as Quiz, heard);
+  review.checks = after.checks.map((c) => (c.id === "own-words" || c.id === "uses-a-moment" ? review.checks.find((r) => r.id === c.id) ?? c : c));
   const citations = [];
   for (const c of out.citations) if (await urlAlive(c.url)) citations.push(c);
 
