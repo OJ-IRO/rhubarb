@@ -31,7 +31,7 @@ Known weakness, stated plainly: measure 5 depends on knowing which voice in a co
 
 ## What every lesson is held to
 
-A lesson is checked before the learner sees it. Seven checks are code and cannot be talked round. Two are a second model reading the first one's work.
+A lesson is checked before the learner sees it. Seven checks are code and cannot be talked round. Two are a second model reading the first one's work, before the learner sees it. In the first live run this reader caught two errors in Japanese honorifics that the writer had stated with confidence.
 
 | Check | How | If it fails |
 |---|---|---|
@@ -42,7 +42,7 @@ A lesson is checked before the learner sees it. Seven checks are code and cannot
 | Every quiz question has exactly one markable answer | Code | Flagged |
 | Further-reading links are real addresses, and alive | Code, plus a live request | Dead links are dropped |
 | The diagram can be read at a glance | Code | Flagged |
-| **The facts hold up** | A second model, told to be hard to please | Flagged and logged |
+| **The facts hold up** | A second model, told to be hard to please | The lesson is rewritten once with the reader's notes and read again. If still doubted, it is shown with the note. |
 | **It teaches this level**, not the one below or above | A second model | Flagged |
 
 On top of these, everything Rhubarb writes is linted against `VOICE.md` and rewritten once if it fails.

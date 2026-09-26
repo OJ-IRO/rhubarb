@@ -16,7 +16,6 @@ import {
   checkLesson,
   withoutInventedQuotes,
   judge,
-  type LessonCheck,
   type LessonReview,
 } from "@rhubarb/core";
 import { z } from "zod";
@@ -232,6 +231,19 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     out = await research(lint.issues.map((i) => `${i.rule}: ${i.detail}`));
   }
 
+  // A second reader checks what code cannot: are the facts right, and is it pitched at this level?
+  // A confident error is the worst thing a lesson can contain, so a doubted draft is rewritten once
+  // with the reader's notes, and the rewrite is read again. Whatever the outcome, it is recorded.
+  let opinion = await secondOpinion(skill, level, out.bodyMd).catch((e: Error) => {
+    log(`lesson for #${skill.id} L${levelIdx}: second reader unavailable (${e.message})`);
+    return null;
+  });
+  if (opinion && !opinion.accurate) {
+    log(`lesson for #${skill.id} L${levelIdx}: second reader doubts the facts; rewriting once. ${opinion.accuracyNote}`);
+    out = await research([`a fact-checker found errors: ${opinion.accuracyNote}`, ...(opinion.rightLevel ? [] : [`pitched at the wrong level: ${opinion.levelNote}`])]);
+    opinion = await secondOpinion(skill, level, out.bodyMd).catch(() => null);
+  }
+
   // Everything the writer was shown from the learner's life. A quoted moment must trace back to it.
   const heard = evidence.flatMap((e) => [e.text, e.context ?? ""]).filter(Boolean);
   const review = checkLesson(out.deck as Deck, out.quiz as Quiz, heard);
@@ -242,6 +254,7 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   // actually gets. The own-words verdict is kept from the first pass, since the cut quotes are gone now.
   const after = checkLesson(deck, out.quiz as Quiz, heard);
   review.checks = after.checks.map((c) => (c.id === "own-words" || c.id === "uses-a-moment" ? review.checks.find((r) => r.id === c.id) ?? c : c));
+  if (opinion) review.checks.push({ id: "accurate", ok: opinion.accurate, detail: opinion.accuracyNote }, { id: "right-level", ok: opinion.rightLevel, detail: opinion.levelNote });
   const citations = [];
   for (const c of out.citations) if (await urlAlive(c.url)) citations.push(c);
 
@@ -256,9 +269,7 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     citations,
   });
   db.setLessonReview(lessonId, review);
-  // A second reader checks what code can't: is it true, and is it pitched at this level? It runs
-  // after the lesson is usable, so a slow or failed review never holds a lesson back.
-  void secondOpinion(deps, lessonId, skill, level, out.bodyMd, review).catch((e: Error) => log(`lesson #${lessonId} second opinion skipped: ${e.message}`));
+  if (opinion && !opinion.accurate) log(`lesson #${lessonId}: still doubted after the rewrite; shown with the note under "What was checked"`);
   db.setLevelStatus(skill.id, levelIdx, "current");
   log(`lesson #${lessonId} ready: ${skill.name} / ${level.title} (${deck.slides.length} cards, ${out.quiz.questions.length} questions)`);
 
@@ -273,22 +284,19 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
 
 const Opinion = z.object({
   accurate: z.boolean().describe("every factual claim in the lesson is correct as stated"),
-  accuracyNote: z.string().describe("one plain sentence to the learner: what is wrong, or that the facts hold up"),
+  accuracyNote: z.string().describe("one or two plain sentences to the learner: what is wrong, or that the facts hold up. Plain text, no HTML or markdown."),
   rightLevel: z.boolean().describe("the lesson teaches this level's outcome: not the level below, not the one above"),
   levelNote: z.string().describe("one plain sentence to the learner about the pitch of the lesson"),
 });
 
 const OPINION_ROLE = `You are the second reader of a lesson another writer produced. You are checking two things only, and you are hard to please. First, is every factual claim correct as stated? A confident error is the worst thing a lesson can contain. Second, does it teach the outcome named for this level, rather than re-teaching the level below or skipping ahead? Say what you found in one plain sentence each, addressed to the learner.`;
 
-async function secondOpinion(deps: LessonDeps, lessonId: number, skill: Skill, level: { title: string; outcome: string }, bodyMd: string, review: LessonReview): Promise<void> {
-  const v = await judge({
+function secondOpinion(skill: Skill, level: { title: string; outcome: string }, bodyMd: string): Promise<z.infer<typeof Opinion>> {
+  return judge({
     system: systemBlocks(voiceGuide(), OPINION_ROLE),
     user: `Skill: ${skill.name}\nThis level: ${level.title}. Outcome: ${level.outcome}\n\nThe lesson:\n${bodyMd}`,
     schema: Opinion,
   });
-  const checks: LessonCheck[] = [...review.checks, { id: "accurate", ok: v.accurate, detail: v.accuracyNote }, { id: "right-level", ok: v.rightLevel, detail: v.levelNote }];
-  deps.db.setLessonReview(lessonId, { ...review, checks });
-  if (!v.accurate) deps.log(`lesson #${lessonId}: second reader doubts the facts: ${v.accuracyNote}`);
 }
 
 const writing = new Set<number>();
