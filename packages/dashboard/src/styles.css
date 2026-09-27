@@ -1429,6 +1429,26 @@ button.linklike:hover:not(:disabled) {
   box-shadow: 0 30px 60px -24px rgba(122, 84, 10, 0.6), 0 8px 18px -10px rgba(31, 27, 20, 0.25);
   animation: rise 320ms var(--ease) both;
 }
+.tour.top {
+  bottom: auto;
+  top: 28px;
+}
+.preview .tour.top {
+  top: 66px;
+}
+.tour.right {
+  left: auto;
+  right: 24px;
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.tour.corner {
+  left: auto;
+  right: 24px;
+  bottom: 24px;
+  width: min(320px, calc(100vw - 32px));
+}
 .tour h2 {
   font-size: 22px;
   line-height: 1.2;

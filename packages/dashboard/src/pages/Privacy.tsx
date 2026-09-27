@@ -72,7 +72,7 @@ export function Privacy() {
           <article className="card">
             <h3>Leaves, to do the thinking</h3>
             <p>
-              To sort a moment, write a lesson or grade an answer, Rhubarb sends the few lines involved to Claude, running in your own AWS account. If you've turned on web sources, it also searches for the subject of a lesson. Those searches are checked before they go: one that repeats what you said is refused.
+              To sort a moment, write a lesson or grade an answer, Rhubarb sends the few lines involved to Claude, on your own key with Anthropic or in your own AWS account. Nothing else, and nothing in bulk. If you've turned on web sources, it also searches for the subject of a lesson. Those searches are checked before they go: one that repeats what you said is refused.
             </p>
           </article>
           <article className="card">

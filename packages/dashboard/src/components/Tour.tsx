@@ -62,11 +62,33 @@ export function Tour({ onClose }: { onClose: () => void }) {
     window.location.hash = `#/preview${step.path === "/" ? "/" : step.path}`;
   }, [step.path]);
 
+  // Where the card sits: in whichever direction from the target has the most room, so it never
+  // covers the thing it is pointing at. A target that fills the screen leaves the bottom-right corner.
+  const [side, setSide] = useState<"bottom" | "top" | "right" | "corner">("bottom");
+
   useLayoutEffect(() => {
+    // Each step brings its target into view once. Not on every scroll: that would fight the reader.
+    let scrolled = false;
     const place = () => {
       const el = document.querySelector<HTMLElement>(`[data-tour="${step.target}"]`);
-      const r = el?.getBoundingClientRect();
-      setBox(r && r.width > 0 ? { top: r.top, left: r.left, width: r.width, height: r.height } : null);
+      if (!el) return setBox(null);
+      let r = el.getBoundingClientRect();
+      if (r.width === 0) return setBox(null);
+      // Instant, not smooth: the page's own scroll reset on arrival would cancel a smooth scroll, and
+      // the ring has to be measured after the move. Tall targets are aligned to their top edge.
+      const offscreen = r.top < 60 || r.bottom > window.innerHeight - 60;
+      if (offscreen && !scrolled) {
+        scrolled = true;
+        const tall = r.height > window.innerHeight * 0.6;
+        el.scrollIntoView({ block: tall ? "start" : "center", behavior: "auto" });
+        if (tall) window.scrollBy(0, -88); // room for the page header above a tall target
+        r = el.getBoundingClientRect();
+      }
+      const room = { top: r.top, bottom: window.innerHeight - r.bottom, right: window.innerWidth - r.right };
+      const need = { top: 300, bottom: 300, right: 420 };
+      const fits = (["bottom", "top", "right"] as const).filter((k) => room[k] >= need[k]);
+      setSide(fits.length ? fits.reduce((a, b) => (room[a] / need[a] >= room[b] / need[b] ? a : b)) : "corner");
+      setBox({ top: r.top, left: r.left, width: r.width, height: r.height });
     };
     setGliding(true);
     place();
@@ -86,7 +108,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
     if (target) ro.observe(target);
     ro.observe(document.body);
     // The page is still arriving when the step changes, so look again for a moment after.
-    const again = [150, 400, 900].map((ms) => setTimeout(place, ms));
+    const again = [150, 400, 900, 1600].map((ms) => setTimeout(place, ms));
     return () => {
       again.forEach(clearTimeout);
       ro.disconnect();
@@ -108,7 +130,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
   return (
     <>
       {box && <div className={gliding ? "tour-ring" : "tour-ring snap"} style={{ top: box.top - 5, left: box.left - 5, width: box.width + 10, height: box.height + 10 }} aria-hidden="true" />}
-      <aside className="tour" role="dialog" aria-label="A quick look around">
+      <aside className={`tour ${side}`} role="dialog" aria-label="A quick look around">
         <p className="eyebrow">
           <span>
             {i + 1} of {STEPS.length}
