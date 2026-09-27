@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "build:demo": "VITE_DEMO=1 vite build --outDir dist-demo",
-    "deploy:demo": "npm run build:demo && cp vercel.json dist-demo/ && vercel deploy dist-demo --prod --yes --scope krisjays-projects"
+    "deploy:demo": "npm run build:demo && cp vercel.json dist-demo/ && mkdir -p dist-demo/.vercel && cp .vercel/project.json dist-demo/.vercel/ && cd dist-demo && vercel deploy --prod --yes --scope krisjays-projects"
   },
   "dependencies": {
     "mermaid": "^12.0.0",
