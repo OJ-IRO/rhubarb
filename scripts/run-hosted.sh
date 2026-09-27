@@ -17,8 +17,8 @@ export RHUBARB_DATA_DIR="$HOME/.rhubarb"
 export PORT="${PORT:-4242}"
 mkdir -p "$RHUBARB_DATA_DIR/logs"
 
-if [ -z "${RHUBARB_ACCESS_TOKEN:-}" ] || [ "${#RHUBARB_ACCESS_TOKEN}" -lt 16 ]; then
-  echo "RHUBARB_ACCESS_TOKEN must be set to a random string of at least 16 characters." >&2
+if [ -z "${RHUBARB_ACCESS_TOKEN:-}" ] || [ "${#RHUBARB_ACCESS_TOKEN}" -lt 8 ]; then
+  echo "RHUBARB_ACCESS_TOKEN must be set, at least 8 characters." >&2
   exit 64
 fi
 
