@@ -17,7 +17,6 @@ COPY . .
 RUN npm run build && npm prune --omit=dev
 
 ENV NODE_ENV=production RHUBARB_HOME=/data PORT=4242
-VOLUME ["/data"]
 EXPOSE 4242
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["bash", "scripts/run-hosted.sh"]
