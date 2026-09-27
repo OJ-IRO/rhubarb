@@ -243,3 +243,51 @@ test("a guess is recorded before the answer, a skip is recorded as a skip, and t
     server.close();
   }
 });
+
+// ---- hosted mode: a token instead of the localhost-only rule
+
+function raw(port: number, method: string, path: string, headers: Record<string, string> = {}, body?: string): Promise<{ status: number; headers: Record<string, string | string[] | undefined>; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = request({ host: "127.0.0.1", port, path, method, headers: { ...headers, ...(body ? { "Content-Type": "application/x-www-form-urlencoded", "Content-Length": String(Buffer.byteLength(body)) } : {}) } }, (res) => {
+      let text = "";
+      res.on("data", (c) => (text += c));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body: text }));
+    });
+    req.on("error", reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+test("hosted mode: nothing but the login page opens without the token; a cookie or bearer opens everything", async () => {
+  const port = 45_000 + Math.floor(Math.random() * 5_000);
+  const db = new RhubarbDb(":memory:");
+  const token = "a-long-random-access-token-1234";
+  const server = startApi({ db, log: () => {}, actions: {} as never }, port, { accessToken: token, where: "a test server" });
+  await new Promise((r) => setTimeout(r, 150));
+  try {
+    // a foreign Host is fine now: the token is the gate
+    assert.equal((await raw(port, "GET", "/api/status", { Host: "rhubarb.example.com" })).status, 401);
+    assert.equal((await raw(port, "GET", "/")).status, 303, "the app itself redirects to the login page");
+    assert.equal((await raw(port, "GET", "/login")).status, 200);
+
+    const wrong = await raw(port, "POST", "/login", {}, "token=nope");
+    assert.equal(wrong.status, 401);
+    assert.equal(wrong.headers["set-cookie"], undefined);
+
+    const ok = await raw(port, "POST", "/login", {}, `token=${encodeURIComponent(token)}`);
+    assert.equal(ok.status, 303);
+    const cookie = String(ok.headers["set-cookie"]).split(";")[0];
+    assert.match(String(ok.headers["set-cookie"]), /HttpOnly/);
+
+    const withCookie = await raw(port, "GET", "/api/status", { Cookie: cookie, Host: "rhubarb.example.com" });
+    assert.equal(withCookie.status, 200);
+    assert.deepEqual(JSON.parse(withCookie.body).hosted, { where: "a test server" }, "the privacy page can say where the data lives");
+
+    assert.equal((await raw(port, "GET", "/api/status", { Authorization: `Bearer ${token}` })).status, 200, "scripts and the agent skill use a bearer");
+    assert.equal((await raw(port, "GET", "/api/status", { Authorization: "Bearer wrong" })).status, 401);
+    assert.equal((await raw(port, "GET", "/logout", { Cookie: cookie })).status, 303);
+  } finally {
+    server.close();
+  }
+});

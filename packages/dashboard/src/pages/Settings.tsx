@@ -5,6 +5,7 @@ import { Toast, type ToastState } from "../components/Toast";
 import { applyReading, readReading, type Reading } from "../lib/reading";
 import { Link } from "../router";
 import { ListInput, STYLES, WINDOWS, splitWindows } from "./Onboarding";
+import { useWhere } from "../lib/where";
 
 const ALL: NudgePrefs = { lessons: true, feedback: true, credits: true, brief: true };
 
@@ -23,6 +24,7 @@ export function Settings() {
   const [p, setP] = useState<Profile | null | undefined>(undefined);
   const [reading, setReading] = useState<Reading>(readReading);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const where = useWhere();
 
   useEffect(() => {
     api.profile().then(setP);
@@ -175,7 +177,7 @@ export function Settings() {
       <section>
         <p className="eyebrow">Your Bee and your data</p>
         <p>
-          Everything Rhubarb holds is on this computer. See what it has, and forget any of it, on the <Link to="/privacy">privacy page</Link>. To connect a different Bee, run <code>bee login</code> in a terminal and restart Rhubarb.
+          Everything Rhubarb holds is on {where.hosted ? where.name : "this computer"}. See what it has, and forget any of it, on the <Link to="/privacy">privacy page</Link>. To connect a different Bee, run <code>bee login</code> {where.hosted ? "on the server" : "in a terminal"} and restart Rhubarb.
         </p>
       </section>
 

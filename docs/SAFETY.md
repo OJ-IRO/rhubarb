@@ -2,6 +2,10 @@
 
 A wearable microphone hears the worst moments of a day along with the best. This is what Rhubarb does about that.
 
+## Where it lives
+
+On the wearer's own computer, or on a small server the wearer rents and holds the only key to. Either way there is no Rhubarb company holding the data and no shared server. A hosted Rhubarb opens only with the wearer's access token, over an encrypted connection, and says so on its privacy page.
+
 ## It never has anyone's voice
 
 Rhubarb receives text from Bee, never audio. There is no recording here to store, leak or replay: not of the wearer, and not of the people around them.

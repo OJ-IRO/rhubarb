@@ -1,0 +1,8 @@
+node_modules
+**/node_modules
+**/dist
+.git
+*.db
+*.log
+launchd-preview
+docs/spike-stream.log

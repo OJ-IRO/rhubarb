@@ -52,6 +52,8 @@ export interface Status {
   evidence: number;
   openPractice: number;
   listening: Listening | null;
+  /** set when Rhubarb runs on a private server rather than this computer */
+  hosted: { where: string } | null;
 }
 
 export type { LearningProgress, HistoryEntry, NudgePrefs } from "@rhubarb/core";
@@ -107,7 +109,7 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   const st = previewState(f);
   let m: RegExpMatchArray | null;
 
-  if (path === "/status") return as({ skills: st.rows.length, evidence: 14, openPractice: 1, listening: { state: "connected", lastHeardAt: Date.now() - 2 * 60_000, since: Date.now() - 3 * 3600_000 } });
+  if (path === "/status") return as({ hosted: null, skills: st.rows.length, evidence: 14, openPractice: 1, listening: { state: "connected", lastHeardAt: Date.now() - 2 * 60_000, since: Date.now() - 3 * 3600_000 } });
   if (path === "/skills" && method === "GET") return as(st.rows.filter((s) => s.status !== "dismissed"));
   if (path === "/skills/dismissed") return as(st.rows.filter((s) => s.status === "dismissed"));
   if ((m = path.match(/^\/skills\/(\d+)\/(accept|dismiss|restore|priority)$/))) {

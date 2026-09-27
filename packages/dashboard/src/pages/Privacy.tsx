@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, when, type PrivacyView } from "../api";
+import { useWhere } from "../lib/where";
 import { HexBadge, Loading } from "../components/Hex";
 import { Toast, type ToastState } from "../components/Toast";
 import { Link } from "../router";
@@ -27,6 +28,7 @@ export function Privacy() {
   const [word, setWord] = useState("");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const where = useWhere();
 
   useEffect(() => {
     api.privacy().then(setView);
@@ -60,9 +62,11 @@ export function Privacy() {
         <p className="eyebrow">Where your words go</p>
         <div className="where">
           <article className="card">
-            <h3>Stays on this computer</h3>
+            <h3>{where.hosted ? "Stays on your own server" : "Stays on this computer"}</h3>
             <p>
-              Everything Rhubarb hears, notes and writes lives in one file on this machine. There is no Rhubarb account and no Rhubarb server. Nobody else can open this page: it only answers this computer.
+              {where.hosted
+                ? `Everything Rhubarb hears, notes and writes lives in one file on ${where.name}: a machine you rent and only you hold the key to. There is no Rhubarb company behind it and no shared server. This page opens only with your access token, over an encrypted connection.`
+                : "Everything Rhubarb hears, notes and writes lives in one file on this machine. There is no Rhubarb account and no Rhubarb server. Nobody else can open this page: it only answers this computer."}
             </p>
           </article>
           <article className="card">

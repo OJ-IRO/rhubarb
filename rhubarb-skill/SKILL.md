@@ -7,7 +7,7 @@ description: Read what the user is learning in Rhubarb, a tutor that listens thr
 
 Rhubarb listens to the user's day through a Bee wearable, works out which skills their life is asking them to build, teaches those skills, and credits them when it hears a skill used for real. This skill lets you read that learning state, so you can answer questions about it and pitch your own help at the right level.
 
-Everything lives on the user's machine. The daemon serves a small HTTP API at `http://127.0.0.1:4242`. There is no key. It answers only requests addressed to this machine.
+Everything lives on the user's machine, or on a private server they run. Locally the daemon serves a small HTTP API at `http://127.0.0.1:4242` with no key, answering only this machine. On a private server, use its address and send `Authorization: Bearer <access token>` on every call; the user gives you both.
 
 ## Check it's running
 

@@ -1,4 +1,5 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
+import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
 import type { Card, Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
@@ -108,7 +109,46 @@ function withLadderLength(db: RhubarbDb, t: { lesson: Lesson; skill: Skill } | n
   return t ? { ...t, ladderLength: db.ladderFor(t.skill.id).length } : null;
 }
 
-export function startApi(deps: ApiDeps, port: number): Server {
+/**
+ * Hosted mode. Rhubarb normally answers only this machine. On a private server it answers the
+ * open internet, so every request must carry the access token instead: as a cookie the login page
+ * sets, or as a bearer header for scripts and the agent skill. Assets are public; nothing else is.
+ */
+export interface HostedOptions {
+  /** the one secret that opens the dashboard; RHUBARB_ACCESS_TOKEN */
+  accessToken: string;
+  /** where to say the data lives, for the privacy page, e.g. "your private server on Railway" */
+  where: string;
+}
+
+const COOKIE = "rhubarb_access";
+const isLocalName = (h: string) => h === "127.0.0.1" || h === "localhost" || h === "[::1]";
+
+function cookies(req: IncomingMessage): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const part of (req.headers.cookie ?? "").split(";")) {
+    const i = part.indexOf("=");
+    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+  }
+  return out;
+}
+
+/** Same length or not, the comparison takes the same time, so the token can't be guessed a byte at a time. */
+function sameSecret(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
+const LOGIN_PAGE = (wrong: boolean) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rhubarb</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#fbf8f1;color:#1f1b14;font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;font-size:17px}
+form{width:min(380px,90vw);padding:30px 32px;background:#fff;border:1px solid #e7dfcc;border-radius:16px;box-shadow:0 22px 40px -20px rgba(122,84,10,.4)}
+h1{font-size:26px;font-weight:500;margin:0 0 6px}p{margin:0 0 18px;color:#6f6656;line-height:1.5}input{width:100%;box-sizing:border-box;font:inherit;padding:11px 14px;border:1px solid #e7dfcc;border-radius:10px}
+button{margin-top:14px;width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid #c98a0e;background:linear-gradient(180deg,#f6c34f,#e9a825 55%,#dd9c1c);color:#2a1e04;cursor:pointer}
+.bad{color:#b2452f}</style></head><body><form method="post" action="/login"><h1>Rhubarb</h1><p>${wrong ? '<span class="bad">That wasn\'t it. Try again.</span>' : "This is your private Rhubarb. Enter the access token to open it."}</p>
+<input type="password" name="token" autocomplete="current-password" autofocus aria-label="Access token"><button type="submit">Open</button></form></body></html>`;
+
+export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): Server {
   const { db, log, actions } = deps;
 
   const server = createServer(async (req, res) => {
@@ -117,27 +157,62 @@ export function startApi(deps: ApiDeps, port: number): Server {
     let url = new URL("http://localhost/");
 
     try {
-      // Transcripts live behind this API. Refuse anything not addressed to this machine by name,
-      // which is what a DNS-rebinding page would look like.
-      const host = (req.headers.host ?? "").replace(/:\d+$/, "");
-      if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") return json(res, 403, { error: "forbidden" });
-      // Browsers attach Origin to cross-site requests. Any other site's page could otherwise POST
-      // here blind, to accept skills or start Opus runs on the wearer's bill.
-      const origin = req.headers.origin;
-      if (origin) {
-        let from = "";
-        try {
-          from = new URL(origin).hostname;
-        } catch {
-          /* unparseable origin is treated as foreign */
-        }
-        if (from !== "127.0.0.1" && from !== "localhost" && from !== "[::1]") return json(res, 403, { error: "forbidden" });
-      }
       try {
         url = new URL(req.url ?? "/", "http://localhost");
         path = url.pathname;
       } catch {
         return json(res, 400, { error: "bad request" });
+      }
+
+      if (hosted) {
+        // Anyone can reach the login page and the app's own assets. Everything else needs the token.
+        if (path === "/login" && method === "POST") {
+          const form = await readForm(req);
+          if (sameSecret(form.token ?? "", hosted.accessToken)) {
+            res.writeHead(303, { "Set-Cookie": `${COOKIE}=${encodeURIComponent(hosted.accessToken)}; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=${60 * 60 * 24 * 90}`, Location: "/" });
+            return res.end();
+          }
+          res.writeHead(401, { "Content-Type": "text/html; charset=utf-8" });
+          return res.end(LOGIN_PAGE(true));
+        }
+        if (path === "/logout") {
+          res.writeHead(303, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Secure; Max-Age=0`, Location: "/login" });
+          return res.end();
+        }
+        const bearer = (req.headers.authorization ?? "").replace(/^Bearer\s+/i, "");
+        const authed = sameSecret(cookies(req)[COOKIE] ?? "", hosted.accessToken) || (bearer !== "" && sameSecret(bearer, hosted.accessToken));
+        if (!authed) {
+          if (path.startsWith("/api/")) return json(res, 401, { error: "sign in at /login" });
+          if (path === "/login" || path.startsWith("/assets/")) {
+            if (path === "/login") {
+              res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+              return res.end(LOGIN_PAGE(false));
+            }
+          } else {
+            res.writeHead(303, { Location: "/login" });
+            return res.end();
+          }
+        } else if (path === "/login") {
+          res.writeHead(303, { Location: "/" });
+          return res.end();
+        }
+      } else {
+        // Local mode. Transcripts live behind this API. Refuse anything not addressed to this
+        // machine by name, which is what a DNS-rebinding page would look like.
+        const host = (req.headers.host ?? "").replace(/:\d+$/, "");
+        if (!isLocalName(host)) return json(res, 403, { error: "forbidden" });
+        // Browsers attach Origin to cross-site requests. Any other site's page could otherwise POST
+        // here blind, to accept skills or start Opus runs on the wearer's bill.
+        const origin = req.headers.origin;
+        if (origin) {
+          let from = "";
+          try {
+            from = new URL(origin).hostname;
+          } catch {
+            /* unparseable origin is treated as foreign */
+          }
+          if (!isLocalName(from)) return json(res, 403, { error: "forbidden" });
+        }
       }
       if (path.startsWith("/api/")) {
         const parts = path.slice(5).split("/").filter(Boolean);
@@ -152,6 +227,8 @@ export function startApi(deps: ApiDeps, port: number): Server {
             evidence: db.evidenceByStage("classified", 1000).length,
             openPractice: db.openPractice().length,
             listening: deps.listening?.() ?? null,
+            // where the data lives, so the privacy page can tell the truth in both modes
+            hosted: hosted ? { where: hosted.where } : null,
           });
         }
         if (head === "today" && method === "GET") {
@@ -374,6 +451,13 @@ export function startApi(deps: ApiDeps, port: number): Server {
     }
   });
 
-  server.listen(port, "127.0.0.1", () => log(`dashboard + api on http://127.0.0.1:${port}`));
+  const bind = hosted ? "0.0.0.0" : "127.0.0.1";
+  server.listen(port, bind, () => log(hosted ? `dashboard + api on port ${port}, hosted mode, token required` : `dashboard + api on http://127.0.0.1:${port}`));
   return server;
+}
+
+async function readForm(req: IncomingMessage): Promise<Record<string, string>> {
+  const chunks: Buffer[] = [];
+  for await (const c of req) chunks.push(c as Buffer);
+  return Object.fromEntries(new URLSearchParams(Buffer.concat(chunks).toString("utf8")));
 }

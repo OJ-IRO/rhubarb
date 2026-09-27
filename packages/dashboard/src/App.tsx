@@ -48,7 +48,7 @@ function Offline({ onRetry }: { onRetry: () => void }) {
         <BrandMark size={30} /> Rhubarb
       </p>
       <h1 className="title">Rhubarb isn't running yet.</h1>
-      <p className="muted lead">This page is only the window. The part that listens to your Bee runs in the background on this computer, and it isn't answering.</p>
+      <p className="muted lead">This page is only the window. The part that listens to your Bee runs in the background, and it isn't answering.</p>
       <ol className="offline-steps">
         <li>
           Open a terminal in your Rhubarb folder and run <code>./scripts/start.sh</code>

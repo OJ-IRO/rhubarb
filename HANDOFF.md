@@ -92,7 +92,7 @@ Also done: Sparks that ask for a guess before showing the answer; an Evidence pa
 
 Also done: a listening light, a privacy page with forget controls, undo for setting a skill aside, a first-run look-around, and the person's name removed from everywhere but settings.
 
-Done since the first handoff: `rhubarb-skill/SKILL.md`; 48 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
+Done since the first handoff: `rhubarb-skill/SKILL.md`; 49 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
 
 ## House rules
 

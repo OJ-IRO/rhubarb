@@ -61,9 +61,19 @@ Bee access runs through the official [`@beeai/cli`](https://github.com/bee-compu
 
 To keep Rhubarb running across reboots on macOS, use `./scripts/install-launchd.sh` instead of `start.sh` (`--dry-run` shows what it would install; `./scripts/uninstall-launchd.sh` removes it). Keys such as `TAVILY_API_KEY` go in `~/.rhubarb/env`, never in the repo.
 
+## On your own server
+
+A laptop that has to stay awake is a weak link, and Bee deletes short conversations within minutes of ending them, so the listener has to be up all day. Rhubarb can run the same code on a small private server instead: [`Dockerfile`](Dockerfile), [`railway.json`](railway.json) and [`scripts/run-hosted.sh`](scripts/run-hosted.sh) run the Bee proxy and the daemon in one container, with the database and the Bee login on a persistent disk at `/data`.
+
+It is still yours alone. There is no Rhubarb company behind it and no shared server: it is a machine you rent, the dashboard opens only with your access token over an encrypted connection, and the privacy page changes its wording from "this computer" to "your own server", because that is now the truth.
+
+Environment variables the container needs: `RHUBARB_ACCESS_TOKEN` (a long random secret), `ANTHROPIC_API_KEY` or AWS credentials, `TZ` (the wearer's timezone), and optionally `TAVILY_API_KEY`, `RHUBARB_WHERE` and `BEE_TOKEN`. Without `BEE_TOKEN`, the first boot prints a Bee login link in the logs to approve on the phone, once.
+
+Scripts and the agent skill reach a hosted Rhubarb with `Authorization: Bearer <access token>`.
+
 ## Tests
 
-`npm test` runs 48 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, and the API's handling of hostile requests.
+`npm test` runs 49 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, the hosted-mode token gate, and the API's handling of hostile requests.
 
 ## For agents
 

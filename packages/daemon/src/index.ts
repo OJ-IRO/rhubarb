@@ -26,7 +26,11 @@ const PRACTICE_SWEEP_MS = 60_000;
 const NIGHTLY_CHECK_MS = 10 * 60_000;
 const FIELD_INTERVAL_MS = 15 * 60_000;
 const REFLECT_HOUR_LOCAL = 3;
-const API_PORT = Number(process.env.RHUBARB_PORT ?? 4242);
+const API_PORT = Number(process.env.PORT ?? process.env.RHUBARB_PORT ?? 4242);
+// A private server: the dashboard is opened with a token instead of being local-only.
+const HOSTED = process.env.RHUBARB_ACCESS_TOKEN
+  ? { accessToken: process.env.RHUBARB_ACCESS_TOKEN, where: process.env.RHUBARB_WHERE ?? "your private server" }
+  : undefined;
 // packages/daemon/dist/index.js -> packages/dashboard/dist
 const DASHBOARD_DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dashboard", "dist");
 
@@ -398,7 +402,8 @@ startApi(
       tutor: (lesson, history, onText) => tutorReply(db, lesson, history, onText),
     },
   },
-  API_PORT
+  API_PORT,
+  HOSTED
 );
 
 function shutdown(): void {

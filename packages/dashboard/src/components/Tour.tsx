@@ -16,7 +16,7 @@ const STEPS: Step[] = [
   { path: "/board", target: "board-top", title: "You decide what's worth learning", body: "This is the board. It ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
   { path: "/lessons/1", target: "lesson-stage", title: "A lesson, then out loud", body: "Lessons are built from your own conversations, a card at a time. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
   { path: "/evidence", target: "evidence-top", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. This page keeps the score, in numbers you can check." },
-  { path: "/privacy", target: "privacy-top", title: "Yours to forget", body: "Everything stays on this computer. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
+  { path: "/privacy", target: "privacy-top", title: "Yours to forget", body: "Everything stays on your own machine, never with a company. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
 ];
 
 export function tourSeen(): boolean {
