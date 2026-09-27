@@ -138,7 +138,15 @@ export function App() {
     <div className={preview ? "frame preview" : "frame"}>
       {preview && (
         <div className="preview-banner">
-          Preview: sample content, not your data. <a href="#/">Back to the live app</a>
+          {import.meta.env.VITE_DEMO ? (
+            <>
+              Demo: one made-up week of sample content. The real Rhubarb runs privately on your own machine. <a href="https://github.com/OJ-IRO/rhubarb">Source and setup</a>
+            </>
+          ) : (
+            <>
+              Preview: sample content, not your data. <a href="#/">Back to the live app</a>
+            </>
+          )}
         </div>
       )}
       <nav className="side">

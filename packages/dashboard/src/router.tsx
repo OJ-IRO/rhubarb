@@ -38,8 +38,12 @@ export function match(pattern: string, path: string): Record<string, string> | n
   return params;
 }
 
+/** In the public demo build every link stays inside the sample week. */
+const DEMO = Boolean(import.meta.env.VITE_DEMO);
+
 export function href(path: string): string {
-  return `#${isPreview() ? PREFIX : ""}${path === "/" && isPreview() ? "/" : path}`;
+  const inPreview = isPreview() || DEMO;
+  return `#${inPreview ? PREFIX : ""}${path === "/" && inPreview ? "/" : path}`;
 }
 
 export function go(path: string): void {
