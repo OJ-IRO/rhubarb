@@ -14,6 +14,8 @@ Rhubarb starts at the other end. It finds what you need from the day you actuall
 
 It also doesn't hand you answers. It asks for your guess first, makes you explain things out loud, and asks again days later. How that is grounded, what gets measured, and what every lesson is checked against is in [`docs/HOW-WE-KNOW.md`](docs/HOW-WE-KNOW.md). What it refuses to learn from is in [`docs/SAFETY.md`](docs/SAFETY.md).
 
+**See it without a Bee:** [rhubarb-demo.vercel.app](https://rhubarb-demo.vercel.app) is the design preview on one made-up week: every screen, no data. The real thing runs privately on your own machine or server.
+
 ## What it does
 
 1. **Listens.** Questions you ask out loud, facts you hedge on, things you say you want to get better at, jargon you're around but never use, and what's coming up on your calendar all become evidence, each with when, where, and who.
