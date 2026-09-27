@@ -94,6 +94,10 @@ Also done: a listening light, a privacy page with forget controls, undo for sett
 
 Done since the first handoff: `rhubarb-skill/SKILL.md`; 49 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
 
+## Where it runs now
+
+Since 2026-09-27 the wearer's Rhubarb runs on Railway (project `rhubarb`, service `rhubarb`, a 5GB volume at `/data`, region asia-southeast1) at https://rhubarb-production.up.railway.app, behind the access token. The Bee login, Anthropic key and Tavily key are Railway variables. Deploy with `railway up --service rhubarb --detach` from the repo; watch with `railway logs --service rhubarb --deployment`. Railway injects `PORT` (8080), and the domain must target that port. The Mac copy is uninstalled so the phone gets one set of alarms; run it locally only for development, and never both at once against the same Bee.
+
 ## House rules
 
 Everything Rhubarb says to a person, including button labels, follows `VOICE.md`, and generated text is checked against it before anyone sees it. If you write a prompt, put `voiceGuide()` in the system blocks the way the existing ones do. No tokens, `.env` files, or databases in git. Commit small and say what changed.
