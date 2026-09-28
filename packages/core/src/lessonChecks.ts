@@ -74,3 +74,37 @@ export function withoutInventedQuotes(deck: Deck, review: LessonReview): Deck {
   const cut = new Set(review.inventedQuotes);
   return { ...deck, slides: deck.slides.filter((_, i) => !cut.has(i)) };
 }
+
+
+export interface TextEdit {
+  find: string;
+  replace: string;
+}
+
+/**
+ * Apply exact-text corrections anywhere in a lesson's text: cards, quiz, prose, beats. Links and
+ * diagram source are left alone, and an edit whose passage cannot be found is skipped rather
+ * than guessed at. Returns a new value and the edits that landed.
+ */
+export function applyTextEdits<T>(value: T, edits: TextEdit[]): { value: T; applied: TextEdit[] } {
+  const usable = edits.filter((e) => e.find.trim().length >= 4 && e.find !== e.replace);
+  const landed = new Set<TextEdit>();
+  const walk = (v: unknown, key?: string): unknown => {
+    if (typeof v === "string") {
+      if (key === "url" || key === "mermaid" || key === "query") return v;
+      let out = v;
+      for (const e of usable) {
+        if (out.includes(e.find)) {
+          out = out.split(e.find).join(e.replace);
+          landed.add(e);
+        }
+      }
+      return out;
+    }
+    if (Array.isArray(v)) return v.map((x) => walk(x));
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x, k)]));
+    return v;
+  };
+  const next = walk(value) as T;
+  return { value: next, applied: usable.filter((e) => landed.has(e)) };
+}

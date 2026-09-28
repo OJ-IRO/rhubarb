@@ -76,3 +76,11 @@ test("a line in a language they are learning counts, even with no English cue", 
   // too short to be a real exchange
   assert.equal(stage1Detect("うん", hints).matched, false);
 });
+
+test("'hey Rhubarb' works too, however the recogniser spells it", () => {
+  assert.equal(directAsk("Hey Rhubarb, teach me how to order at a konbini"), "teach me how to order at a konbini");
+  assert.equal(directAsk("hey rue barb what is the history of osaka castle"), "what is the history of osaka castle");
+  assert.equal(directAsk("okay ruby barb explain keigo to me"), "explain keigo to me");
+  assert.equal(isBareAddress("Hey, Rhubarb."), true);
+  assert.equal(directAsk("I love rhubarb pie"), null);
+});

@@ -13,6 +13,7 @@ import {
   type Skill,
   type Slide,
   type RhubarbDb,
+  applyTextEdits,
   checkLesson,
   withoutInventedQuotes,
   judge,
@@ -248,14 +249,26 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   // A second reader checks what code cannot: are the facts right, and is it pitched at this level?
   // A confident error is the worst thing a lesson can contain, so a doubted draft is rewritten once
   // with the reader's notes, and the rewrite is read again. Whatever the outcome, it is recorded.
-  let opinion = await secondOpinion(skill, level, out.bodyMd).catch((e: Error) => {
+  let opinion = await secondOpinion(skill, level, readable(out)).catch((e: Error) => {
     log(`lesson for #${skill.id} L${levelIdx}: second reader unavailable (${e.message})`);
     return null;
   });
   if (opinion && !opinion.accurate) {
     log(`lesson for #${skill.id} L${levelIdx}: second reader doubts the facts; rewriting once. ${opinion.accuracyNote}`);
     out = await research([`a fact-checker found errors: ${opinion.accuracyNote}`, ...(opinion.rightLevel ? [] : [`pitched at the wrong level: ${opinion.levelNote}`])]);
-    opinion = await secondOpinion(skill, level, out.bodyMd).catch(() => null);
+    opinion = await secondOpinion(skill, level, readable(out)).catch(() => null);
+  }
+  // Still doubted after a full rewrite: fix the disputed claims themselves, then read again.
+  let corrected = 0;
+  for (let round = 0; opinion && !opinion.accurate && round < 2; round++) {
+    const fix = await correctClaims(skill, out, opinion.accuracyNote, log).catch((e: Error) => {
+      log(`lesson for #${skill.id} L${levelIdx}: correction pass failed (${e.message})`);
+      return null;
+    });
+    if (!fix || fix.applied === 0) break;
+    out = fix.out;
+    corrected += fix.applied;
+    opinion = await secondOpinion(skill, level, readable(out)).catch(() => null);
   }
 
   // Everything the writer was shown from the learner's life. A quoted moment must trace back to it.
@@ -268,7 +281,7 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   // actually gets. The own-words verdict is kept from the first pass, since the cut quotes are gone now.
   const after = checkLesson(deck, out.quiz as Quiz, heard);
   review.checks = after.checks.map((c) => (c.id === "own-words" || c.id === "uses-a-moment" ? review.checks.find((r) => r.id === c.id) ?? c : c));
-  if (opinion) review.checks.push({ id: "accurate", ok: opinion.accurate, detail: opinion.accuracyNote }, { id: "right-level", ok: opinion.rightLevel, detail: opinion.levelNote });
+  if (opinion) review.checks.push(accuracyCheck(opinion, corrected), { id: "right-level", ok: opinion.rightLevel, detail: opinion.levelNote });
   const citations = [];
   for (const c of out.citations) if (await urlAlive(c.url)) citations.push(c);
 
@@ -306,12 +319,115 @@ const Opinion = z.object({
 
 const OPINION_ROLE = `You are the second reader of a lesson another writer produced. You are checking two things only, and you are hard to please. First, is every factual claim correct as stated? A confident error is the worst thing a lesson can contain. Second, does it teach the outcome named for this level, rather than re-teaching the level below or skipping ahead? Say what you found in one plain sentence each, addressed to the learner.`;
 
-function secondOpinion(skill: Skill, level: { title: string; outcome: string }, bodyMd: string): Promise<z.infer<typeof Opinion>> {
+function secondOpinion(skill: Skill, level: { title: string; outcome: string }, lessonText: string): Promise<z.infer<typeof Opinion>> {
   return judge({
     system: systemBlocks(voiceGuide(), OPINION_ROLE),
-    user: `Skill: ${skill.name}\nThis level: ${level.title}. Outcome: ${level.outcome}\n\nThe lesson:\n${bodyMd}`,
+    user: `Skill: ${skill.name}\nThis level: ${level.title}. Outcome: ${level.outcome}\n\nThe lesson:\n${lessonText}`,
     schema: Opinion,
   });
+}
+
+type LessonText = { deck: unknown; quiz: unknown; bodyMd: string; beats: unknown };
+
+/** Everything the learner will read: the prose, the cards, and the quiz with its explanations. */
+function readable(out: LessonText): string {
+  const quiz = (out.quiz as Quiz).questions
+    .map((q, i) => (q.kind === "mcq" ? `Q${i + 1}. ${q.prompt}\nAnswer: ${q.choices[q.answer]}. ${q.explanation}` : `Q${i + 1}. ${q.prompt}`))
+    .join("\n");
+  return `${out.bodyMd}\n\n## The cards\n${deckProse(out.deck as Deck)}\n\n## The quiz\n${quiz}`;
+}
+
+function accuracyCheck(opinion: z.infer<typeof Opinion>, corrected: number) {
+  const fixed = corrected > 0 ? ` ${corrected === 1 ? "One claim was" : `${corrected} claims were`} corrected after the first check.` : "";
+  return { id: "accurate" as const, ok: opinion.accurate, detail: `${opinion.accuracyNote}${fixed}` };
+}
+
+const Corrections = z.object({
+  edits: z
+    .array(
+      z.object({
+        find: z.string().describe("a passage copied exactly, character for character, from one field of the lesson JSON: one sentence or less"),
+        replace: z.string().describe("the corrected passage, same length and tone, in the same voice"),
+      })
+    )
+    .max(12),
+});
+
+const FIX_ROLE = `A fact-checker doubted some claims in a finished lesson. Correct those claims and change nothing else.
+- For each wrong claim, copy the exact passage from the lesson JSON as "find" (it must match character for character, inside a single field) and give the corrected passage as "replace". The same claim often appears in several places (a card, the prose, a quiz explanation): fix every place.
+- Check each disputed claim against sources before changing it. The fact-checker can be wrong too; if a claim holds up, leave it.
+- If the right figure cannot be pinned down, replace the precise number with what sources agree on ("about", "more than") or cut the detail. A vaguer true sentence beats a precise wrong one.
+- If a quiz answer depends on a corrected fact, fix the question, choices and explanation so they still agree.`;
+
+/** Targeted fix: patch the disputed claims in place instead of rewriting the whole lesson again. */
+async function correctClaims<T extends LessonText>(skill: Skill, out: T, note: string, log: (m: string) => void): Promise<{ out: T; applied: number }> {
+  const lessonJson = JSON.stringify({ bodyMd: out.bodyMd, deck: out.deck, quiz: out.quiz, beats: out.beats });
+  const fix = await researchThenEmit({
+    system: systemBlocks(voiceGuide(), FIX_ROLE),
+    ask: `Topic: ${skill.name}\n\nWhat the fact-checker said:\n${note}\n\nThe lesson JSON:\n${lessonJson}`,
+    schema: Corrections,
+    emitName: "emit_corrections",
+    emitDescription: "Return the exact passages to replace and their corrections.",
+    maxSearches: 3,
+    effort: "medium",
+    maxTokens: 6000,
+  });
+  const { value, applied } = applyTextEdits({ bodyMd: out.bodyMd, deck: out.deck, quiz: out.quiz, beats: out.beats }, fix.edits);
+  const missed = fix.edits.length - applied.length;
+  log(`lesson "${skill.name}": corrected ${applied.length} claim${applied.length === 1 ? "" : "s"}${missed ? `, ${missed} passage${missed === 1 ? "" : "s"} not found` : ""}`);
+  return { out: { ...out, ...value }, applied: applied.length };
+}
+
+/**
+ * Lessons written before the correction pass existed, still flagged as inaccurate, get it once.
+ * The learner sees the corrected lesson and an honest note under "What was checked".
+ */
+export async function correctDoubtedLessons(deps: LessonDeps): Promise<number> {
+  const { db, log } = deps;
+  let fixed = 0;
+  for (const skill of db.skillsByStatus(["active", "mastered"])) {
+    for (const lesson of db.lessonsForSkill(skill.id)) {
+      const key = `claims_corrected:${lesson.id}`;
+      if (db.getKv(key) || !lesson.review) continue;
+      const review = JSON.parse(lesson.review) as LessonReview;
+      const accurate = review.checks.find((c) => c.id === "accurate");
+      if (!accurate || accurate.ok) continue;
+      db.setKv(key, String(Date.now()));
+      const level = db.ladderFor(skill.id).find((l) => l.idx === lesson.levelIdx);
+      if (!level) continue;
+      let out = { bodyMd: lesson.bodyMd, deck: JSON.parse(lesson.deck) as Deck, quiz: JSON.parse(lesson.quiz) as Quiz, beats: JSON.parse(lesson.beats) as LessonBeat[] };
+      let note = accurate.detail;
+      let opinion: z.infer<typeof Opinion> | null = null;
+      let corrected = 0;
+      for (let round = 0; round < 2; round++) {
+        const fix = await correctClaims(skill, out, note, log).catch((e: Error) => {
+          log(`lesson #${lesson.id}: correction pass failed (${e.message})`);
+          return null;
+        });
+        if (!fix || fix.applied === 0) break;
+        out = fix.out;
+        corrected += fix.applied;
+        opinion = await secondOpinion(skill, level, readable(out)).catch(() => null);
+        if (!opinion || opinion.accurate) break;
+        note = opinion.accuracyNote;
+      }
+      if (corrected === 0 || !opinion) continue;
+      db.updateLessonContent(lesson.id, out);
+      const heard = db.evidenceForSkill(skill.id).flatMap((e) => [e.text, e.context ?? ""]).filter(Boolean);
+      const again = checkLesson(out.deck, out.quiz, heard);
+      const kept = review.checks.filter((c) => c.id === "own-words" || c.id === "uses-a-moment");
+      review.checks = [
+        ...again.checks.map((c) => kept.find((k) => k.id === c.id) ?? c),
+        accuracyCheck(opinion, corrected),
+        { id: "right-level", ok: opinion.rightLevel, detail: opinion.levelNote },
+      ];
+      review.checkedAt = Date.now();
+      db.setLessonReview(lesson.id, review);
+      log(`lesson #${lesson.id}: ${corrected} claim${corrected === 1 ? "" : "s"} corrected; fact-checker now ${opinion.accurate ? "satisfied" : "still has a doubt, shown to the learner"}`);
+      fixed++;
+    }
+  }
+  return fixed;
 }
 
 const writing = new Set<number>();

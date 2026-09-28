@@ -84,12 +84,12 @@ export function Board() {
   return (
     <div className="board">
       <h1 className="title">The board</h1>
-      <p className="muted lead">What your conversations suggest you might want to learn, in the order Rhubarb would take them. Say yes or no to each. Anything you ask your Bee for out loud starts on its own.</p>
+      <p className="muted lead">What your conversations suggest you might want to learn, in the order Rhubarb would take them. Say yes or no to each. Anything you ask for out loud, "Hey Rhubarb, teach me…", starts on its own.</p>
 
       {ranked.length === 0 && (
         <div className="empty">
           <p>
-            <strong>Nothing here yet.</strong> The board fills a few hours after Rhubarb first hears you: skills and one-off lessons your conversations point at, ranked, each with the moments that put it there. You say yes or no to each one. Or just ask: "Hey Bee, give me a lesson on…"
+            <strong>Nothing here yet.</strong> The board fills a few hours after Rhubarb first hears you: skills and one-off lessons your conversations point at, ranked, each with the moments that put it there. You say yes or no to each one. Or just ask out loud: "Hey Rhubarb, give me a lesson on…"
           </p>
           <Link to="/" className="button">
             See how to get started

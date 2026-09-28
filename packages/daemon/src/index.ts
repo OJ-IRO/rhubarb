@@ -9,7 +9,7 @@ import { handleAsk, topicFromSpark } from "./pipeline/asks.js";
 import { askIn, handleStreamEvent, recordAsk } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
-import { generateLessonOnce, resumeMissingLessons, startSkill } from "./pipeline/lessons.js";
+import { correctDoubtedLessons, generateLessonOnce, resumeMissingLessons, startSkill } from "./pipeline/lessons.js";
 import { writeTodayLetter } from "./pipeline/letter.js";
 import { gradeAnswer, handleJournalReady, schedulePractice, sweepPractice, type Grade } from "./pipeline/practice.js";
 import { bestFieldRung, maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
@@ -424,6 +424,8 @@ function rescanForAsks(days = 3): void {
   db.setKv(key, String(Date.now()));
   log(`rescan: ${found} earlier ask${found === 1 ? "" : "s"} to Bee picked back up`);
 }
+// Lessons the fact-checker still doubted get their disputed claims corrected, once.
+setTimeout(() => void correctDoubtedLessons(lessonDeps).catch((e: Error) => log(`claim correction failed: ${e.message}`)), 60_000);
 setTimeout(() => {
   try {
     rescanForAsks();

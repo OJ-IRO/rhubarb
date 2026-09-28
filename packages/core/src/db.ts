@@ -646,6 +646,13 @@ export class RhubarbDb {
     return Number(res.lastInsertRowid);
   }
 
+  /** Replace a lesson's text after a correction pass. */
+  updateLessonContent(id: number, l: { bodyMd: string; deck: Deck; quiz: Quiz; beats: LessonBeat[] }): void {
+    this.db
+      .prepare("UPDATE lessons SET body_md = ?, deck = ?, quiz = ?, beats = ? WHERE id = ?")
+      .run(l.bodyMd, JSON.stringify(l.deck), JSON.stringify(l.quiz), JSON.stringify(l.beats), id);
+  }
+
   getLesson(id: number): Lesson | null {
     const r = this.db.prepare("SELECT * FROM lessons WHERE id = ?").get(id) as Row | undefined;
     return r ? rowToLesson(r) : null;

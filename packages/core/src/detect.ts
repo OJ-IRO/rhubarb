@@ -135,7 +135,8 @@ const ASSISTANT_ADDRESS = /^(hey |ok |okay )?(siri|alexa|google)\b/;
 // required: a bare "be" or "b" starts too many ordinary sentences. A false match costs little,
 // because the ask is read by a model before anything is written.
 const GREETING = String.raw`(?:hey|hi|okay|ok|yo)`;
-const NAME = String.raw`(?:bee|be|b|bea|rhubarb)`;
+// "Hey Rhubarb" is the demo phrase; the recogniser splits and respells it.
+const NAME = String.raw`(?:rhubarbs?|rubarb|ruebarb|rue\s?barb|roo\s?barb|ruby\s?barb|bee|be|b|bea)`;
 const BEE_ADDRESS = new RegExp(String.raw`(?:^|[\s,.!?])${GREETING}[,.!\s]+${NAME}(?![a-z'])[,.!?]*\s*(.*)$`, "i");
 
 /** "hey Bee, give me a history lesson on ferris wheels" -> "give me a history lesson on ferris wheels". */

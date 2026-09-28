@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkLesson, withoutInventedQuotes } from "./lessonChecks.js";
+import { applyTextEdits, checkLesson, withoutInventedQuotes } from "./lessonChecks.js";
 import type { Deck, Quiz, Slide } from "./types.js";
 
 const HEARD = [
@@ -63,4 +63,22 @@ test("a wall of text, a broken question and a fake link are each flagged", () =>
   assert.equal(byId(r, "quiz").ok, false);
   assert.equal(byId(r, "sources").ok, false);
   assert.equal(byId(r, "own-words").ok, true);
+});
+
+test("claim corrections land everywhere the claim appears, and nowhere they should not", () => {
+  const lesson = {
+    bodyMd: "The axle weighed 70 tons.",
+    deck: { slides: [{ kind: "text", body: "Its axle weighed 70 tons, the heaviest forging of its day." }, { kind: "learnmore", links: [{ url: "https://x.test/70 tons", why: "70 tons" }] }] },
+    quiz: { questions: [{ kind: "mcq", explanation: "It weighed 70 tons." }] },
+  };
+  const { value, applied } = applyTextEdits(lesson, [
+    { find: "70 tons", replace: "about 45 tons" },
+    { find: "a passage that is not there", replace: "x" },
+  ]);
+  assert.equal(applied.length, 1);
+  assert.equal(value.bodyMd, "The axle weighed about 45 tons.");
+  assert.match(JSON.stringify(value.deck.slides[0]), /about 45 tons, the heaviest/);
+  assert.equal(value.quiz.questions[0].explanation, "It weighed about 45 tons.");
+  assert.equal((value.deck.slides[1] as { links: Array<{ url: string; why: string }> }).links[0].url, "https://x.test/70 tons", "links are never rewritten");
+  assert.equal(lesson.bodyMd, "The axle weighed 70 tons.", "the original is not mutated");
 });
