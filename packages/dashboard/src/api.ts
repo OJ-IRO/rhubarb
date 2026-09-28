@@ -162,6 +162,13 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   if (path === "/sparks") return as(st.cards);
   if (path === "/progress") return as(f.progress);
   if (path === "/history") return as(f.history);
+  if ((m = path.match(/^\/moments\/(\d+)$/)) && method === "PUT" && body) {
+    const e = f.skillDetail.evidence.find((x) => x.id === Number(m![1]));
+    const patch = JSON.parse(String(body)) as { text?: string; context?: string };
+    if (e) Object.assign(e, { ...(patch.text ? { text: patch.text } : {}), ...(patch.context !== undefined ? { context: patch.context } : {}), editedAt: Date.now() });
+    return as(e ?? null);
+  }
+  if (/^\/skills\/\d+\/rewrite$/.test(path)) return as({ ok: true });
   if ((m = path.match(/^\/sparks\/(\d+)\/lesson$/))) {
     const row = st.cards.find((c) => c.card.id === Number(m![1]));
     await new Promise((r) => setTimeout(r, 600));
@@ -235,6 +242,10 @@ export const api = {
   reflect: () => call<{ ok: boolean }>("/reflect", { method: "POST" }),
   sparks: () => call<SparkRow[]>("/sparks"),
   /** Turn a spark into a full one-lesson topic. Returns the skill it became. */
+  /** Correct what the transcript says for one moment: the line, the lines around it, or both. */
+  editMoment: (id: number, patch: { text?: string; context?: string }) => call<Evidence>(`/moments/${id}`, { method: "PUT", body: JSON.stringify(patch) }),
+  /** Write the current lesson again from the corrected moments. */
+  rewriteLesson: (skillId: number) => call<{ ok: boolean }>(`/skills/${skillId}/rewrite`, { method: "POST" }),
   sparkLesson: (cardId: number) => call<{ skillId: number }>(`/sparks/${cardId}/lesson`, { method: "POST" }),
   lesson: (id: number) => call<LessonView>(`/lessons/${id}`),
   startSession: (id: number) => call<LessonSession>(`/lessons/${id}/session`, { method: "POST" }),

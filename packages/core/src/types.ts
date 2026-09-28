@@ -81,6 +81,8 @@ export interface Evidence {
   topic: string | null;
   confidence: number | null;
   skillId: number | null;
+  /** When the wearer corrected what the transcript says. The corrected words are what everything uses. */
+  editedAt: number | null;
   createdAt: number;
 }
 
@@ -131,7 +133,8 @@ export interface LessonBeat {
   rubric: string;
 }
 
-export type LessonStatus = "draft" | "ready" | "done";
+/** replaced: superseded by a rewrite (for example after the learner corrected what was said). Kept, never shown. */
+export type LessonStatus = "draft" | "ready" | "done" | "replaced";
 
 /** One card in a lesson deck. */
 export type Slide =

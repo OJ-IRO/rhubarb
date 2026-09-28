@@ -18,6 +18,8 @@ export interface ApiDeps {
     reflectNow: () => Promise<void>;
     acceptSkill: (id: number) => Promise<void>;
     dismissSkill: (id: number) => Promise<void>;
+    /** Write the current lesson again from corrected moments. Returns at once; the lesson nudge says when it is ready. */
+    rewriteLesson?: (skillId: number) => Promise<void>;
     /** "Teach me the whole thing": a spark becomes a one-lesson topic. Returns the new skill id. */
     lessonFromSpark?: (card: Card) => Promise<number>;
     restoreSkill?: (id: number) => Promise<void>;
@@ -326,6 +328,24 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
             practice: db.practiceForSkill(id),
             fieldEvidence: db.fieldEvidenceForSkill(id),
           });
+        }
+        // The transcript got it wrong: the wearer corrects the line and the lines around it.
+        if (head === "moments" && idStr && method === "PUT") {
+          const body = await readBody<{ text?: unknown; context?: unknown } | null>(req).catch(() => null);
+          const text = typeof body?.text === "string" ? body.text.slice(0, 2000) : undefined;
+          const context = typeof body?.context === "string" ? body.context.slice(0, 8000) : undefined;
+          if (text === undefined && context === undefined) return json(res, 400, { error: "send text and/or context" });
+          if (text !== undefined && !text.trim()) return json(res, 400, { error: "the line cannot be empty" });
+          const e = db.editMoment(id, { text, context });
+          if (!e) return json(res, 404, { error: "not found" });
+          log(`moment #${id} corrected by the wearer`);
+          return json(res, 200, e);
+        }
+        if (head === "skills" && idStr && tail === "rewrite" && method === "POST") {
+          if (!db.getSkill(id)) return json(res, 404, { error: "not found" });
+          if (!actions.rewriteLesson) return json(res, 501, { error: "not available" });
+          void actions.rewriteLesson(id).catch((e: Error) => log(`rewrite ${id} failed: ${e.message}`));
+          return json(res, 202, { ok: true });
         }
         if (head === "skills" && idStr && tail === "accept" && method === "POST") {
           await actions.acceptSkill(id);

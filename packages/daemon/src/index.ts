@@ -9,7 +9,7 @@ import { handleAsk, topicFromSpark } from "./pipeline/asks.js";
 import { askIn, handleStreamEvent, recordAsk } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
-import { correctDoubtedLessons, generateLessonOnce, resumeMissingLessons, startSkill } from "./pipeline/lessons.js";
+import { correctDoubtedLessons, generateLessonOnce, resumeMissingLessons, rewriteLesson, startSkill } from "./pipeline/lessons.js";
 import { writeTodayLetter } from "./pipeline/letter.js";
 import { gradeAnswer, handleJournalReady, schedulePractice, sweepPractice, type Grade } from "./pipeline/practice.js";
 import { bestFieldRung, maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
@@ -448,6 +448,7 @@ startApi(
         void startSkill(lessonDeps, id).catch((e: Error) => log(`startSkill ${id} failed: ${e.message}`));
       },
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
+      rewriteLesson: (id) => rewriteLesson(lessonDeps, id),
       lessonFromSpark: async (card) => {
         const item = db.cardsWithItems(200).find((r) => r.card.id === card.id)?.item ?? null;
         const e = item?.utteranceId ? db.evidenceByUtterance(item.utteranceId) : null;

@@ -366,3 +366,25 @@ test("the sweep matches lines already heard live and only adds what the stream m
   assert.equal(db.getKv("changes_cursor"), "v1-2");
   db.close();
 });
+
+test("correcting a misheard moment changes what every later lesson reads, and a rewrite hides the old lesson", () => {
+  const db = freshDb();
+  const deps = { db, log: () => {}, onJournalReady: () => {}, onAsk: () => {} };
+  handleUtterance(deps, "c9", { id: 900, text: "Hey Rhubarb, I'm on the Old Southfield ferris wheel, teach me its history", spoken_at: "2026-09-27T05:00:00.000Z" });
+  const e = db.evidenceByUtterance(900)!;
+  const fixed = db.editMoment(e.id, { text: "Hey Rhubarb, I'm on the Osaka ferris wheel, teach me its history", context: "you: I'm on the Osaka ferris wheel." })!;
+  assert.match(fixed.text, /Osaka/);
+  assert.equal(fixed.context, "you: I'm on the Osaka ferris wheel.");
+  assert.ok(fixed.editedAt);
+  assert.match(db.windowAroundUtterance(900)!.find((u) => u.id === 900)!.text, /Osaka/, "the stored line is corrected too");
+
+  const skillId = db.insertSkill({ name: "Ferris wheels", domain: null, competentLooksLike: "", terms: [], priority: 90, brief: "", kind: "topic", origin: "asked" });
+  const lesson = { skillId, levelIdx: 0, style: "story" as const, bodyMd: "", deck: { title: "", subtitle: "", minutes: 5, slides: [] }, quiz: { questions: [] }, beats: [], citations: [] };
+  const old = db.insertLesson(lesson);
+  const fresh = db.insertLesson(lesson);
+  db.replaceOlderLessons(skillId, 0, fresh);
+  assert.deepEqual(db.lessonsForSkill(skillId).map((l) => l.id), [fresh]);
+  assert.equal(db.currentLesson(skillId, 0)!.id, fresh);
+  assert.equal(db.getLesson(old)!.status, "replaced", "the old lesson is kept, not deleted");
+  db.close();
+});

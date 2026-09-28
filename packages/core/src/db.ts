@@ -209,6 +209,8 @@ export class RhubarbDb {
     const scols = (this.db.prepare("PRAGMA table_info(skills)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!scols.includes("kind")) this.db.exec("ALTER TABLE skills ADD COLUMN kind TEXT NOT NULL DEFAULT 'skill'");
     if (!scols.includes("origin")) this.db.exec("ALTER TABLE skills ADD COLUMN origin TEXT NOT NULL DEFAULT 'noticed'");
+    const ecols = (this.db.prepare("PRAGMA table_info(evidence)").all() as Array<{ name: string }>).map((c) => c.name);
+    if (!ecols.includes("edited_at")) this.db.exec("ALTER TABLE evidence ADD COLUMN edited_at INTEGER");
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_utterances_spoken ON utterances(spoken_at)");
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_evidence_utterance ON evidence(utterance_id)");
   }
@@ -659,12 +661,31 @@ export class RhubarbDb {
   }
 
   lessonsForSkill(skillId: number): Lesson[] {
-    return (this.db.prepare("SELECT * FROM lessons WHERE skill_id = ? ORDER BY level_idx").all(skillId) as Row[]).map(rowToLesson);
+    return (this.db.prepare("SELECT * FROM lessons WHERE skill_id = ? AND status != 'replaced' ORDER BY level_idx").all(skillId) as Row[]).map(rowToLesson);
+  }
+
+  /** A rewrite supersedes every earlier lesson at the same level. */
+  replaceOlderLessons(skillId: number, levelIdx: number, keepId: number): void {
+    this.db.prepare("UPDATE lessons SET status = 'replaced' WHERE skill_id = ? AND level_idx = ? AND id != ? AND status != 'done'").run(skillId, levelIdx, keepId);
+  }
+
+  /**
+   * The wearer says the transcript got it wrong. The corrected words replace the stored ones for
+   * the line itself and for the lines around it, so every later lesson reads what was really said.
+   */
+  editMoment(id: number, patch: { text?: string; context?: string }): Evidence | null {
+    const e = this.evidenceById(id);
+    if (!e) return null;
+    const text = patch.text?.trim() || e.text;
+    const context = patch.context !== undefined ? patch.context.trim() : e.context;
+    this.db.prepare("UPDATE evidence SET text = ?, context = ?, edited_at = ? WHERE id = ?").run(text, context, Date.now(), id);
+    if (e.utteranceId && text !== e.text) this.db.prepare("UPDATE utterances SET text = ? WHERE id = ? AND private = 0").run(text, e.utteranceId);
+    return this.evidenceById(id);
   }
 
   currentLesson(skillId: number, levelIdx: number): Lesson | null {
     const r = this.db
-      .prepare("SELECT * FROM lessons WHERE skill_id = ? AND level_idx = ? ORDER BY id DESC LIMIT 1")
+      .prepare("SELECT * FROM lessons WHERE skill_id = ? AND level_idx = ? AND status != 'replaced' ORDER BY id DESC LIMIT 1")
       .get(skillId, levelIdx) as Row | undefined;
     return r ? rowToLesson(r) : null;
   }
@@ -994,6 +1015,7 @@ function rowToEvidence(r: Row): Evidence {
     topic: (r.topic as string) ?? null,
     confidence: (r.confidence as number) ?? null,
     skillId: (r.skill_id as number) ?? null,
+    editedAt: (r.edited_at as number) ?? null,
     createdAt: r.created_at as number,
   };
 }

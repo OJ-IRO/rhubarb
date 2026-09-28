@@ -224,7 +224,7 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   const baseAsk = `${shape.trimStart()}${shape ? "\n\n" : ""}## Skill\n${skill.name}${skill.domain ? ` (${skill.domain})` : ""}\nCompetent use sounds like: ${skill.competentLooksLike}\n\n## This level (${levelIdx + 1} of ${ladder.length}): ${level.title}\nOutcome: ${level.outcome}\n${
     earlier.length ? `\nEarlier levels already covered: ${earlier.map((l) => ladder[l.levelIdx]?.title).join(", ")}` : ""
   }\n\n## Why this skill is on their board\n${skill.brief}\n\n## Moments from their life to draw on\n${
-    evidence.map((e) => `- ${e.spokenAt}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
+    evidence.map((e) => `- ${e.spokenAt}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}${e.editedAt ? " (corrected by the learner: trust these words over anything else)" : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
   }\n\n## Reader\n${profile ? `goals: ${profile.goals.join("; ") || "none stated"}` : "no profile yet"}`;
 
   const research = (feedback?: string[]) =>
@@ -374,6 +374,7 @@ async function correctClaims<T extends LessonText>(skill: Skill, out: T, note: s
   });
   const { value, applied } = applyTextEdits({ bodyMd: out.bodyMd, deck: out.deck, quiz: out.quiz, beats: out.beats }, fix.edits);
   const missed = fix.edits.length - applied.length;
+  if (fix.edits.length === 0) log(`lesson "${skill.name}": the corrector checked the disputed claims and found nothing to change`);
   log(`lesson "${skill.name}": corrected ${applied.length} claim${applied.length === 1 ? "" : "s"}${missed ? `, ${missed} passage${missed === 1 ? "" : "s"} not found` : ""}`);
   return { out: { ...out, ...value }, applied: applied.length };
 }
@@ -428,6 +429,46 @@ export async function correctDoubtedLessons(deps: LessonDeps): Promise<number> {
     }
   }
   return fixed;
+}
+
+const Refreshed = z.object({
+  name: z.string().describe("the same title, corrected if it rested on a misheard word"),
+  brief: z.string().describe("the same brief, corrected so it matches what was really said; same length and voice; never uses the reader's name"),
+});
+
+/**
+ * The learner fixed what the transcript says. Correct the title and brief if they rested on a
+ * misheard word, then write the lesson again from the corrected moments. The old lesson stays
+ * readable until the new one is ready, then it is set aside.
+ */
+export async function rewriteLesson(deps: LessonDeps, skillId: number): Promise<void> {
+  const { db, log } = deps;
+  const skill = db.getSkill(skillId);
+  if (!skill || writing.has(skillId)) return;
+  const evidence = db.evidenceForSkill(skillId);
+  if (evidence.some((e) => e.editedAt)) {
+    const fixed = await classify({
+      model: MODELS.worker,
+      system: systemBlocks(voiceGuide(), "A speech recogniser misheard some words, and the learner has corrected the transcript. Correct the lesson's title and brief to match what was really said. Change nothing that was right."),
+      user: `Title: ${skill.name}\nBrief: ${skill.brief}\n\nWhat was really said:\n${evidence.map((e) => `- "${e.text}"\n  around it:\n  ${(e.context ?? "").replace(/\n/g, "\n  ")}`).join("\n")}`,
+      schema: Refreshed,
+      maxTokens: 1500,
+    }).catch((e: Error) => {
+      log(`rewrite: title and brief left as they were (${e.message})`);
+      return null;
+    });
+    if (fixed) db.updateSkill(skillId, { name: fixed.name.trim() || skill.name, brief: fixed.brief.trim() || skill.brief });
+  }
+  const fresh = db.getSkill(skillId)!;
+  writing.add(skillId);
+  try {
+    await ensureLadder(deps, fresh);
+    const lessonId = await generateLesson(deps, fresh, fresh.level);
+    db.replaceOlderLessons(skillId, fresh.level, lessonId);
+    log(`rewrite: ${fresh.name} rewritten from the corrected moments as lesson #${lessonId}`);
+  } finally {
+    writing.delete(skillId);
+  }
 }
 
 const writing = new Set<number>();

@@ -172,6 +172,9 @@ export function LessonPage({ id }: { id: number }) {
       </article>
 
       <Checked review={lesson.review} />
+      <p className="muted small misheard">
+        Built on something Bee misheard? <Link to={`/skills/${lesson.skillId}`}>Fix what was said</Link> and have it written again.
+      </p>
 
       <Tutor lessonId={id} initial={view.session ? (JSON.parse(view.session.tutor) as Msg[]) : []} open={tutorOpen} onClose={() => setTutorOpen(false)} />
     </div>
