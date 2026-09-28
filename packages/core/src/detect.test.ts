@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { stage1Detect } from "./detect.js";
+import { directAsk, goalLanguages, isBareAddress, stage1Detect } from "./detect.js";
 
 // Speech recognition gives no question marks and drops apostrophes, so these read the way Bee sends them.
 const kind = (text: string) => {
@@ -39,4 +39,40 @@ test("small talk, short fragments and assistant commands are ignored", () => {
   assert.equal(kind("what is that"), null, "under four words is too little to act on");
   assert.equal(kind("hey siri what is the weather like tomorrow"), null);
   assert.equal(kind("Alexa, how many ounces are in a cup"), null);
+});
+
+test("asking Bee directly is the strongest signal, never noise", () => {
+  const r = stage1Detect("Hey Bee, can you give me a history lesson on ferris wheels?");
+  assert.equal(r.matched, true);
+  assert.equal(r.kind, "intent");
+  assert.deepEqual(r.cues, ["hey-bee"]);
+  assert.equal(r.ask, "can you give me a history lesson on ferris wheels");
+  // the ways speech recognition spells it
+  assert.equal(directAsk("hey B teach me how the osaka loop line works"), "teach me how the osaka loop line works");
+  assert.equal(directAsk("Hey, be. How do I order at a ramen counter"), "How do I order at a ramen counter");
+  assert.equal(directAsk("okay so hey bee what is a torii gate"), "what is a torii gate");
+});
+
+test("ordinary sentences that start like an address are left alone", () => {
+  assert.equal(directAsk("be careful on the stairs"), null);
+  assert.equal(directAsk("okay but that was the best ramen"), null);
+  assert.equal(directAsk("hey bear come here"), null);
+  assert.equal(directAsk("they believe it was built in 1997"), null);
+});
+
+test("a bare address waits for the next line", () => {
+  assert.equal(isBareAddress("Hey Bee."), true);
+  assert.equal(isBareAddress("hey bee, what is"), false);
+  assert.equal(isBareAddress("hey you"), false);
+});
+
+test("a line in a language they are learning counts, even with no English cue", () => {
+  const hints = { languages: goalLanguages(["conversational Japanese for daily life in Japan"]) };
+  assert.deepEqual(hints.languages, ["japanese"]);
+  assert.equal(stage1Detect("すみません、これをください", hints).kind, "exposure");
+  assert.equal(stage1Detect("すみません、これをください", hints).matched, true);
+  // not a goal: no signal
+  assert.equal(stage1Detect("すみません、これをください").matched, false);
+  // too short to be a real exchange
+  assert.equal(stage1Detect("うん", hints).matched, false);
 });

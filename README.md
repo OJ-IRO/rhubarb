@@ -75,7 +75,7 @@ Scripts and the agent skill reach a hosted Rhubarb with `Authorization: Bearer <
 
 ## Tests
 
-`npm test` runs 49 tests with no Bee, no AWS and no network: the first-pass detector, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, the hosted-mode token gate, and the API's handling of hostile requests.
+`npm test` runs 56 tests with no Bee, no AWS and no network: the first-pass detector, spoken asks to Bee, the nightly sweep's matching, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, the hosted-mode token gate, and the API's handling of hostile requests.
 
 ## For agents
 

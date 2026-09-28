@@ -2,6 +2,13 @@ import type { Card, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBe
 
 export type { Card, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, LessonSession, Practice, Profile, Skill };
 
+/** A spark card, and the lesson it became if the reader asked for the whole story. */
+export interface SparkRow {
+  card: Card;
+  item: Item;
+  lessonSkillId?: number | null;
+}
+
 export interface SkillRow extends Skill {
   evidenceCount: number;
   ladderLength: number;
@@ -86,7 +93,7 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 interface PreviewState {
   rows: SkillRow[];
   privacy: PrivacyView;
-  cards: Array<{ card: Card; item: Item }>;
+  cards: SparkRow[];
   profile: Profile;
   lastQuiz?: QuizResult;
 }
@@ -155,6 +162,12 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   if (path === "/sparks") return as(st.cards);
   if (path === "/progress") return as(f.progress);
   if (path === "/history") return as(f.history);
+  if ((m = path.match(/^\/sparks\/(\d+)\/lesson$/))) {
+    const row = st.cards.find((c) => c.card.id === Number(m![1]));
+    await new Promise((r) => setTimeout(r, 600));
+    if (row) row.lessonSkillId = 8;
+    return as({ skillId: 8 });
+  }
   if ((m = path.match(/^\/sparks\/(\d+)\/guess$/))) {
     const row = st.cards.find((c) => c.card.id === Number(m![1]));
     const text = body ? String((JSON.parse(String(body)) as { text?: string }).text ?? "").trim() : "";
@@ -220,7 +233,9 @@ export const api = {
   eraseEverything: () => call<PrivacyView>("/privacy/everything", { method: "DELETE", body: JSON.stringify({ confirm: "erase everything" }) }),
   setPriority: (id: number, priority: number) => call<Skill>(`/skills/${id}/priority`, { method: "PUT", body: JSON.stringify({ priority }) }),
   reflect: () => call<{ ok: boolean }>("/reflect", { method: "POST" }),
-  sparks: () => call<Array<{ card: Card; item: Item }>>("/sparks"),
+  sparks: () => call<SparkRow[]>("/sparks"),
+  /** Turn a spark into a full one-lesson topic. Returns the skill it became. */
+  sparkLesson: (cardId: number) => call<{ skillId: number }>(`/sparks/${cardId}/lesson`, { method: "POST" }),
   lesson: (id: number) => call<LessonView>(`/lessons/${id}`),
   startSession: (id: number) => call<LessonSession>(`/lessons/${id}/session`, { method: "POST" }),
   saveResponses: (id: number, responses: Record<string, string>) =>

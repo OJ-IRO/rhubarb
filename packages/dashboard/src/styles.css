@@ -510,6 +510,39 @@ textarea {
   border-color: var(--comb);
   color: var(--ink);
 }
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
+}
+.chip-kind {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
+.chip-kind.asked {
+  border-style: solid;
+  border-color: var(--honey);
+  background: var(--honey);
+  color: var(--ink);
+}
+.spark-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
 .chip-status.mastered {
   background: var(--ink);
   border-color: var(--ink);

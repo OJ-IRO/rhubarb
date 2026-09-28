@@ -9,6 +9,40 @@ export interface Stage1Result {
   matched: boolean;
   kind: EvidenceKind;
   cues: string[];
+  /** Set when the wearer addressed Bee directly ("hey Bee, teach me ..."): the ask, without the address. */
+  ask?: string;
+}
+
+/** Languages a person can name as a goal that we can also recognise by script. */
+export type ScriptLanguage = "japanese" | "korean" | "chinese";
+
+export interface DetectHints {
+  /** Languages from the profile goals; a line in one of these scripts counts as exposure. */
+  languages?: ScriptLanguage[];
+}
+
+const SCRIPT: Record<ScriptLanguage, RegExp> = {
+  japanese: /[\u3040-\u30ff]/, // kana; kanji alone could be Chinese
+  korean: /[\uac00-\ud7af\u1100-\u11ff]/,
+  chinese: /[\u4e00-\u9fff]/,
+};
+
+/** Which script languages a profile's goals mention ("conversational Japanese", "日本語"). */
+export function goalLanguages(goals: string[]): ScriptLanguage[] {
+  const text = goals.join(" ").toLowerCase();
+  const out: ScriptLanguage[] = [];
+  if (/japanese|日本語|nihongo/.test(text)) out.push("japanese");
+  if (/korean|한국어|hangul/.test(text)) out.push("korean");
+  if (/chinese|mandarin|cantonese|中文|汉语|漢語/.test(text)) out.push("chinese");
+  return out;
+}
+
+/** The script language a line is written in, if any. Japanese wins over Chinese when kana are present. */
+export function scriptLanguage(text: string): ScriptLanguage | null {
+  if (SCRIPT.japanese.test(text)) return "japanese";
+  if (SCRIPT.korean.test(text)) return "korean";
+  if (SCRIPT.chinese.test(text)) return "chinese";
+  return null;
 }
 
 const INTENT_CUES = [
@@ -94,12 +128,44 @@ const HEDGE_CUES = [
 ];
 
 const INTERROGATIVE_START = /^(who|what|when|where|why|how|which|whose)\b/;
-// Direct-address noise we never want ("hey siri", "alexa, ...")
-const ASSISTANT_ADDRESS = /^(hey |ok |okay )?(siri|alexa|google|bee)\b/;
+// Commands to someone else's assistant are noise ("hey siri, set a timer").
+const ASSISTANT_ADDRESS = /^(hey |ok |okay )?(siri|alexa|google)\b/;
+// Addressing the wearable itself is the opposite: the clearest ask Rhubarb ever gets. Speech
+// recognition spells the name several ways ("hey B", "Hey, be.", "Hey Bea"), so the greeting is
+// required: a bare "be" or "b" starts too many ordinary sentences. A false match costs little,
+// because the ask is read by a model before anything is written.
+const GREETING = String.raw`(?:hey|hi|okay|ok|yo)`;
+const NAME = String.raw`(?:bee|be|b|bea|rhubarb)`;
+const BEE_ADDRESS = new RegExp(String.raw`(?:^|[\s,.!?])${GREETING}[,.!\s]+${NAME}(?![a-z'])[,.!?]*\s*(.*)$`, "i");
 
-export function stage1Detect(text: string): Stage1Result {
+/** "hey Bee, give me a history lesson on ferris wheels" -> "give me a history lesson on ferris wheels". */
+export function directAsk(text: string): string | null {
+  const m = text.trim().match(BEE_ADDRESS);
+  if (!m) return null;
+  const ask = m[1].trim().replace(/^[,.!?\s]+|[.?!]+$/g, "");
+  return ask.split(/\s+/).length >= 2 ? ask : null;
+}
+
+/** "Hey Bee." on its own: the ask is the next line in the same conversation. */
+export function isBareAddress(text: string): boolean {
+  const m = text.trim().match(BEE_ADDRESS);
+  return Boolean(m) && m![1].replace(/[,.!?\s]/g, "").length === 0;
+}
+
+export function stage1Detect(text: string, hints: DetectHints = {}): Stage1Result {
   const t = text.toLowerCase().trim();
   const cues: string[] = [];
+
+  const ask = directAsk(text);
+  if (ask) return { matched: true, kind: "intent", cues: ["hey-bee"], ask };
+
+  // A line in a language they are learning is exposure even when no English cue fires. Spoken
+  // Japanese has no spaces, so the word count below would drop every one of these.
+  const lang = scriptLanguage(text);
+  if (lang) {
+    if (hints.languages?.includes(lang) && text.replace(/\s+/g, "").length >= 6) return { matched: true, kind: "exposure", cues: [lang] };
+    return { matched: false, kind: "exposure", cues };
+  }
 
   if (t.split(/\s+/).length < 4) return { matched: false, kind: "question", cues };
   if (ASSISTANT_ADDRESS.test(t)) return { matched: false, kind: "question", cues };

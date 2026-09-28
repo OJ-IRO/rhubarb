@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { llmRoute, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
-import { handleStreamEvent } from "./pipeline/capture.js";
+import { handleAsk, topicFromSpark } from "./pipeline/asks.js";
+import { askIn, handleStreamEvent, recordAsk } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
 import { generateLessonOnce, resumeMissingLessons, startSkill } from "./pipeline/lessons.js";
@@ -26,6 +27,13 @@ const PRACTICE_SWEEP_MS = 60_000;
 const NIGHTLY_CHECK_MS = 10 * 60_000;
 const FIELD_INTERVAL_MS = 15 * 60_000;
 const REFLECT_HOUR_LOCAL = 3;
+// Proposals are made during the day too, a few hours after the conversations that prompted them,
+// so a yes or no can happen while the moment is still fresh.
+const DAY_REFLECT_EVERY_MS = 3 * 3600_000;
+const DAY_REFLECT_FROM_HOUR = 9;
+const DAY_REFLECT_UNTIL_HOUR = 21;
+// One proposal alarm at most this often. A buzzing wrist is how people come to hate a device.
+const PROPOSAL_NUDGE_GAP_MS = 3 * 3600_000;
 const API_PORT = Number(process.env.PORT ?? process.env.RHUBARB_PORT ?? 4242);
 // A private server: the dashboard is opened with a token instead of being local-only.
 const HOSTED = process.env.RHUBARB_ACCESS_TOKEN
@@ -73,11 +81,38 @@ const fieldDeps = {
   onCredited: (skillId: number, level: number) => advanceAndContinue(skillId, onFieldCredited(db, skillId, level)),
 };
 
+// Building a lesson takes minutes. Asks and sparks only start it; the lesson nudge says when it's ready.
+const startInBackground = async (skillId: number) => {
+  void startSkill(lessonDeps, skillId).catch((e: Error) => log(`startSkill ${skillId} failed: ${e.message}`));
+};
+
+// --- asks: "hey Bee, ..." handled one at a time, straight away
+const askQueue: Array<{ e: Evidence; ask: string }> = [];
+let asking = false;
+async function drainAsks(): Promise<void> {
+  if (asking) return;
+  asking = true;
+  try {
+    while (askQueue.length > 0) {
+      const next = askQueue.shift()!;
+      await handleAsk({ db, log, start: startInBackground, spark: (e, topic) => classifyDeps.onSpark(e, topic) }, next.e, next.ask).catch((err: Error) =>
+        log(`ask #${next.e.id} failed: ${err.message}`)
+      );
+    }
+  } finally {
+    asking = false;
+  }
+}
+
 const captureDeps = {
   db,
   log,
   onJournalReady: (journalId: string, text: string) => {
     handleJournalReady(practiceDeps, journalId, text).catch((e: Error) => log(`grading failed: ${e.message}`));
+  },
+  onAsk: (e: Evidence, ask: string) => {
+    askQueue.push({ e, ask });
+    void drainAsks();
   },
 };
 
@@ -139,14 +174,40 @@ const reflectNow = guarded("reflect", async () => {
   // Calendar stakes are a nice-to-have. Their failure must not stop the reflection itself.
   await ingestStakes({ db, bee, log }).catch((e: Error) => log(`stakes skipped: ${e.message}`));
   await classifyTick();
-  const touched = await runReflection({ db, log });
-  const proposed = db.skillsByStatus(["proposed"]);
-  if (touched.length > 0 && proposed.length > 0) {
-    const top = proposed[0];
-    const line = `Your learning brief is ready. ${proposed.length === 1 ? "One skill" : `${proposed.length} skills`} worth a look, starting with ${top.name}.`;
-    if (nudgeOn(db, "brief")) await bee.createTodo(line, afterQuietHours(new Date(Date.now() + 2 * 60_000)).toISOString()).catch((e: Error) => log(`brief nudge failed: ${e.message}`));
-  }
+  const { created } = await runReflection({ db, log });
+  db.setKv("last_reflect_at", String(Date.now()));
+  await nudgeProposals(created);
   await writeTodayLetter(db, log);
+});
+
+/** One alarm for new proposals: what it is, and that it wants a yes or no. */
+async function nudgeProposals(created: number[]): Promise<void> {
+  const fresh = created.map((id) => db.getSkill(id)).filter((s): s is NonNullable<typeof s> => Boolean(s && s.status === "proposed"));
+  if (fresh.length === 0 || !nudgeOn(db, "brief")) return;
+  const last = Number(db.getKv("last_proposal_nudge_at") ?? 0);
+  if (Date.now() - last < PROPOSAL_NUDGE_GAP_MS) {
+    log(`proposal nudge held back (${fresh.length} new); the board still has them`);
+    return;
+  }
+  const top = fresh.sort((a, b) => b.priority - a.priority)[0];
+  const what = top.kind === "topic" ? "a lesson idea" : "a skill idea";
+  const more = fresh.length > 1 ? ` Plus ${fresh.length - 1} more.` : "";
+  const line = `Rhubarb has ${what} from your day: ${top.name}. Yes or no on your board.${more}`;
+  await bee
+    .createTodo(line, afterQuietHours(new Date(Date.now() + 2 * 60_000)).toISOString())
+    .then(() => db.setKv("last_proposal_nudge_at", String(Date.now())))
+    .catch((e: Error) => log(`proposal nudge failed: ${e.message}`));
+}
+
+/** Daytime pass: only when there is something new, only in waking hours, at most every few hours. */
+const dayReflectTick = guarded("day-reflect", async () => {
+  const h = new Date().getHours();
+  if (h < DAY_REFLECT_FROM_HOUR || h >= DAY_REFLECT_UNTIL_HOUR) return;
+  if (Date.now() - Number(db.getKv("last_reflect_at") ?? 0) < DAY_REFLECT_EVERY_MS) return;
+  await classifyTick();
+  if (db.unassignedSkillEvidence().length === 0) return;
+  log("day-reflect: new moments since the last pass; proposing");
+  await reflectNow();
 });
 
 // --- in-page lesson interactions
@@ -303,6 +364,7 @@ const nightly = guarded("nightly", async () => {
   db.setKv("last_nightly", today);
   // Bee's /v1/changes returns a 500 some nights. Reflect on what the live stream caught anyway.
   await runSweep({ ...captureDeps, bee }).catch((e: Error) => log(`sweep failed, reflecting without it: ${e.message}`));
+  await classifyTick();
   await reflectNow();
 });
 
@@ -321,6 +383,10 @@ const listening: Listening = { state: "connecting", lastHeardAt: db.lastHeardAt(
 const consumer = new BeeStreamConsumer({
   onEvent: (ev) => {
     if (ev.type === "new-utterance") listening.lastHeardAt = Date.now();
+    // The nightly sweep knows conversations by number, the stream by uuid. Remember the pair.
+    if ((ev.type === "new-conversation" || ev.type === "update-conversation") && ev.conversation?.id && ev.conversation.conversation_uuid) {
+      db.setKv(`conv:${ev.conversation.id}`, ev.conversation.conversation_uuid);
+    }
     handleStreamEvent(captureDeps, ev);
   },
   onState: (state) => {
@@ -338,10 +404,33 @@ const timers = [
   setInterval(() => void nightly(), NIGHTLY_CHECK_MS),
   setInterval(() => void fieldTick(), FIELD_INTERVAL_MS),
   setInterval(() => void lessonsTick(), 30 * 60_000),
+  setInterval(() => void dayReflectTick(), 30 * 60_000),
 ];
 void classifyTick();
 // A restart mid-generation leaves a skill with no lesson and nothing writing one. Pick those up.
 setTimeout(() => void lessonsTick(), 20_000);
+
+// Until this version, "hey Bee, ..." was thrown away as a command to an assistant. The words were
+// still stored, so the last few days are read once more for asks that were dropped.
+function rescanForAsks(days = 3): void {
+  const key = "ask_rescan_v1";
+  if (db.getKv(key)) return;
+  let found = 0;
+  for (const u of db.utterancesSince(Date.now() - days * 86_400_000)) {
+    if (db.hasEvidenceForUtterance(u.id)) continue;
+    const ask = askIn(db, u.conversation_uuid, u);
+    if (ask && recordAsk(captureDeps, u.conversation_uuid, u, ask, "stream")) found++;
+  }
+  db.setKv(key, String(Date.now()));
+  log(`rescan: ${found} earlier ask${found === 1 ? "" : "s"} to Bee picked back up`);
+}
+setTimeout(() => {
+  try {
+    rescanForAsks();
+  } catch (e) {
+    log(`rescan failed: ${(e as Error).message}`);
+  }
+}, 5_000);
 
 startApi(
   {
@@ -357,6 +446,13 @@ startApi(
         void startSkill(lessonDeps, id).catch((e: Error) => log(`startSkill ${id} failed: ${e.message}`));
       },
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
+      lessonFromSpark: async (card) => {
+        const item = db.cardsWithItems(200).find((r) => r.card.id === card.id)?.item ?? null;
+        const e = item?.utteranceId ? db.evidenceByUtterance(item.utteranceId) : null;
+        const skillId = await topicFromSpark({ db, log, start: startInBackground }, card, e);
+        db.setKv(`spark_lesson:${card.id}`, String(skillId));
+        return skillId;
+      },
       judgeGuess: (card, guess) =>
         classify({
           system: systemBlocks(voiceGuide(), "Someone guessed the answer to a question before being shown it. Say whether the guess was close to the real answer, and give one warm, honest sentence about it. If they were wrong, name the one thing the real answer turns on. Never say 'great guess'."),

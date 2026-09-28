@@ -291,3 +291,78 @@ test("hosted mode: nothing but the login page opens without the token; a cookie 
     server.close();
   }
 });
+
+// ---- asks to Bee, and the nightly sweep
+
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { askIn, handleUtterance } from "./pipeline/capture.js";
+import { runSweep } from "./pipeline/sweep.js";
+
+function freshDb(): RhubarbDb {
+  return new RhubarbDb(join(mkdtempSync(join(tmpdir(), "rhubarb-test-")), "t.db"));
+}
+
+test("'hey Bee, ...' becomes a moment and is handed to the ask handler, not dropped", () => {
+  const db = freshDb();
+  const asks: string[] = [];
+  const deps = { db, log: () => {}, onJournalReady: () => {}, onAsk: (_e: unknown, ask: string) => asks.push(ask) };
+  handleUtterance(deps, "c1", { id: 1, text: "Hey Bee, can you give me a history lesson on ferris wheels?", spoken_at: "2026-09-27T05:00:00.000Z" });
+  assert.deepEqual(asks, ["can you give me a history lesson on ferris wheels"]);
+  const e = db.evidenceByUtterance(1)!;
+  assert.equal(e.kind, "intent");
+  assert.equal(e.route, "skill");
+  // Siri is still someone else's assistant
+  handleUtterance(deps, "c1", { id: 2, text: "hey siri what is the weather like tomorrow", spoken_at: "2026-09-27T05:00:10.000Z" });
+  assert.equal(db.evidenceByUtterance(2), null);
+  db.close();
+});
+
+test("a bare 'Hey Bee.' takes the next line as the ask", () => {
+  const db = freshDb();
+  const asks: string[] = [];
+  const deps = { db, log: () => {}, onJournalReady: () => {}, onAsk: (_e: unknown, ask: string) => asks.push(ask) };
+  handleUtterance(deps, "c1", { id: 10, text: "Hey Bee.", spoken_at: "2026-09-27T05:00:00.000Z" });
+  handleUtterance(deps, "c1", { id: 11, text: "Tell me the history of this ferris wheel.", spoken_at: "2026-09-27T05:00:04.000Z" });
+  assert.deepEqual(asks, ["Tell me the history of this ferris wheel"]);
+  // a minute later is a different sentence, not the ask
+  assert.equal(askIn(db, "c1", { id: 12, text: "Tell me more about it", spoken_at: "2026-09-27T05:01:30.000Z" }), null);
+  db.close();
+});
+
+test("the sweep matches lines already heard live and only adds what the stream missed", async () => {
+  const db = freshDb();
+  const deps = { db, log: () => {}, onJournalReady: () => {} };
+  handleUtterance(deps, "live-uuid", { id: 3520110070, text: "Why are you in Osaka?", spoken_at: "2026-09-27T11:07:49.000Z" });
+  const at = Date.parse("2026-09-27T11:07:49.000Z");
+  const bee = {
+    changes: async () => ({ facts: [], conversations: [10763793], dailies: [], journals: [], todos: [], next_cursor: "v1-2", since: 0, until: 0, updated: true }),
+    // Bee's shape: wrapped, epoch-ms timestamps, new ids, "Unknown" speakers
+    getConversation: async () => ({
+      conversation: {
+        id: 10763793,
+        start_time: at - 30_000,
+        end_time: at + 600_000,
+        transcriptions: [
+          {
+            realtime: false,
+            utterances: [
+              { id: 3520133419, text: "Why are you in Osaka?", spoken_at: at, speaker: "Unknown" },
+              { id: 3520133500, text: "I wonder how they keep the ferris wheel balanced in the wind", spoken_at: at + 120_000, speaker: "Unknown" },
+            ],
+          },
+        ],
+      },
+      timezone: "Asia/Tokyo",
+    }),
+  };
+  const out = await runSweep({ ...deps, bee: bee as never });
+  assert.deepEqual({ matched: out.matched, added: out.utterances }, { matched: 1, added: 1 });
+  assert.equal(db.privacySummary().utterances, 2, "the Osaka line is not stored twice");
+  const recovered = db.evidenceByUtterance(3520133500)!;
+  assert.equal(recovered.conversationUuid, "live-uuid", "a recovered line joins the live conversation it belongs to");
+  assert.equal(recovered.speakerLabel, null, "'Unknown' is not a speaker label");
+  assert.equal(db.getKv("changes_cursor"), "v1-2");
+  db.close();
+});

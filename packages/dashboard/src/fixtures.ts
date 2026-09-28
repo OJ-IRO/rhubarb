@@ -33,6 +33,8 @@ const mk = (id: number, name: string, priority: number, status: Skill["status"],
   priority,
   brief,
   level,
+  kind: "skill",
+  origin: "noticed",
   createdAt: now - 5 * d,
   updatedAt: now - h,
 });
@@ -101,12 +103,24 @@ export const skills: Skill[] = [
     0,
     "Home"
   ),
+  {
+    ...mk(
+      8,
+      "Why the fog rolls in every afternoon",
+      63,
+      "proposed",
+      "Twice this week you stopped mid-sentence on the walk home to point at the fog coming over the hills, and on Thursday you asked why it always shows up at the same time. That is one good lesson, not a course: where it comes from, why it arrives on a schedule, and why it burns off by noon.",
+      0,
+      "Weather"
+    ),
+    kind: "topic",
+  },
 ];
 
 export const skillRows: SkillRow[] = skills.map((s) => ({
   ...s,
-  evidenceCount: [7, 4, 3, 6, 2, 1, 2][s.id - 1],
-  ladderLength: [4, 4, 3, 5, 3, 3, 3][s.id - 1],
+  evidenceCount: [7, 4, 3, 6, 2, 1, 2, 2][s.id - 1],
+  ladderLength: [4, 4, 3, 5, 3, 3, 3, 1][s.id - 1],
   lessonReady: s.status === "active",
   lessonId: s.status === "active" ? 1 : null,
 }));

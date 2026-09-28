@@ -21,7 +21,7 @@ import {
 import { z } from "zod";
 import { resolveImage, sanitizeMermaid, urlAlive } from "./images.js";
 import { researchThenEmit } from "./research.js";
-import { nextLearningSlot } from "./schedule.js";
+import { afterQuietHours, nextLearningSlot } from "./schedule.js";
 
 const Ladder = z.object({
   levels: z
@@ -130,6 +130,12 @@ export interface LessonDeps {
 export async function ensureLadder(deps: LessonDeps, skill: Skill): Promise<void> {
   const { db, log } = deps;
   if (db.ladderFor(skill.id).length > 0) return;
+  // A topic is one lesson, not a climb: a single rung, and finishing it finishes the topic.
+  if (skill.kind === "topic") {
+    db.replaceLadder(skill.id, [{ title: skill.name, outcome: `can tell someone the story of it: ${skill.competentLooksLike}` }]);
+    log(`topic #${skill.id} ${skill.name}: one lesson`);
+    return;
+  }
   const out = await classify({
     model: MODELS.writer,
     effort: "medium",
@@ -210,7 +216,11 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   const earlier = db.lessonsForSkill(skill.id).filter((l) => l.levelIdx < levelIdx);
 
   const system = systemBlocks(voiceGuide(), lessonRole(profile));
-  const baseAsk = `## Skill\n${skill.name}${skill.domain ? ` (${skill.domain})` : ""}\nCompetent use sounds like: ${skill.competentLooksLike}\n\n## This level (${levelIdx + 1} of ${ladder.length}): ${level.title}\nOutcome: ${level.outcome}\n${
+  const shape =
+    skill.kind === "topic"
+      ? `\n\n## Shape\nThis is a single lesson on one topic from their day, not a rung on a ladder. Tell the whole story in one deck: where it came from, how it works, why it matters, and the one surprising thing worth repeating to a friend.${skill.origin === "asked" ? " They asked for this out loud, so open by answering what they asked." : ""}`
+      : "";
+  const baseAsk = `${shape.trimStart()}${shape ? "\n\n" : ""}## Skill\n${skill.name}${skill.domain ? ` (${skill.domain})` : ""}\nCompetent use sounds like: ${skill.competentLooksLike}\n\n## This level (${levelIdx + 1} of ${ladder.length}): ${level.title}\nOutcome: ${level.outcome}\n${
     earlier.length ? `\nEarlier levels already covered: ${earlier.map((l) => ladder[l.levelIdx]?.title).join(", ")}` : ""
   }\n\n## Why this skill is on their board\n${skill.brief}\n\n## Moments from their life to draw on\n${
     evidence.map((e) => `- ${e.spokenAt}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
@@ -278,7 +288,8 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   log(`lesson #${lessonId} ready: ${skill.name} / ${level.title} (${deck.slides.length} cards, ${out.quiz.questions.length} questions)`);
 
   const nudge = `Your ${skill.name} lesson is ready. About ${deck.minutes} minutes, whenever you're at your desk.`;
-  const at = nextLearningSlot(db);
+  // Something they asked for out loud is wanted now, not at the next study slot.
+  const at = skill.origin === "asked" ? afterQuietHours(new Date(Date.now() + 60_000)) : nextLearningSlot(db);
   if ((profile?.nudges ?? ALL_NUDGES).lessons !== false) {
     await bee.createTodo(nudge, at.toISOString()).catch((e: Error) => log(`lesson nudge failed: ${e.message}`));
     log(`lesson nudge scheduled for ${at.toISOString()}`);

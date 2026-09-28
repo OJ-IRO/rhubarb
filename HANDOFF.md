@@ -68,6 +68,10 @@ packages/dashboard/src
 - `bee stream` dies roughly every ninety minutes. `BeeStreamConsumer` respawns it. `/v1/changes` sometimes returns a 500; we keep the old cursor and try again the next night.
 - A voice note shows up twice: once as a journal, then again about twenty seconds later as ordinary overheard speech. `capture.ts` drops the echo.
 - Bee's own assistant already answers questions asked directly into a voice note. Our ground is what it can't do: questions and gaps from ordinary conversation, lessons, spoken practice, and field evidence.
+- "Hey Bee, give me a lesson on ..." spoken out loud arrives as an ordinary utterance on the stream. It is the clearest ask we get, so `capture.ts` sends it straight to `pipeline/asks.ts`, which starts a lesson with no yes-or-no step. Until 2026-09-28 the detector dropped it as an assistant command. Siri, Alexa and Google still are dropped.
+- The nightly transcript is a fresh transcription: new utterance ids, epoch-ms timestamps, the conversation wrapped as `{ conversation: {...} }`. The sweep matches lines to what the stream already stored by time and text, so nothing is counted twice.
+- Speaker labels came back "Unknown" on every line of the first real day. Treat that as no label. Telling the wearer from friends has to come from somewhere else.
+- Proposals come from conversations, not from the goals in the profile. Goals only raise priority. Reflection runs at 3am and every three hours between 9am and 9pm when there is something new, and sends at most one proposal alarm every three hours.
 - Opus 5 on Bedrock takes over a minute even for one line. Short text (nudges, feedback, tutor replies) goes to Sonnet 5 through `write({ quick: true })`. Opus is for lessons, reflection, and grading.
 - Never run the daemon as a background job inside a Claude Code session. The session reaps it under memory pressure. Use `scripts/start.sh`.
 
@@ -92,7 +96,7 @@ Also done: Sparks that ask for a guess before showing the answer; an Evidence pa
 
 Also done: a listening light, a privacy page with forget controls, undo for setting a skill aside, a first-run look-around, and the person's name removed from everywhere but settings.
 
-Done since the first handoff: `rhubarb-skill/SKILL.md`; 49 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
+Done since the first handoff: `rhubarb-skill/SKILL.md`; 56 tests (`npm test`); launchd install and uninstall scripts; a hardening pass over the daemon (see the commit "Harden the daemon and fix the learning loop's logic errors" for the list).
 
 ## Where it runs now
 

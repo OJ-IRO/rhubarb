@@ -85,6 +85,10 @@ export interface Evidence {
 }
 
 export type SkillStatus = "proposed" | "active" | "dismissed" | "mastered";
+/** skill: a capability built over weeks, on a ladder. topic: one lesson on something they wanted to understand. */
+export type SkillKind = "skill" | "topic";
+/** noticed: Rhubarb inferred it from conversation and asks yes or no. asked: they asked Bee for it out loud. */
+export type SkillOrigin = "noticed" | "asked";
 
 export interface Skill {
   id: number;
@@ -100,6 +104,8 @@ export interface Skill {
   brief: string;
   /** current ladder level index (0 = not started) */
   level: number;
+  kind: SkillKind;
+  origin: SkillOrigin;
   createdAt: number;
   updatedAt: number;
 }

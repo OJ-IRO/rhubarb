@@ -16,8 +16,9 @@ const Batch = z.object({ verdicts: z.array(Verdict) });
 const SYSTEM = `You classify moments captured by a wearable microphone worn by one person through their day. Each item is one thing they (or someone near them) said, with the surrounding lines for context. The wearer is the speaker unless the context makes clear someone else was talking.
 
 Decide, for each item:
-- kind: question (they want to know something), gap (they hedged or misstated a fact they were trying to state), struggle (they did not understand something said to them), intent (they said they want to learn or improve at something), exposure (a domain they are clearly around but not fluent in), stake (an upcoming event that raises the cost of not knowing).
-- route: spark if it is a passing curiosity that a paragraph would satisfy; skill if it points at a capability worth building up over time; noise if it is not a learning signal at all. Be strict about noise: TV or podcast audio, jokes, commands to Siri or Alexa, and rhetorical questions are noise.
+- kind: question (they want to know something), gap (they hedged or misstated a fact they were trying to state), struggle (they did not understand something said to them), intent (they said they want to learn or improve at something), exposure (a domain they are clearly around but not fluent in, including a line in a language they are learning), stake (an upcoming event that raises the cost of not knowing).
+- route: spark if it is a passing curiosity that a paragraph would satisfy; skill if it points at a capability worth building up over time; noise if it is not a learning signal at all. Noise is TV or podcast audio, jokes, commands to Siri or Alexa, rhetorical questions, and small talk between other people that says nothing about what the wearer wants to know. A real question with some substance behind it is a spark even when it was asked in passing.
+- Their goals are a tiebreaker, not a filter. Anything that touches a goal (a line in a language they are learning, a moment where that goal was needed) routes to skill. Everything else is judged on its own.
 - topic: a short noun phrase naming the subject.
 - confidence: how sure you are about kind and route together.
 
@@ -39,8 +40,10 @@ type VerdictOut = z.infer<typeof Verdict>;
  * Without this, the same oldest 25 rows were retried every two minutes forever and nothing
  * behind them was ever classified.
  */
-async function classifyResilient(items: Evidence[], log: (msg: string) => void): Promise<VerdictOut[]> {
-  const user = items
+async function classifyResilient(db: RhubarbDb, items: Evidence[], log: (msg: string) => void): Promise<VerdictOut[]> {
+  const goals = db.getProfile()?.goals ?? [];
+  const header = `Goals they named: ${goals.join("; ") || "(none)"}\n\n`;
+  const user = header + items
     .map((e) => `### item ${e.id} (heuristic kind: ${e.kind}, spoken ${e.spokenAt})\nline: "${e.text}"\ncontext:\n${e.context ?? "(none)"}`)
     .join("\n\n");
   try {
@@ -52,7 +55,7 @@ async function classifyResilient(items: Evidence[], log: (msg: string) => void):
     }
     const mid = Math.ceil(items.length / 2);
     log(`classify: batch of ${items.length} failed (${(e as Error).message}); splitting`);
-    return [...(await classifyResilient(items.slice(0, mid), log)), ...(await classifyResilient(items.slice(mid), log))];
+    return [...(await classifyResilient(db, items.slice(0, mid), log)), ...(await classifyResilient(db, items.slice(mid), log))];
   }
 }
 
@@ -62,7 +65,7 @@ export async function runClassifyBatch(deps: ClassifyDeps, limit = 25): Promise<
   const pending = db.evidenceByStage("detected", limit);
   if (pending.length === 0) return 0;
 
-  const verdicts = await classifyResilient(pending, log);
+  const verdicts = await classifyResilient(db, pending, log);
   const byId = new Map(pending.map((e) => [e.id, e]));
   let handled = 0;
 

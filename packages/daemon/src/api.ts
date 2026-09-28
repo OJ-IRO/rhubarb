@@ -18,6 +18,8 @@ export interface ApiDeps {
     reflectNow: () => Promise<void>;
     acceptSkill: (id: number) => Promise<void>;
     dismissSkill: (id: number) => Promise<void>;
+    /** "Teach me the whole thing": a spark becomes a one-lesson topic. Returns the new skill id. */
+    lessonFromSpark?: (card: Card) => Promise<number>;
     restoreSkill?: (id: number) => Promise<void>;
     /** How close was a guess to the answer on the card? Optional so tests need not fake a model. */
     judgeGuess?: (card: Card, guess: string) => Promise<{ close: boolean; note: string }>;
@@ -147,6 +149,8 @@ h1{font-size:26px;font-weight:500;margin:0 0 6px}p{margin:0 0 18px;color:#6f6656
 button{margin-top:14px;width:100%;font:inherit;padding:10px;border-radius:10px;border:1px solid #c98a0e;background:linear-gradient(180deg,#f6c34f,#e9a825 55%,#dd9c1c);color:#2a1e04;cursor:pointer}
 .bad{color:#b2452f}</style></head><body><form method="post" action="/login"><h1>Rhubarb</h1><p>${wrong ? '<span class="bad">That wasn\'t it. Try again.</span>' : "This is your private Rhubarb. Enter the access token to open it."}</p>
 <input type="password" name="token" autocomplete="current-password" autofocus aria-label="Access token"><button type="submit">Open</button></form></body></html>`;
+
+const sparkLessonsStarting = new Set<number>();
 
 export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): Server {
   const { db, log, actions } = deps;
@@ -342,7 +346,29 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
         }
 
         // ---- sparks / practice
-        if (head === "sparks" && method === "GET" && !idStr) return json(res, 200, db.cardsWithItems(100));
+        if (head === "sparks" && method === "GET" && !idStr) {
+          const rows = db.cardsWithItems(100).map((r) => {
+            const sid = Number(db.getKv(`spark_lesson:${r.card.id}`) ?? 0);
+            return { ...r, lessonSkillId: sid > 0 ? sid : null };
+          });
+          return json(res, 200, rows);
+        }
+        if (head === "sparks" && idStr && tail === "lesson" && method === "POST") {
+          const card = db.getCard(id);
+          if (!card) return json(res, 404, { error: "not found" });
+          if (!actions.lessonFromSpark) return json(res, 501, { error: "not available" });
+          const existing = Number(db.getKv(`spark_lesson:${card.id}`) ?? 0);
+          if (existing > 0) return json(res, 200, { skillId: existing });
+          // Two quick taps must not write two lessons.
+          if (sparkLessonsStarting.has(card.id)) return json(res, 409, { error: "already starting" });
+          sparkLessonsStarting.add(card.id);
+          try {
+            const skillId = await actions.lessonFromSpark(card);
+            return json(res, 200, { skillId });
+          } finally {
+            sparkLessonsStarting.delete(card.id);
+          }
+        }
         // Guess first, then see the answer. An empty guess means "just show me", and is recorded as a skip.
         if (head === "sparks" && idStr && tail === "guess" && method === "POST") {
           const card = db.getCard(id);

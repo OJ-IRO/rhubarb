@@ -2,6 +2,9 @@ import { classify, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evid
 import { z } from "zod";
 
 const SkillOut = z.object({
+  kind: z
+    .enum(["skill", "topic"])
+    .describe("skill: a capability built over weeks (a language, negotiating). topic: one lesson's worth, something they kept circling and would enjoy understanding properly (the history of a place, how a machine works)"),
   existingId: z.number().nullable().describe("id of an existing skill this evidence belongs to, or null for a new skill"),
   name: z.string().describe("short, specific skill name, e.g. 'Kubernetes rolling deployments' not 'DevOps'"),
   domain: z.string().nullable(),
@@ -21,11 +24,13 @@ const Reflection = z.object({
 const ROLE = `You are Rhubarb's reflection pass. You read moments a wearable microphone caught during one person's days: questions they asked, things they hedged or got wrong, things they said they wanted to learn, jargon they were around, and upcoming events on their calendar. Your job is to decide what skills their life is actually asking them to build, and to rank them.
 
 Rules:
-- Cluster evidence into skills. A skill is a capability someone builds over weeks, not a fact. Merge into an existing skill when the evidence clearly belongs to it (use existingId).
+- Cluster evidence into proposals. Each one is a skill (a capability someone builds over weeks) or a topic (one lesson on something their day kept circling, worth understanding properly). A single fact is neither: leave it for the sparks lane and put it in drop. Merge into an existing proposal when the evidence clearly belongs to it (use existingId).
+- These are proposals the person will say yes or no to. Propose from what their conversations reveal, whether or not it matches a goal they already named. A named goal raises priority; it never decides what may be proposed.
 - Priority (0-100) weighs: stated intent (they said they want this) highest; then urgency from upcoming calendar stakes; then how often and how recently it came up; then how deep the gap looks; then fit with their declared goals. Passing curiosity with no follow-up ranks low.
 - Respect off-limits topics from the profile absolutely: never create a skill in one, and put that evidence in drop.
 - The brief is written to the reader in the house voice. Cite the actual moments: what they said, roughly when, who was there if known. Say why now. End with what it would take.
-- Prefer three to six skills total. Fewer, sharper skills beat a long list.`;
+- Prefer three to six proposals on the board at once. Fewer, sharper ones beat a long list.
+- The brief never uses the person's name.`;
 
 export interface ReflectDeps {
   db: RhubarbDb;
@@ -45,7 +50,7 @@ function renderEvidence(list: Evidence[]): string {
 
 function renderSkills(list: Skill[]): string {
   if (list.length === 0) return "(none yet)";
-  return list.map((s) => `- id ${s.id} | ${s.name} | status ${s.status} | level ${s.level} | priority ${s.priority}`).join("\n");
+  return list.map((s) => `- id ${s.id} | ${s.kind} | ${s.name} | status ${s.status} | level ${s.level} | priority ${s.priority}`).join("\n");
 }
 
 function renderProfile(p: Profile | null): string {
@@ -64,13 +69,13 @@ async function fixBrief(brief: string, reasons: string[]): Promise<string> {
   return fixed.trim();
 }
 
-/** Cluster unassigned evidence into skills, rank, and write briefs. Returns ids of skills created or updated. */
-export async function runReflection(deps: ReflectDeps): Promise<number[]> {
+/** Cluster unassigned evidence into proposals, rank, and write briefs. Returns ids of proposals created or updated, and which were new. */
+export async function runReflection(deps: ReflectDeps): Promise<{ touched: number[]; created: number[] }> {
   const { db, log } = deps;
   const evidence = db.unassignedSkillEvidence();
   if (evidence.length === 0) {
     log("reflect: nothing new to reflect on");
-    return [];
+    return { touched: [], created: [] };
   }
   const existing = db.skillsByStatus(["proposed", "active"]);
   const profile = db.getProfile();
@@ -87,6 +92,7 @@ export async function runReflection(deps: ReflectDeps): Promise<number[]> {
   });
 
   const touched: number[] = [];
+  const created: number[] = [];
   for (const s of out.skills) {
     let brief = s.brief;
     const lint = lintProse(brief);
@@ -101,8 +107,9 @@ export async function runReflection(deps: ReflectDeps): Promise<number[]> {
       db.updateSkill(id, { priority: s.priority, brief, terms: s.terms, competentLooksLike: s.competentLooksLike });
       log(`reflect: updated skill #${id} ${s.name} (priority ${s.priority})`);
     } else {
-      id = db.insertSkill({ name: s.name, domain: s.domain, competentLooksLike: s.competentLooksLike, terms: s.terms, priority: s.priority, brief });
-      log(`reflect: new skill #${id} ${s.name} (priority ${s.priority})`);
+      id = db.insertSkill({ name: s.name, domain: s.domain, competentLooksLike: s.competentLooksLike, terms: s.terms, priority: s.priority, brief, kind: s.kind, origin: "noticed" });
+      created.push(id);
+      log(`reflect: new ${s.kind} #${id} ${s.name} (priority ${s.priority})`);
     }
     const validIds = s.evidenceIds.filter((eid) => evidence.some((e) => e.id === eid));
     if (validIds.length > 0) db.assignEvidenceToSkill(validIds, id);
@@ -112,5 +119,5 @@ export async function runReflection(deps: ReflectDeps): Promise<number[]> {
   // Evidence the model dropped is parked on a sentinel so it isn't re-fed every night.
   if (out.drop.length > 0) db.assignEvidenceToSkill(out.drop.filter((eid) => evidence.some((e) => e.id === eid)), -1);
 
-  return touched;
+  return { touched, created };
 }

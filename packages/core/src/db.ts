@@ -25,6 +25,8 @@ import type {
   LearningProgress,
   PrivacySummary,
   ProgressPoint,
+  SkillKind,
+  SkillOrigin,
   SkillStatus,
 } from "./types.js";
 
@@ -204,6 +206,11 @@ export class RhubarbDb {
     const ucols = (this.db.prepare("PRAGMA table_info(utterances)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!ucols.includes("echo")) this.db.exec("ALTER TABLE utterances ADD COLUMN echo INTEGER NOT NULL DEFAULT 0");
     if (!ucols.includes("private")) this.db.exec("ALTER TABLE utterances ADD COLUMN private INTEGER NOT NULL DEFAULT 0");
+    const scols = (this.db.prepare("PRAGMA table_info(skills)").all() as Array<{ name: string }>).map((c) => c.name);
+    if (!scols.includes("kind")) this.db.exec("ALTER TABLE skills ADD COLUMN kind TEXT NOT NULL DEFAULT 'skill'");
+    if (!scols.includes("origin")) this.db.exec("ALTER TABLE skills ADD COLUMN origin TEXT NOT NULL DEFAULT 'noticed'");
+    this.db.exec("CREATE INDEX IF NOT EXISTS idx_utterances_spoken ON utterances(spoken_at)");
+    this.db.exec("CREATE INDEX IF NOT EXISTS idx_evidence_utterance ON evidence(utterance_id)");
   }
 
   close(): void {
@@ -481,15 +488,65 @@ export class RhubarbDb {
   }
 
   // ------------------------------------------------------------------ skills
-  insertSkill(s: { name: string; domain: string | null; competentLooksLike: string; terms: string[]; priority: number; brief: string }): number {
+  insertSkill(s: {
+    name: string;
+    domain: string | null;
+    competentLooksLike: string;
+    terms: string[];
+    priority: number;
+    brief: string;
+    kind?: SkillKind;
+    origin?: SkillOrigin;
+  }): number {
     const now = Date.now();
     const res = this.db
       .prepare(
-        `INSERT INTO skills (name, domain, competent_looks_like, terms, priority, brief, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO skills (name, domain, competent_looks_like, terms, priority, brief, kind, origin, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(s.name, s.domain, s.competentLooksLike, JSON.stringify(s.terms), s.priority, s.brief, now, now);
+      .run(s.name, s.domain, s.competentLooksLike, JSON.stringify(s.terms), s.priority, s.brief, s.kind ?? "skill", s.origin ?? "noticed", now, now);
     return Number(res.lastInsertRowid);
+  }
+
+  evidenceById(id: number): Evidence | null {
+    const r = this.db.prepare("SELECT * FROM evidence WHERE id = ?").get(id) as Row | undefined;
+    return r ? rowToEvidence(r) : null;
+  }
+
+  /** The moment an utterance became, if it became one. */
+  evidenceByUtterance(utteranceId: number): Evidence | null {
+    const r = this.db.prepare("SELECT * FROM evidence WHERE utterance_id = ? ORDER BY id LIMIT 1").get(utteranceId) as Row | undefined;
+    return r ? rowToEvidence(r) : null;
+  }
+
+  /** Has this utterance already become a moment? */
+  hasEvidenceForUtterance(utteranceId: number): boolean {
+    return Boolean(this.db.prepare("SELECT 1 FROM evidence WHERE utterance_id = ?").get(utteranceId));
+  }
+
+  /**
+   * Stored speech within a time window, for matching Bee's cleaned-up transcript against what the
+   * live stream already gave us. The two carry different utterance ids for the same words.
+   */
+  utterancesBetween(fromIso: string, toIso: string): Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }> {
+    return this.db
+      .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE spoken_at >= ? AND spoken_at <= ? ORDER BY spoken_at")
+      .all(fromIso, toIso) as Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }>;
+  }
+
+  /** Utterances heard since a time, in the order they were spoken, private and echoed lines left out. */
+  utterancesSince(sinceMs: number): Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }> {
+    return this.db
+      .prepare("SELECT id, conversation_uuid, text, spoken_at, speaker FROM utterances WHERE received_at >= ? AND echo = 0 AND private = 0 ORDER BY conversation_uuid, spoken_at, id")
+      .all(sinceMs) as Array<{ id: number; conversation_uuid: string; text: string; spoken_at: string; speaker: string | null }>;
+  }
+
+  /** The line spoken just before this one in the same conversation. */
+  previousUtterance(conversationUuid: string, beforeId: number): { id: number; text: string; spoken_at: string } | null {
+    const r = this.db
+      .prepare("SELECT id, text, spoken_at FROM utterances WHERE conversation_uuid = ? AND id < ? AND private = 0 ORDER BY id DESC LIMIT 1")
+      .get(conversationUuid, beforeId) as { id: number; text: string; spoken_at: string } | undefined;
+    return r ?? null;
   }
 
   updateSkill(id: number, patch: Partial<Pick<Skill, "name" | "domain" | "competentLooksLike" | "priority" | "brief" | "status" | "level">> & { terms?: string[] }): void {
@@ -945,6 +1002,8 @@ function rowToSkill(r: Row): Skill {
     priority: r.priority as number,
     brief: r.brief as string,
     level: r.level as number,
+    kind: ((r.kind as string) ?? "skill") as SkillKind,
+    origin: ((r.origin as string) ?? "noticed") as SkillOrigin,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
   };

@@ -1,18 +1,33 @@
 import { useEffect, useState } from "react";
-import { api, when, type Card, type Item } from "../api";
+import { api, when, type Card, type SparkRow } from "../api";
 import { Loading } from "../components/Hex";
+import { Link } from "../router";
 
-type Row = { card: Card; item: Item };
+type Row = SparkRow;
 
 /**
  * A spark used to hand over the answer the moment you opened the page. Reading an answer feels
  * like learning and mostly isn't. Guessing first, even wrongly, is what makes the answer stay, so
  * the card asks before it tells. "Just show me" is always there: it's your curiosity, not a test.
  */
-function Spark({ row, onChange }: { row: Row; onChange: (c: Card) => void }) {
+function Spark({ row, onChange, onLesson }: { row: Row; onChange: (c: Card) => void; onLesson: (skillId: number) => void }) {
   const { card, item } = row;
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function wholeStory() {
+    setStarting(true);
+    setFailed(false);
+    try {
+      onLesson((await api.sparkLesson(card.id)).skillId);
+    } catch {
+      setFailed(true);
+    } finally {
+      setStarting(false);
+    }
+  }
   const asked = card.guess !== null;
   const cites = JSON.parse(card.citations) as Array<{ title: string; url: string }>;
 
@@ -87,6 +102,23 @@ function Spark({ row, onChange }: { row: Row; onChange: (c: Card) => void }) {
               ))}
             </p>
           )}
+          <div className="spark-actions">
+            {row.lessonSkillId ? (
+              <>
+                <Link to={`/skills/${row.lessonSkillId}`} className="button">
+                  See the full lesson
+                </Link>
+                <span className="muted small">It takes a few minutes to write. Your Bee buzzes when it's ready.</span>
+              </>
+            ) : (
+              <>
+                <button className="ghost" disabled={starting} onClick={() => void wholeStory()}>
+                  {starting ? "Starting…" : "Teach me the whole story"}
+                </button>
+                <span className="muted small">{failed ? "That didn't start. Try again in a moment." : "A paragraph not enough? Rhubarb writes one full lesson on it."}</span>
+              </>
+            )}
+          </div>
         </div>
       )}
     </article>
@@ -112,7 +144,12 @@ export function Sparks() {
         </div>
       )}
       {rows.map((row) => (
-        <Spark key={row.card.id} row={row} onChange={(card) => setRows((all) => (all ?? []).map((r) => (r.card.id === card.id ? { ...r, card } : r)))} />
+        <Spark
+          key={row.card.id}
+          row={row}
+          onChange={(card) => setRows((all) => (all ?? []).map((r) => (r.card.id === card.id ? { ...r, card } : r)))}
+          onLesson={(skillId) => setRows((all) => (all ?? []).map((r) => (r.card.id === row.card.id ? { ...r, lessonSkillId: skillId } : r)))}
+        />
       ))}
     </div>
   );

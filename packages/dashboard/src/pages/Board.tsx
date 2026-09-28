@@ -10,11 +10,21 @@ function firstSentence(s: string): string {
   return m ? m[0].trim() : s;
 }
 
+/** Where a proposal came from, and what shape it is. Shown next to the status. */
+function Origin({ s }: { s: SkillRow }) {
+  return (
+    <>
+      {s.origin === "asked" && <span className="chip-kind asked">You asked</span>}
+      {s.kind === "topic" && <span className="chip-kind">One lesson</span>}
+    </>
+  );
+}
+
 function Action({ s, busy, onAccept }: { s: SkillRow; busy: boolean; onAccept: () => void }) {
   if (s.status === "proposed")
     return (
       <button className="primary" disabled={busy} onClick={onAccept}>
-        {busy ? "Starting…" : "Yes, teach me this"}
+        {busy ? "Starting…" : s.kind === "topic" ? "Yes, write it" : "Yes, teach me this"}
       </button>
     );
   if (s.status === "active" && s.lessonReady && s.lessonId)
@@ -74,12 +84,12 @@ export function Board() {
   return (
     <div className="board">
       <h1 className="title">The board</h1>
-      <p className="muted lead">Everything your days have asked you to learn, in the order Rhubarb would take them.</p>
+      <p className="muted lead">What your conversations suggest you might want to learn, in the order Rhubarb would take them. Say yes or no to each. Anything you ask your Bee for out loud starts on its own.</p>
 
       {ranked.length === 0 && (
         <div className="empty">
           <p>
-            <strong>Nothing here yet.</strong> The board fills the first night after Rhubarb has heard you: every skill it thinks your week is asking for, ranked, each with the moments that put it there. You say yes or no to each one.
+            <strong>Nothing here yet.</strong> The board fills a few hours after Rhubarb first hears you: skills and one-off lessons your conversations point at, ranked, each with the moments that put it there. You say yes or no to each one. Or just ask: "Hey Bee, give me a lesson on…"
           </p>
           <Link to="/" className="button">
             See how to get started
@@ -93,7 +103,10 @@ export function Board() {
             <article key={s.id} className={`spot spot-${i + 1}`}>
               <div className="spot-top">
                 <HexBadge n={i + 1} tone={i === 0 ? "honey" : "wax"} size={42} />
-                <StatusChip status={s.status} />
+                <span className="chips">
+                  <Origin s={s} />
+                  <StatusChip status={s.status} />
+                </span>
               </div>
               <h2>
                 <Link to={`/skills/${s.id}`}>{s.name}</Link>
@@ -103,7 +116,8 @@ export function Board() {
               <p className="muted small spot-foot">
                 {s.status !== "proposed" && <HexLevels level={s.level} total={s.ladderLength} mastered={s.status === "mastered"} size={15} />}
                 <span>
-                  {s.evidenceCount} moments{s.status === "active" ? ` · level ${s.level + 1} of ${s.ladderLength || "?"}` : ""}
+                  {s.evidenceCount} {s.evidenceCount === 1 ? "moment" : "moments"}
+                  {s.status === "active" && s.kind !== "topic" ? ` · level ${s.level + 1} of ${s.ladderLength || "?"}` : ""}
                 </span>
               </p>
               <div className="actions">
@@ -135,6 +149,7 @@ export function Board() {
                     <h3>
                       <Link to={`/skills/${s.id}`}>{s.name}</Link>
                     </h3>
+                    <Origin s={s} />
                     <StatusChip status={s.status} />
                     <span className="muted small">{s.evidenceCount} moments</span>
                   </div>

@@ -112,3 +112,12 @@ Format per hackathon guidance: task, steps, expected vs. actual, severity, worka
 - **Severity:** papercut (an nvm quirk, not Bee's, but it is the first thing every nvm user will hit)
 - **Workaround:** put nvm's bin directory on PATH for the command.
 - **Suggestion:** a one-line note in the install docs for nvm users, or offer a Homebrew formula.
+
+### 2026-09-28 — The nightly transcript does not share ids with the live one
+- **Task:** Use `/v1/changes` plus `/v1/conversations/:id` to recover lines the live stream missed, and to pick up speaker labels.
+- **Steps:** Captured a full day live, then read the same conversations back through REST.
+- **Expected:** The same utterance ids, so the REST copy can be matched to the live copy and fill in speaker labels.
+- **Actual:** Every REST utterance has a new id (for example live 3520110070 and REST 3520133419 for "Why are you in Osaka?"), timestamps switch from ISO strings to epoch milliseconds, the payload is wrapped in `{ conversation: ... }`, the conversation has no `conversation_uuid` to join on, and every speaker is `"Unknown"`.
+- **Severity:** major (a naive sweep double-counts every long conversation, and speaker attribution is not possible from either feed)
+- **Workaround:** match REST lines to stored live lines by timestamp (they agree to the second) and text similarity; remember the stream's conversation id-to-uuid pair from `new-conversation` events.
+- **Suggestion:** keep ids stable between the realtime and final transcripts, or include the realtime id on each final utterance; include `conversation_uuid` in the REST conversation; document when speaker labels are expected to appear.

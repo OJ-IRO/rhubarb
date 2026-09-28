@@ -1,4 +1,4 @@
-import { sensitiveReason, stage1Detect, textContainment, type BeeStreamEvent, type RhubarbDb } from "@rhubarb/core";
+import { directAsk, goalLanguages, isBareAddress, sensitiveReason, stage1Detect, textContainment, type BeeStreamEvent, type Evidence, type RhubarbDb } from "@rhubarb/core";
 
 // Voice notes echo into ambient capture as near-duplicate utterances ~20s later
 // (docs/spike-results.md), so utterances are checked against recent journal texts.
@@ -10,6 +10,52 @@ export interface CaptureDeps {
   log: (msg: string) => void;
   /** Called when a voice note finishes transcribing (teach-back answers, missions). */
   onJournalReady: (journalId: string, text: string) => void;
+  /** Called when the wearer asked Bee for something out loud ("hey Bee, teach me ..."). */
+  onAsk?: (e: Evidence, ask: string) => void;
+}
+
+// "Hey Bee." then a pause then the ask: the two lines arrive as separate utterances.
+const BARE_ADDRESS_WINDOW_MS = 20_000;
+
+function spokenMs(iso: string): number {
+  const n = Date.parse(iso);
+  return Number.isNaN(n) ? 0 : n;
+}
+
+/** The ask in this line, or in this line following a bare "Hey Bee." a moment before. */
+export function askIn(db: RhubarbDb, conversationUuid: string, u: { id: number; text: string; spoken_at: string }): string | null {
+  const own = directAsk(u.text);
+  if (own) return own;
+  const prev = db.previousUtterance(conversationUuid, u.id);
+  if (prev && isBareAddress(prev.text) && Math.abs(spokenMs(u.spoken_at) - spokenMs(prev.spoken_at)) <= BARE_ADDRESS_WINDOW_MS) {
+    const words = u.text.trim().replace(/[.?!]+$/, "");
+    return words.split(/\s+/).length >= 2 ? words : null;
+  }
+  return null;
+}
+
+/** Record a direct ask as a moment and hand it on. Returns the evidence id, or null if it was already one. */
+export function recordAsk(deps: CaptureDeps, conversationUuid: string, u: { id: number; text: string; spoken_at: string; speaker?: string | null }, ask: string, source: "stream" | "sweep"): number | null {
+  const { db, log } = deps;
+  if (db.hasEvidenceForUtterance(u.id)) return null;
+  const context = renderContext(db.conversationWindow(conversationUuid, u.id));
+  const id = db.insertEvidence({
+    kind: "intent",
+    text: u.text,
+    context,
+    spokenAt: u.spoken_at,
+    utteranceId: u.id,
+    conversationUuid,
+    speakerLabel: u.speaker ?? null,
+    source,
+  });
+  // Asks skip the classifier: the wearer already said what they want. The ask handler decides
+  // whether it is a lesson, a quick answer, or something meant for Bee's own assistant.
+  db.classifyEvidence(id, { kind: "intent", route: "skill", topic: ask.slice(0, 120), confidence: 1 });
+  log(`asked #${id}: "${ask}"`);
+  const e = db.evidenceById(id);
+  if (e) deps.onAsk?.(e, ask);
+  return id;
 }
 
 function isJournalEcho(db: RhubarbDb, text: string): boolean {
@@ -24,7 +70,7 @@ export function renderContext(window: Array<{ text: string; speaker: string | nu
 export function handleUtterance(
   deps: CaptureDeps,
   conversationUuid: string,
-  u: { id: number; text: string; spoken_at: string; speaker?: string },
+  u: { id: number; text: string; spoken_at: string; speaker?: string | null },
   source: "stream" | "sweep" = "stream"
 ): void {
   const { db, log } = deps;
@@ -56,8 +102,14 @@ export function handleUtterance(
     return;
   }
 
-  const det = stage1Detect(u.text);
   db.markUtterancesProcessed([u.id]);
+  const ask = askIn(db, conversationUuid, u);
+  if (ask) {
+    recordAsk(deps, conversationUuid, u, ask, source);
+    return;
+  }
+
+  const det = stage1Detect(u.text, { languages: goalLanguages(db.getProfile()?.goals ?? []) });
   if (!det.matched) return;
 
   const context = renderContext(db.conversationWindow(conversationUuid, u.id));
