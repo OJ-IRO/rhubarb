@@ -1317,6 +1317,21 @@ textarea {
   text-wrap: balance;
   will-change: transform;
 }
+.comb3d-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+}
+/* A serif letter is about half an em wide on average. Cap the size so the longest word fits the label. */
+.comb3d-label {
+  font-size: max(7.5px, min(clamp(9px, calc(var(--cell) * 0.098), 13.5px), calc(var(--cell) * 0.6 / (var(--longest, 8) * 0.5))));
+}
+.comb3d-label.long {
+  width: calc(var(--cell) * 0.56);
+  font-size: max(7.5px, min(clamp(8.5px, calc(var(--cell) * 0.084), 12px), calc(var(--cell) * 0.56 / (var(--longest, 8) * 0.5))));
+}
 .comb3d-label.waiting {
   color: var(--muted);
 }
@@ -2569,4 +2584,54 @@ a.glance-tile:hover {
 }
 .listening.alert .listening-dot {
   margin-top: 4px;
+}
+
+/* ---------- honeycomb on a phone: numbers in the cells, names in a key below ---------- */
+.comb3d-num {
+  display: none;
+}
+.comb3d.compact .comb3d-name {
+  display: none;
+}
+.comb3d.compact .comb3d-num {
+  display: inline;
+  font-size: max(11px, calc(var(--cell) * 0.26));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.comb3d.compact .comb3d-label {
+  width: auto;
+}
+.comb3d-legend {
+  display: none;
+  list-style: none;
+  margin: 4px 0 14px;
+  padding: 0;
+  gap: 6px;
+}
+.comb3d.compact + .comb3d-legend {
+  display: grid;
+}
+.comb3d-legend a {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--ink);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.comb3d-legend .waiting a {
+  color: var(--muted);
+}
+.comb3d-legend-num {
+  flex-shrink: 0;
+  min-width: 1.6em;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--comb-light);
+  border: 1px solid var(--comb);
 }

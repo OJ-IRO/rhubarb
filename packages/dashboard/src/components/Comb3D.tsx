@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { href } from "../router";
@@ -31,6 +31,16 @@ const OUTER = 0.965;
 const INNER = 0.83;
 const LIFT = 0.14;
 const MARGIN = 0.9; // how much of the frame the comb may fill, in NDC
+const COMPACT_BELOW_PX = 80; // narrower cells than this show a number, with the names listed below
+
+function longestWord(name: string): number {
+  return Math.max(1, ...name.split(/\s+/).map((w) => w.length));
+}
+
+/** Too long to sit in a cell at full size: many characters, or one word too wide to wrap. */
+function isLongName(name: string): boolean {
+  return name.length > 26 || longestWord(name) > 11;
+}
 
 function hexShape(r: number): THREE.Shape {
   const s = new THREE.Shape();
@@ -276,7 +286,10 @@ export default function Comb3D({ cells, ghosts = [], hovered, onHover, onOpen, o
       // Width of the centre cell in CSS pixels, so label size follows the comb on any screen.
       edgeA.set(-Math.sqrt(3) / 2, WALL, 0).project(camera);
       edgeB.set(Math.sqrt(3) / 2, WALL, 0).project(camera);
-      host.style.setProperty("--cell", `${(((edgeB.x - edgeA.x) / 2) * w).toFixed(1)}px`);
+      const cellPx = ((edgeB.x - edgeA.x) / 2) * w;
+      host.style.setProperty("--cell", `${cellPx.toFixed(1)}px`);
+      // On a phone no name fits in a cell. Number the cells instead and list the names below.
+      host.classList.toggle("compact", cellPx < COMPACT_BELOW_PX);
       for (const l of live) {
         const el = labels.current.get(l.cell.id);
         if (!el) continue;
@@ -363,26 +376,55 @@ export default function Comb3D({ cells, ghosts = [], hovered, onHover, onOpen, o
   }, [cells, ghosts]);
 
   return (
-    <div className="comb3d" ref={wrap}>
-      {cells.map((c) => (
-        <a
-          key={c.id}
-          href={href(`/skills/${c.id}`)}
-          className={c.waiting ? "comb3d-label waiting" : "comb3d-label"}
-          ref={(el) => {
-            if (el) labels.current.set(c.id, el);
-            else labels.current.delete(c.id);
-          }}
-          onClick={(e) => {
-            e.preventDefault();
-            onOpen(c.id);
-          }}
-          onFocus={() => onHover(c.id)}
-          onBlur={() => onHover(null)}
-        >
-          {c.name}
-        </a>
-      ))}
-    </div>
+    <>
+      <div className="comb3d" ref={wrap}>
+        {cells.map((c, i) => (
+          <a
+            key={c.id}
+            href={href(`/skills/${c.id}`)}
+            // A long name gets a smaller, narrower label and at most three lines, so it stays inside
+            // the hexagon, which narrows toward its corners. The full name is on hover.
+            className={`comb3d-label${c.waiting ? " waiting" : ""}${isLongName(c.name) ? " long" : ""}`}
+            title={c.name}
+            aria-label={c.name}
+            // The font shrinks until the longest word fits the label, so no word is split in two.
+            style={{ "--longest": longestWord(c.name) } as CSSProperties}
+            ref={(el) => {
+              if (el) labels.current.set(c.id, el);
+              else labels.current.delete(c.id);
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              onOpen(c.id);
+            }}
+            onFocus={() => onHover(c.id)}
+            onBlur={() => onHover(null)}
+          >
+            <span className="comb3d-name">{c.name}</span>
+            <span className="comb3d-num" aria-hidden="true">
+              {i + 1}
+            </span>
+          </a>
+        ))}
+      </div>
+      <ol className="comb3d-legend">
+        {cells.map((c, i) => (
+          <li key={c.id} className={c.waiting ? "waiting" : ""}>
+            <a
+              href={href(`/skills/${c.id}`)}
+              onClick={(e) => {
+                e.preventDefault();
+                onOpen(c.id);
+              }}
+              onMouseEnter={() => onHover(c.id)}
+              onMouseLeave={() => onHover(null)}
+            >
+              <span className="comb3d-legend-num">{i + 1}</span>
+              <span>{c.name}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </>
   );
 }
