@@ -39,6 +39,7 @@ export interface SkillDetail {
   lessons: Lesson[];
   practice: Practice[];
   fieldEvidence: FieldEvidence[];
+  rewrite?: RewriteStatus | null;
 }
 
 export interface LessonView {
@@ -54,11 +55,26 @@ export interface Listening {
   since: number;
 }
 
+/** Whether Claude answered last time Rhubarb asked. `problem` is plain words, null when fine. */
+export interface ClaudeHealth {
+  problem: string | null;
+  since: number | null;
+  lastOkAt: number | null;
+}
+
+export interface RewriteStatus {
+  state: "writing" | "done" | "failed";
+  at: number;
+  lessonId?: number;
+  reason?: string;
+}
+
 export interface Status {
   skills: number;
   evidence: number;
   openPractice: number;
   listening: Listening | null;
+  claude?: ClaudeHealth;
   /** set when Rhubarb runs on a private server rather than this computer */
   hosted: { where: string } | null;
 }
@@ -168,7 +184,11 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     if (e) Object.assign(e, { ...(patch.text ? { text: patch.text } : {}), ...(patch.context !== undefined ? { context: patch.context } : {}), editedAt: Date.now() });
     return as(e ?? null);
   }
-  if (/^\/skills\/\d+\/rewrite$/.test(path)) return as({ ok: true });
+  if (/^\/skills\/\d+\/rewrite$/.test(path)) {
+    (f.skillDetail as { rewrite?: unknown }).rewrite = { state: "writing", at: Date.now() };
+    setTimeout(() => ((f.skillDetail as { rewrite?: unknown }).rewrite = { state: "done", at: Date.now(), lessonId: 1 }), 8000);
+    return as({ ok: true });
+  }
   if ((m = path.match(/^\/sparks\/(\d+)\/lesson$/))) {
     const row = st.cards.find((c) => c.card.id === Number(m![1]));
     await new Promise((r) => setTimeout(r, 600));
@@ -189,7 +209,8 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     }
     return as(row?.card ?? null);
   }
-  if (/^\/skills\/\d+$/.test(path)) return as(f.skillDetail);
+  // A copy, as a real server would send: handing back the same object hides changes from React.
+  if (/^\/skills\/\d+$/.test(path)) return as(structuredClone(f.skillDetail));
   if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
   if (/^\/lessons\/\d+\/session$/.test(path)) return as({ id: 1, lessonId: 1, startedAt: Date.now(), completedAt: null, responses: "{}", tutor: "[]" });
   if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the gate right. The part you'd add for level two is what happens when it never opens: the rollout stalls, it doesn't break.", score: 4 });

@@ -1,4 +1,4 @@
-import { classify, llm, MODELS, type Effort } from "@rhubarb/core";
+import { classify, llm, MODELS, tracked, type Effort } from "@rhubarb/core";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { z } from "zod";
 import { z as zod } from "zod";
@@ -93,15 +93,17 @@ export async function researchThenEmit<T>(opts: ResearchOptions<T>): Promise<T> 
   const maxSearches = opts.maxSearches ?? 3;
 
   for (let turn = 0; turn < maxSearches + 3; turn++) {
-    const res = await llm().messages.create({
-      model: MODELS.writer,
-      max_tokens: opts.maxTokens ?? 8000,
-      system: opts.system,
-      thinking: { type: "adaptive" },
-      output_config: { effort: opts.effort ?? "medium" },
-      tools: searches < maxSearches ? [SEARCH_TOOL, emitTool] : [emitTool],
-      messages,
-    });
+    const res = await tracked(
+      llm().messages.create({
+        model: MODELS.writer,
+        max_tokens: opts.maxTokens ?? 8000,
+        system: opts.system,
+        thinking: { type: "adaptive" },
+        output_config: { effort: opts.effort ?? "medium" },
+        tools: searches < maxSearches ? [SEARCH_TOOL, emitTool] : [emitTool],
+        messages,
+      })
+    );
     if (res.stop_reason === "refusal") throw new Error("model refused research");
     const calls = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
     const emit = calls.find((c) => c.name === opts.emitName);

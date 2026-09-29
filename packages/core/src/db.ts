@@ -515,6 +515,23 @@ export class RhubarbDb {
     return r ? rowToEvidence(r) : null;
   }
 
+  /**
+   * Moments filed as noise only because Claude could not be reached (the classifier's fallback
+   * leaves confidence 0 and no topic). Put back in the queue to be judged properly.
+   */
+  requeueUnjudged(): number {
+    return this.db
+      .prepare("UPDATE evidence SET stage = 'detected', route = NULL, topic = NULL, confidence = NULL WHERE stage = 'classified' AND route = 'noise' AND confidence = 0 AND topic IS NULL AND skill_id IS NULL")
+      .run().changes;
+  }
+
+  /** Spoken asks that never became a lesson (Claude was unreachable when they arrived). */
+  pendingAsks(sinceMs: number): Evidence[] {
+    return (this.db
+      .prepare("SELECT * FROM evidence WHERE kind = 'intent' AND route = 'skill' AND confidence = 1 AND skill_id IS NULL AND created_at >= ? ORDER BY id")
+      .all(sinceMs) as Row[]).map(rowToEvidence);
+  }
+
   /** The moment an utterance became, if it became one. */
   evidenceByUtterance(utteranceId: number): Evidence | null {
     const r = this.db.prepare("SELECT * FROM evidence WHERE utterance_id = ? ORDER BY id LIMIT 1").get(utteranceId) as Row | undefined;

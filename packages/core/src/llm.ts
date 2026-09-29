@@ -38,6 +38,56 @@ export function llmRoute(): string {
   return DIRECT ? `Anthropic API (${MODELS.writer}, ${MODELS.worker})` : `Amazon Bedrock ${process.env.AWS_REGION ?? "us-east-1"} (${MODELS.writer}, ${MODELS.worker})`;
 }
 
+/**
+ * A failure about reaching Claude at all, not about this request: out of credit, the key refused,
+ * rate limited, Anthropic having trouble, or the network. Work that fails this way is held and
+ * retried later. It must never be judged, for example filed as noise. Null for anything else.
+ */
+export function unavailableReason(e: unknown): string | null {
+  const status = (e as { status?: number } | null)?.status;
+  const msg = String((e as Error | null)?.message ?? e ?? "");
+  if (/credit balance is too low/i.test(msg)) return "the Anthropic account is out of credit";
+  if (/not available for this account|quota|too many tokens per day/i.test(msg)) return "the account isn't allowed to use this model yet";
+  if (status === 401 || status === 403) return "the API key was refused";
+  if (status === 429 || /rate limit|too many requests/i.test(msg)) return "Claude is rate limiting us";
+  if ((status && status >= 500) || /overloaded/i.test(msg)) return "Claude is having trouble on Anthropic's side";
+  if (e instanceof Anthropic.APIConnectionError || /ECONNRESET|ETIMEDOUT|ENOTFOUND|fetch failed|socket hang up/i.test(msg)) return "Claude can't be reached";
+  return null;
+}
+
+export interface LlmHealth {
+  /** Plain words for the dashboard, or null when the last call got through. */
+  problem: string | null;
+  /** When the current problem started. */
+  since: number | null;
+  lastOkAt: number | null;
+}
+
+const health: LlmHealth = { problem: null, since: null, lastOkAt: null };
+
+/** Whether Claude answered last time Rhubarb asked, for the dashboard. */
+export function llmHealth(): LlmHealth {
+  return { ...health };
+}
+
+/** Wrap any call to Claude so the dashboard can say plainly when Claude can't be reached. */
+export async function tracked<T>(call: Promise<T>): Promise<T> {
+  try {
+    const out = await call;
+    health.problem = null;
+    health.since = null;
+    health.lastOkAt = Date.now();
+    return out;
+  } catch (e) {
+    const reason = unavailableReason(e);
+    if (reason) {
+      if (health.problem !== reason) health.since = Date.now();
+      health.problem = reason;
+    }
+    throw e;
+  }
+}
+
 /** System prompt as cacheable blocks: stable guide first (cached), then the volatile part. */
 export function systemBlocks(stable: string, volatile?: string): Anthropic.TextBlockParam[] {
   const blocks: Anthropic.TextBlockParam[] = [{ type: "text", text: stable, cache_control: { type: "ephemeral" } }];
@@ -66,7 +116,7 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: opts.user }];
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await llm().messages.create({
+    const res = await tracked(llm().messages.create({
       model: opts.model ?? MODELS.worker,
       max_tokens: opts.maxTokens ?? 4096,
       system: opts.system,
@@ -80,7 +130,7 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
       ],
       tool_choice: { type: "tool", name: "emit" },
       messages,
-    });
+    }));
     if (res.stop_reason === "refusal") throw new Error(`model refused: ${res.stop_details?.explanation ?? "no explanation"}`);
     const call = res.content.find((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
     if (!call) throw new Error("model did not call the emit tool");
@@ -126,7 +176,7 @@ export async function write(opts: WriteOptions): Promise<string> {
     messages: opts.messages,
   });
   if (opts.onText) stream.on("text", opts.onText);
-  const msg = await stream.finalMessage();
+  const msg = await tracked(stream.finalMessage());
   if (msg.stop_reason === "refusal") throw new Error(`model refused: ${msg.stop_details?.explanation ?? "no explanation"}`);
   return msg.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

@@ -14,6 +14,7 @@ import {
   type Slide,
   type RhubarbDb,
   applyTextEdits,
+  unavailableReason,
   checkLesson,
   withoutInventedQuotes,
   judge,
@@ -445,6 +446,7 @@ export async function rewriteLesson(deps: LessonDeps, skillId: number): Promise<
   const { db, log } = deps;
   const skill = db.getSkill(skillId);
   if (!skill || writing.has(skillId)) return;
+  setRewriteStatus(db, skillId, { state: "writing", at: Date.now() });
   const evidence = db.evidenceForSkill(skillId);
   if (evidence.some((e) => e.editedAt)) {
     const fixed = await classify({
@@ -465,10 +467,31 @@ export async function rewriteLesson(deps: LessonDeps, skillId: number): Promise<
     await ensureLadder(deps, fresh);
     const lessonId = await generateLesson(deps, fresh, fresh.level);
     db.replaceOlderLessons(skillId, fresh.level, lessonId);
+    setRewriteStatus(db, skillId, { state: "done", at: Date.now(), lessonId });
     log(`rewrite: ${fresh.name} rewritten from the corrected moments as lesson #${lessonId}`);
+  } catch (e) {
+    setRewriteStatus(db, skillId, { state: "failed", at: Date.now(), reason: unavailableReason(e) ?? "something went wrong while writing it" });
+    throw e;
   } finally {
     writing.delete(skillId);
   }
+}
+
+export interface RewriteStatus {
+  state: "writing" | "done" | "failed";
+  at: number;
+  lessonId?: number;
+  /** plain words for the learner when it failed */
+  reason?: string;
+}
+
+export function setRewriteStatus(db: RhubarbDb, skillId: number, s: RewriteStatus): void {
+  db.setKv(`rewrite:${skillId}`, JSON.stringify(s));
+}
+
+export function rewriteStatus(db: RhubarbDb, skillId: number): RewriteStatus | null {
+  const raw = db.getKv(`rewrite:${skillId}`);
+  return raw ? (JSON.parse(raw) as RewriteStatus) : null;
 }
 
 const writing = new Set<number>();

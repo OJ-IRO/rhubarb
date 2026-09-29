@@ -426,6 +426,35 @@ function rescanForAsks(days = 3): void {
 }
 // Lessons the fact-checker still doubted get their disputed claims corrected, once.
 setTimeout(() => void correctDoubtedLessons(lessonDeps).catch((e: Error) => log(`claim correction failed: ${e.message}`)), 60_000);
+// Before this version, moments that failed to classify because Claude couldn't be reached were
+// filed as noise. Put them back once; they are judged when Claude answers.
+if (!db.getKv("requeue_unjudged_v1")) {
+  const n = db.requeueUnjudged();
+  db.setKv("requeue_unjudged_v1", String(Date.now()));
+  if (n > 0) log(`requeue: ${n} moment${n === 1 ? "" : "s"} filed as noise during an outage put back in the queue`);
+}
+
+// Rewrites finished before their status was recorded: mark them done so the page stops offering one.
+for (const skill of db.skillsByStatus(["active", "mastered"])) {
+  if (db.getKv(`rewrite:${skill.id}`)) continue;
+  const lastEdit = Math.max(0, ...db.evidenceForSkill(skill.id).map((e) => e.editedAt ?? 0));
+  const lesson = db.currentLesson(skill.id, skill.level);
+  if (lastEdit > 0 && lesson && lesson.createdAt > lastEdit) {
+    db.setKv(`rewrite:${skill.id}`, JSON.stringify({ state: "done", at: lesson.createdAt, lessonId: lesson.id }));
+  }
+}
+
+// A spoken ask that arrived while Claude was unreachable is tried again, for up to three days.
+const askRetryTick = guarded("ask-retry", async () => {
+  if (asking || askQueue.length > 0) return;
+  for (const e of db.pendingAsks(Date.now() - 3 * 86_400_000)) askQueue.push({ e, ask: e.topic ?? e.text });
+  if (askQueue.length > 0) {
+    log(`asks: retrying ${askQueue.length} that never became a lesson`);
+    await drainAsks();
+  }
+});
+timers.push(setInterval(() => void askRetryTick(), 10 * 60_000));
+
 setTimeout(() => {
   try {
     rescanForAsks();

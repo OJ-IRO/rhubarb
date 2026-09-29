@@ -2559,3 +2559,14 @@ a.glance-tile:hover {
     transform: none;
   }
 }
+.rewrite-banner.done {
+  border-color: var(--good);
+  background: color-mix(in srgb, var(--good) 8%, transparent);
+}
+.listening.alert {
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+}
+.listening.alert .listening-dot {
+  margin-top: 4px;
+}

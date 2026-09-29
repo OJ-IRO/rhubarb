@@ -93,22 +93,36 @@ function Moment({ e, onSaved }: { e: Evidence; onSaved: (e: Evidence) => void })
 
 export function SkillPage({ id }: { id: number }) {
   const [d, setD] = useState<SkillDetail | null>(null);
-  const [corrected, setCorrected] = useState(false);
-  const [rewriting, setRewriting] = useState<"idle" | "asking" | "started" | "failed">("idle");
+  const [asking, setAsking] = useState(false);
+  const [askFailed, setAskFailed] = useState(false);
+  const writing = d?.rewrite?.state === "writing";
   useEffect(() => {
     api.skill(id).then(setD);
   }, [id]);
+  // While a rewrite is running, check back until it has finished one way or the other.
+  useEffect(() => {
+    if (!writing) return;
+    const t = setInterval(() => void api.skill(id).then(setD), 10_000);
+    return () => clearInterval(t);
+  }, [id, writing]);
   if (!d) return <Loading />;
   const { skill, ladder, evidence, lessons, practice, fieldEvidence } = d;
   const hasLesson = lessons.length > 0;
+  const rw = d.rewrite ?? null;
+  const lastEdit = Math.max(0, ...evidence.map((e) => e.editedAt ?? 0));
+  // Corrections made after the last finished rewrite are the ones not yet in the lesson.
+  const unapplied = lastEdit > 0 && (!rw || rw.state === "failed" || (rw.state === "done" && lastEdit > rw.at));
 
   async function rewrite() {
-    setRewriting("asking");
+    setAsking(true);
+    setAskFailed(false);
     try {
       await api.rewriteLesson(skill.id);
-      setRewriting("started");
+      setD(await api.skill(id));
     } catch {
-      setRewriting("failed");
+      setAskFailed(true);
+    } finally {
+      setAsking(false);
     }
   }
 
@@ -202,26 +216,37 @@ export function SkillPage({ id }: { id: number }) {
           <Moment
             key={e.id}
             e={e}
-            onSaved={(saved) => {
-              setD({ ...d, evidence: evidence.map((x) => (x.id === saved.id ? saved : x)) });
-              setCorrected(true);
-              setRewriting("idle");
-            }}
+            onSaved={(saved) => setD({ ...d, evidence: evidence.map((x) => (x.id === saved.id ? saved : x)) })}
           />
         ))}
-        {(corrected || evidence.some((e) => e.editedAt)) && hasLesson && skill.status !== "proposed" && (
-          <div className="rewrite-banner">
-            {rewriting === "started" ? (
-              <p>Rewriting it from your corrections. It takes a few minutes, and your Bee buzzes when it's ready. The current lesson stays here until then.</p>
-            ) : (
-              <>
-                <p>{corrected ? "Saved. The next lesson uses your words." : "Some of these moments were corrected."} Want the current lesson written again from what you really said?</p>
-                <button className="primary" disabled={rewriting === "asking"} onClick={() => void rewrite()}>
-                  {rewriting === "asking" ? "Starting…" : "Rewrite the lesson"}
-                </button>
-                {rewriting === "failed" && <p className="feedback">That didn't start. Try again in a moment.</p>}
-              </>
+        {hasLesson && skill.status !== "proposed" && writing && (
+          <div className="rewrite-banner" role="status">
+            <p>
+              Rewriting it from your corrections, started {when(new Date(rw!.at).toISOString())}. It takes a few minutes, and your Bee buzzes when it's ready. The current lesson stays here until then.
+            </p>
+          </div>
+        )}
+        {hasLesson && skill.status !== "proposed" && !writing && rw?.state === "done" && !unapplied && (
+          <div className="rewrite-banner done" role="status">
+            <p>Rewritten from your corrections, {when(new Date(rw.at).toISOString())}.</p>
+            {rw.lessonId && (
+              <Link to={`/lessons/${rw.lessonId}`} className="button primary">
+                Open the new lesson
+              </Link>
             )}
+          </div>
+        )}
+        {hasLesson && skill.status !== "proposed" && !writing && unapplied && (
+          <div className="rewrite-banner">
+            {rw?.state === "failed" ? (
+              <p>The last rewrite didn't finish: {rw.reason}. Your corrections are saved, so it can be tried again.</p>
+            ) : (
+              <p>You corrected what was said. Want the current lesson written again from your words?</p>
+            )}
+            <button className="primary" disabled={asking} onClick={() => void rewrite()}>
+              {asking ? "Starting…" : rw?.state === "failed" ? "Try the rewrite again" : "Rewrite the lesson"}
+            </button>
+            {askFailed && <p className="feedback">That didn't start. Try again in a moment.</p>}
           </div>
         )}
       </section>

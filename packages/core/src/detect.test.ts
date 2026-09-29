@@ -84,3 +84,14 @@ test("'hey Rhubarb' works too, however the recogniser spells it", () => {
   assert.equal(isBareAddress("Hey, Rhubarb."), true);
   assert.equal(directAsk("I love rhubarb pie"), null);
 });
+
+test("an unreachable Claude is told apart from a bad answer, so moments are held and not binned", async () => {
+  const { unavailableReason } = await import("./llm.js");
+  const credit = Object.assign(new Error('400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}'), { status: 400 });
+  assert.equal(unavailableReason(credit), "the Anthropic account is out of credit");
+  assert.equal(unavailableReason(Object.assign(new Error("rate_limit_error"), { status: 429 })), "Claude is rate limiting us");
+  assert.equal(unavailableReason(Object.assign(new Error("Overloaded"), { status: 529 })), "Claude is having trouble on Anthropic's side");
+  assert.equal(unavailableReason(Object.assign(new Error("invalid x-api-key"), { status: 401 })), "the API key was refused");
+  assert.equal(unavailableReason(new Error("model refused: sensitive")), null, "a refusal is about this item, not about Claude");
+  assert.equal(unavailableReason(new Error("structured output failed schema validation twice")), null);
+});

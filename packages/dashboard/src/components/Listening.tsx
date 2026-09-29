@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, type Listening } from "../api";
+import { api, type ClaudeHealth, type Listening } from "../api";
 
 const FRESH_MS = 10 * 60_000;
 
@@ -29,6 +29,7 @@ function describe(l: Listening | null, now: number): { tone: "live" | "quiet" | 
  */
 export function ListeningLight() {
   const [l, setL] = useState<Listening | null>(null);
+  const [claude, setClaude] = useState<ClaudeHealth | null>(null);
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
@@ -36,7 +37,11 @@ export function ListeningLight() {
     const load = () =>
       api
         .status()
-        .then((s) => live && setL(s.listening))
+        .then((s) => {
+          if (!live) return;
+          setL(s.listening);
+          setClaude(s.claude ?? null);
+        })
         .catch(() => live && setL({ state: "down", lastHeardAt: null, since: Date.now() }));
     void load();
     const poll = setInterval(load, 15_000);
@@ -50,9 +55,25 @@ export function ListeningLight() {
 
   const d = describe(l, now);
   return (
-    <p className={`listening ${d.tone}`} title={d.detail} data-tour="listening" role="status">
-      <span className="listening-dot" aria-hidden="true" />
-      <span>{d.line}</span>
-    </p>
+    <>
+      <p className={`listening ${d.tone}`} title={d.detail} data-tour="listening" role="status">
+        <span className="listening-dot" aria-hidden="true" />
+        <span>{d.line}</span>
+      </p>
+      {claude?.problem && (
+        // Listening and thinking fail separately. Hearing still works when Claude can't answer,
+        // and the person should know which one is broken.
+        <p
+          className="listening down alert"
+          role="alert"
+          title="Rhubarb still hears and saves everything. Lessons, answers and proposals wait, and catch up once Claude answers again."
+        >
+          <span className="listening-dot" aria-hidden="true" />
+          <span>
+            Can't reach Claude{claude.since ? ` since ${ago(now - claude.since)}` : ""}: {claude.problem}. Nothing is lost.
+          </span>
+        </p>
+      )}
+    </>
   );
 }

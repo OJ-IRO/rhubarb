@@ -388,3 +388,19 @@ test("correcting a misheard moment changes what every later lesson reads, and a 
   assert.equal(db.getLesson(old)!.status, "replaced", "the old lesson is kept, not deleted");
   db.close();
 });
+
+test("moments binned as noise because Claude was unreachable go back in the queue; real verdicts stay", () => {
+  const db = freshDb();
+  const mk = (id: number) => db.insertEvidence({ kind: "question", text: `line ${id}`, context: null, spokenAt: "2026-09-28T05:00:00.000Z", utteranceId: id, conversationUuid: "c", speakerLabel: null, source: "stream" });
+  const lost = mk(1);
+  const judged = mk(2);
+  const asked = mk(3);
+  db.classifyEvidence(lost, { kind: "question", route: "noise", topic: null, confidence: 0 });
+  db.classifyEvidence(judged, { kind: "question", route: "noise", topic: "small talk", confidence: 0.7 });
+  db.classifyEvidence(asked, { kind: "intent", route: "skill", topic: "ferris wheels", confidence: 1 });
+  assert.equal(db.requeueUnjudged(), 1);
+  assert.equal(db.evidenceById(lost)!.stage, "detected");
+  assert.equal(db.evidenceById(judged)!.route, "noise");
+  assert.deepEqual(db.pendingAsks(0).map((e) => e.id), [asked], "an ask with no lesson yet is waiting to be retried");
+  db.close();
+});

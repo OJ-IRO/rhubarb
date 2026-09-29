@@ -1,4 +1,4 @@
-import { classify, type Evidence, type RhubarbDb } from "@rhubarb/core";
+import { classify, unavailableReason, type Evidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 const Verdict = z.object({
@@ -33,6 +33,8 @@ export interface ClassifyDeps {
 
 type VerdictOut = z.infer<typeof Verdict>;
 
+let heldFor: string | null = null;
+
 /**
  * Classify a batch. If the model call fails (a refusal on something sensitive it overheard, a
  * malformed reply twice over, a token limit), split the batch and try each half, down to single
@@ -49,6 +51,8 @@ async function classifyResilient(db: RhubarbDb, items: Evidence[], log: (msg: st
   try {
     return (await classify({ system: SYSTEM, user, schema: Batch, maxTokens: 8000 })).verdicts;
   } catch (e) {
+    // Claude couldn't be reached at all. Nothing about these moments is known, so they wait.
+    if (unavailableReason(e)) throw e;
     if (items.length === 1) {
       log(`classify: gave up on evidence #${items[0].id} (${(e as Error).message})`);
       return [];
@@ -65,7 +69,19 @@ export async function runClassifyBatch(deps: ClassifyDeps, limit = 25): Promise<
   const pending = db.evidenceByStage("detected", limit);
   if (pending.length === 0) return 0;
 
-  const verdicts = await classifyResilient(db, pending, log);
+  let verdicts: VerdictOut[];
+  try {
+    verdicts = await classifyResilient(db, pending, log);
+  } catch (e) {
+    const reason = unavailableReason(e);
+    if (!reason) throw e;
+    // Held, not dropped: they stay in the queue and are judged once Claude answers again.
+    if (heldFor !== reason) log(`classify: holding ${pending.length}+ moments until Claude is back (${reason})`);
+    heldFor = reason;
+    return 0;
+  }
+  if (heldFor) log("classify: Claude is back; catching up");
+  heldFor = null;
   const byId = new Map(pending.map((e) => [e.id, e]));
   let handled = 0;
 

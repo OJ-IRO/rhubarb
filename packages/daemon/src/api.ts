@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
 import type { Card, Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
+import { llmHealth } from "@rhubarb/core";
 import { z } from "zod";
 
 export interface ApiDeps {
@@ -233,6 +234,8 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
             evidence: db.evidenceByStage("classified", 1000).length,
             openPractice: db.openPractice().length,
             listening: deps.listening?.() ?? null,
+            // whether Claude answered last time, so an empty account or an outage is visible
+            claude: llmHealth(),
             // where the data lives, so the privacy page can tell the truth in both modes
             hosted: hosted ? { where: hosted.where } : null,
           });
@@ -327,6 +330,7 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
             lessons: db.lessonsForSkill(id),
             practice: db.practiceForSkill(id),
             fieldEvidence: db.fieldEvidenceForSkill(id),
+            rewrite: JSON.parse(db.getKv(`rewrite:${id}`) ?? "null"),
           });
         }
         // The transcript got it wrong: the wearer corrects the line and the lines around it.
@@ -344,6 +348,7 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
         if (head === "skills" && idStr && tail === "rewrite" && method === "POST") {
           if (!db.getSkill(id)) return json(res, 404, { error: "not found" });
           if (!actions.rewriteLesson) return json(res, 501, { error: "not available" });
+          db.setKv(`rewrite:${id}`, JSON.stringify({ state: "writing", at: Date.now() }));
           void actions.rewriteLesson(id).catch((e: Error) => log(`rewrite ${id} failed: ${e.message}`));
           return json(res, 202, { ok: true });
         }
