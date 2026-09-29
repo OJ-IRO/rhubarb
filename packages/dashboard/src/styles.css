@@ -34,6 +34,9 @@ body {
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* One unbroken run (a URL, a long romanized word, a name) must wrap instead of pushing the
+     whole page sideways on a phone. "anywhere" also lets flex and grid children shrink past it. */
+  overflow-wrap: anywhere;
 }
 :focus-visible {
   outline: 2px solid var(--honey-deep);
@@ -2557,18 +2560,18 @@ a.glance-tile:hover {
   margin-top: 10px;
 }
 
-/* On a narrow screen a tab on the right edge sits on top of the text column. Tuck it into the
-   bottom corner as a small pill instead, where it covers the least. */
 @media (max-width: 760px) {
+  /* Anything floating over a phone screen covers text as you scroll. Put it at the foot of the page. */
   .help-tab {
-    top: auto;
-    bottom: 16px;
-    right: 16px;
+    position: static;
+    display: block;
+    margin: 8px auto 28px;
     writing-mode: horizontal-tb;
     padding: 7px 14px;
     border-right: 1px solid var(--line);
     border-radius: 999px;
     font-size: 13px;
+    box-shadow: none;
   }
   .help-tab:hover:not(:disabled) {
     transform: none;
