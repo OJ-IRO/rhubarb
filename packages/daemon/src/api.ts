@@ -23,6 +23,8 @@ export interface ApiDeps {
     rewriteLesson?: (skillId: number) => Promise<void>;
     /** "Teach me the whole thing": a spark becomes a one-lesson topic. Returns the new skill id. */
     lessonFromSpark?: (card: Card) => Promise<number>;
+    /** Answer a spark again after its words were corrected. Returns when written. */
+    reanswerSpark?: (cardId: number) => Promise<void>;
     restoreSkill?: (id: number) => Promise<void>;
     /** How close was a guess to the answer on the card? Optional so tests need not fake a model. */
     judgeGuess?: (card: Card, guess: string) => Promise<{ close: boolean; note: string }>;
@@ -332,6 +334,7 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
             practice: db.practiceForSkill(id),
             fieldEvidence: db.fieldEvidenceForSkill(id),
             rewrite: JSON.parse(db.getKv(`rewrite:${id}`) ?? "null"),
+            days: db.skillDays(id),
           });
         }
         // The transcript got it wrong: the wearer corrects the line and the lines around it.
@@ -366,6 +369,13 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
           db.updateSkill(id, { priority });
           return json(res, 200, db.getSkill(id));
         }
+        // ---- one day at a time: where, what was noticed, what came of it
+        if (head === "days" && method === "GET" && !idStr) return json(res, 200, db.capturedDays(90));
+        if (head === "days" && idStr && method === "GET") {
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(idStr)) return json(res, 400, { error: "day is YYYY-MM-DD" });
+          return json(res, 200, db.dayDetail(idStr));
+        }
+
         // ---- what Claude has cost, and the daily budget
         if (head === "usage" && method === "GET" && !idStr) {
           const budget = Number(db.getKv("daily_budget_usd") ?? process.env.RHUBARB_DAILY_BUDGET_USD ?? 3);
@@ -388,9 +398,40 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
         if (head === "sparks" && method === "GET" && !idStr) {
           const rows = db.cardsWithItems(100).map((r) => {
             const sid = Number(db.getKv(`spark_lesson:${r.card.id}`) ?? 0);
-            return { ...r, lessonSkillId: sid > 0 ? sid : null };
+            const moment = r.item.utteranceId ? db.evidenceByUtterance(r.item.utteranceId) : null;
+            return {
+              ...r,
+              lessonSkillId: sid > 0 ? sid : null,
+              // the lines around it, so a misheard word there can be fixed too
+              context: moment?.context ?? null,
+              editedAt: moment?.editedAt ?? null,
+              rewrite: JSON.parse(db.getKv(`spark_rewrite:${r.card.id}`) ?? "null"),
+            };
           });
           return json(res, 200, rows);
+        }
+        // Bee misheard what was wondered: correct the line (and the lines around it)...
+        if (head === "sparks" && idStr && tail === "said" && method === "PUT") {
+          const card = db.getCard(id);
+          const item = card ? db.getItem(card.itemId) : null;
+          if (!card || !item) return json(res, 404, { error: "not found" });
+          const body = await readBody<{ text?: unknown; context?: unknown } | null>(req).catch(() => null);
+          const text = typeof body?.text === "string" ? body.text.trim().slice(0, 2000) : "";
+          const context = typeof body?.context === "string" ? body.context.slice(0, 8000) : undefined;
+          if (!text) return json(res, 400, { error: "the line cannot be empty" });
+          db.setItemSource(item.id, text);
+          const moment = item.utteranceId ? db.evidenceByUtterance(item.utteranceId) : null;
+          if (moment) db.editMoment(moment.id, { text, context });
+          log(`spark card #${id}: what was said corrected by the wearer`);
+          return json(res, 200, { ok: true });
+        }
+        // ...then answer it again from the corrected words.
+        if (head === "sparks" && idStr && tail === "answer-again" && method === "POST") {
+          if (!db.getCard(id)) return json(res, 404, { error: "not found" });
+          if (!actions.reanswerSpark) return json(res, 501, { error: "not available" });
+          db.setKv(`spark_rewrite:${id}`, JSON.stringify({ state: "writing", at: Date.now() }));
+          void actions.reanswerSpark(id).catch((e: Error) => log(`spark #${id} answer again failed: ${e.message}`));
+          return json(res, 202, { ok: true });
         }
         if (head === "sparks" && idStr && tail === "lesson" && method === "POST") {
           const card = db.getCard(id);

@@ -32,7 +32,7 @@ function titleFor(path: string): string {
   if (path === "/honeycomb") return "Honeycomb";
   if (path === "/welcome") return "Set up";
   if (path === "/settings") return "Settings";
-  if (path === "/history") return "Looking back";
+  if (path.startsWith("/history")) return "Looking back";
   if (path === "/privacy") return "Privacy and safety";
   if (path === "/evidence") return "Evidence";
   if (path.startsWith("/lessons")) return "Lesson";
@@ -129,6 +129,7 @@ export function App() {
   else if (route.path === "/privacy") page = <Privacy />;
   else if (route.path === "/evidence") page = <Evidence />;
   else if (route.path === "/history") page = <History />;
+  else if ((params = match("/history/:day", route.path))) page = <History day={params.day} />;
   else if (route.path === "/settings") page = <Settings />;
   else if ((params = match("/skills/:id", route.path))) page = <SkillPage id={Number(params.id)} />;
   else if ((params = match("/lessons/:id", route.path))) page = <LessonPage id={Number(params.id)} />;
@@ -154,7 +155,7 @@ export function App() {
           <BrandMark /> Rhubarb
         </Link>
         {NAV.map(([to, label]) => (
-          <Link key={to} to={to} className={route.path === to ? "navlink active" : "navlink"} tour={`nav-${label.toLowerCase()}`}>
+          <Link key={to} to={to} className={route.path === to || (to === "/history" && route.path.startsWith("/history/")) ? "navlink active" : "navlink"} tour={`nav-${label.toLowerCase()}`}>
             {label}
           </Link>
         ))}

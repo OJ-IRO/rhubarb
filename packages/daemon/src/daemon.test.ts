@@ -418,3 +418,21 @@ test("a conversation's place reaches its moments, arriving before or after them,
   assert.equal(db.conversationPlace("wheel"), null);
   db.close();
 });
+
+test("a day shows where you were, what was noticed, and the plans it fed; a plan lists its days", () => {
+  const db = freshDb();
+  const deps = { db, log: () => {}, onJournalReady: () => {}, onAsk: () => {} };
+  const noon = (d: string) => new Date(`${d}T12:00:00`).toISOString();
+  db.setConversationPlace("wheel", "Minato, Osaka");
+  handleUtterance(deps, "wheel", { id: 801, text: "I wonder how they keep the ferris wheel level in typhoons", spoken_at: noon("2026-09-27") });
+  handleUtterance(deps, "later", { id: 802, text: "why do the gondolas have glass floors", spoken_at: noon("2026-09-28") });
+  const skill = db.insertSkill({ name: "Ferris wheels", domain: null, competentLooksLike: "", terms: [], priority: 50, brief: "", kind: "topic" });
+  db.assignEvidenceToSkill([db.evidenceByUtterance(801)!.id, db.evidenceByUtterance(802)!.id], skill);
+
+  const day = db.dayDetail("2026-09-27");
+  assert.deepEqual(day.places, ["Minato, Osaka"]);
+  assert.equal(day.moments.length, 1);
+  assert.deepEqual(day.skills.map((s) => [s.name, s.moments]), [["Ferris wheels", 1]]);
+  assert.deepEqual(db.skillDays(skill), ["2026-09-28", "2026-09-27"]);
+  db.close();
+});

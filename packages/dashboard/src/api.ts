@@ -7,6 +7,20 @@ export interface SparkRow {
   card: Card;
   item: Item;
   lessonSkillId?: number | null;
+  /** the lines around it, when it came from a conversation */
+  context?: string | null;
+  editedAt?: number | null;
+  rewrite?: { state: "writing" | "done" | "failed"; at: number; reason?: string } | null;
+}
+
+/** One day as it happened: where, what was noticed, and what came of it. */
+export interface DayDetail {
+  day: string;
+  utterances: number;
+  places: string[];
+  moments: Evidence[];
+  sparks: Array<{ card: Card; item: Item }>;
+  skills: Array<{ id: number; name: string; status: Skill["status"]; kind: Skill["kind"]; moments: number; lessonId: number | null }>;
 }
 
 export interface SkillRow extends Skill {
@@ -40,6 +54,8 @@ export interface SkillDetail {
   practice: Practice[];
   fieldEvidence: FieldEvidence[];
   rewrite?: RewriteStatus | null;
+  /** days its moments came from, newest first (YYYY-MM-DD) */
+  days?: string[];
 }
 
 export interface LessonView {
@@ -158,6 +174,37 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     }
     return as(row ?? null);
   }
+  if (path === "/days") return as(st.privacy.days);
+  if ((m = path.match(/^\/days\/(\d{4}-\d{2}-\d{2})$/))) {
+    const day = m[1];
+    const moments = f.evidence.filter((e) => localDay(e.spokenAt) === day).map((e) => ({ ...e, place: e.place ?? "Minato, Osaka" }));
+    const ids = [...new Set(moments.map((e) => e.skillId).filter((x): x is number => Boolean(x)))];
+    return as({
+      day,
+      utterances: st.privacy.days.find((d) => d.day === day)?.utterances ?? 0,
+      places: [...new Set(moments.map((e) => e.place))],
+      moments,
+      sparks: st.cards.filter((c) => localDay(c.item.spokenAt) === day),
+      skills: ids.map((id) => {
+        const s = st.rows.find((r) => r.id === id)!;
+        return { id, name: s.name, status: s.status, kind: s.kind, moments: moments.filter((e) => e.skillId === id).length, lessonId: s.lessonId };
+      }),
+    });
+  }
+  if ((m = path.match(/^\/sparks\/(\d+)\/said$/)) && body) {
+    const row = st.cards.find((c) => c.card.id === Number(m![1]));
+    const patch = JSON.parse(String(body)) as { text: string; context?: string };
+    if (row) Object.assign(row, { item: { ...row.item, sourceText: patch.text }, context: patch.context ?? row.context, editedAt: Date.now() });
+    return as({ ok: true });
+  }
+  if ((m = path.match(/^\/sparks\/(\d+)\/answer-again$/))) {
+    const row = st.cards.find((c) => c.card.id === Number(m![1]));
+    if (row) {
+      row.rewrite = { state: "writing", at: Date.now() };
+      setTimeout(() => (row.rewrite = { state: "done", at: Date.now() }), 6000);
+    }
+    return as({ ok: true });
+  }
   if (path === "/usage") return as({ today: 0.84, week: 6.12, total: 11.4, since: Date.now() - 9 * 86_400_000, budget: st.budget ?? 3, byPurpose: [{ purpose: "lessons", calls: 38, cost: 4.1, input: 910_000, output: 88_000 }, { purpose: "spark answers", calls: 22, cost: 0.95, input: 160_000, output: 21_000 }, { purpose: "proposals and letter", calls: 9, cost: 0.61, input: 70_000, output: 12_000 }, { purpose: "sorting moments", calls: 140, cost: 0.46, input: 180_000, output: 11_000 }], byDay: [] });
   if (path === "/usage/budget" && body) {
     st.budget = (JSON.parse(String(body)) as { usd: number }).usd;
@@ -193,7 +240,7 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     if (method === "PUT" && body) st.profile = { ...st.profile, ...(JSON.parse(String(body)) as Partial<Profile>) };
     return as(st.profile);
   }
-  if (path === "/sparks") return as(st.cards);
+  if (path === "/sparks") return as(st.cards.map((c) => ({ ...c })));
   if (path === "/progress") return as(f.progress);
   if (path === "/history") return as(f.history);
   if ((m = path.match(/^\/moments\/(\d+)$/)) && method === "PUT" && body) {
@@ -228,7 +275,7 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     return as(row?.card ?? null);
   }
   // A copy, as a real server would send: handing back the same object hides changes from React.
-  if (/^\/skills\/\d+$/.test(path)) return as(structuredClone(f.skillDetail));
+  if (/^\/skills\/\d+$/.test(path)) return as({ ...structuredClone(f.skillDetail), days: [...new Set(f.evidence.map((e) => localDay(e.spokenAt)))].sort().reverse() });
   if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
   if (/^\/lessons\/\d+\/session$/.test(path)) return as({ id: 1, lessonId: 1, startedAt: Date.now(), completedAt: null, responses: "{}", tutor: "[]" });
   if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the gate right. The part you'd add for level two is what happens when it never opens: the rollout stalls, it doesn't break.", score: 4 });
@@ -287,6 +334,12 @@ export const api = {
   editMoment: (id: number, patch: { text?: string; context?: string }) => call<Evidence>(`/moments/${id}`, { method: "PUT", body: JSON.stringify(patch) }),
   /** Write the current lesson again from the corrected moments. */
   rewriteLesson: (skillId: number) => call<{ ok: boolean }>(`/skills/${skillId}/rewrite`, { method: "POST" }),
+  /** Correct what Bee heard for a spark. */
+  fixSpark: (cardId: number, patch: { text: string; context?: string }) => call<{ ok: boolean }>(`/sparks/${cardId}/said`, { method: "PUT", body: JSON.stringify(patch) }),
+  /** Answer a spark again from the corrected words. */
+  answerSparkAgain: (cardId: number) => call<{ ok: boolean }>(`/sparks/${cardId}/answer-again`, { method: "POST" }),
+  days: () => call<Array<{ day: string; utterances: number; moments: number }>>("/days"),
+  day: (day: string) => call<DayDetail>(`/days/${day}`),
   sparkLesson: (cardId: number) => call<{ skillId: number }>(`/sparks/${cardId}/lesson`, { method: "POST" }),
   lesson: (id: number) => call<LessonView>(`/lessons/${id}`),
   startSession: (id: number) => call<LessonSession>(`/lessons/${id}/session`, { method: "POST" }),

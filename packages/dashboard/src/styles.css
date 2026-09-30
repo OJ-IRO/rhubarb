@@ -2696,3 +2696,76 @@ a.glance-tile:hover {
 .budget-row input {
   width: 120px;
 }
+.fix-said {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: -4px 0 14px;
+}
+.fix-said p {
+  margin: 0;
+}
+.spark-card .moment-edit {
+  margin: 0 0 14px;
+}
+
+/* ---------- looking back, one day at a time ---------- */
+.day-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 2px 10px;
+  margin: 0 0 12px;
+  scrollbar-width: thin;
+}
+.day-tab {
+  flex-shrink: 0;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--wax);
+  color: var(--ink);
+  font-size: 14px;
+  text-decoration: none;
+}
+.day-tab:hover {
+  border-color: var(--comb);
+  text-decoration: none;
+}
+.day-tab.active {
+  background: var(--comb);
+  border-color: var(--honey);
+}
+.day-title {
+  margin: 4px 0 2px;
+}
+.day-places {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 14px;
+}
+.day-places .chip-kind {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  white-space: normal;
+}
+.day-plan {
+  margin-bottom: 10px;
+}
+.day-plan h3 {
+  margin: 0;
+}
+.day-plan .muted.small {
+  margin: 6px 0 0;
+}
+.made-from {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 14px;
+}

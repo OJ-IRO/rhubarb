@@ -109,6 +109,7 @@ Learning style: ${STYLE_NOTES[style]}
 
 Deck rules:
 - 8 to 12 cards. Open with a cover whose hook promises something specific. Close with learnmore.
+- Never invent a person or a name. A name appears only if it is in the reader's moments.
 - At least one example card built from a real moment in the reader's evidence: quote it verbatim, say when, name who if known, then explain what was actually going on. This card is the reason Rhubarb exists; a deck without it has failed.
 - Exactly one diagram card when the idea has structure (a flow, a sequence, states). Mermaid only: flowchart, sequenceDiagram, or stateDiagram-v2, at most 12 nodes, short plain labels, no styling or class lines. If a diagram would be forced, use a steps card instead.
 - One or two image cards where a real photo or diagram would help. Give a search query that will actually find something on Wikimedia Commons (concrete nouns, no jargon), plus a caption that does teaching work on its own.

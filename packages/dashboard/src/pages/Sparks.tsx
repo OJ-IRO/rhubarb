@@ -5,12 +5,103 @@ import { Link } from "../router";
 
 type Row = SparkRow;
 
+/** Enough rows to show the words without scrolling inside the box, on a phone as well. */
+function rowsFor(text: string, min: number): number {
+  const lines = text.split("\n").reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 34)), 0);
+  return Math.min(14, Math.max(min, lines + 1));
+}
+
+/**
+ * Bee mishears. A spark answered from a misheard question answers the wrong question, so the
+ * words can be fixed here and the answer written again from what was really said.
+ */
+function FixSaid({ row, onReload }: { row: Row; onReload: () => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(row.item.sourceText);
+  const [context, setContext] = useState(row.context ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const rw = row.rewrite ?? null;
+  const writing = rw?.state === "writing";
+  const unapplied = Boolean(row.editedAt) && (!rw || rw.state === "failed" || (rw.state === "done" && (row.editedAt ?? 0) > rw.at));
+
+  async function save() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.fixSpark(row.card.id, { text, ...(row.context !== undefined && row.context !== null ? { context } : {}) });
+      await onReload();
+      setEditing(false);
+    } catch {
+      setError("That didn't save. Try again in a moment.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function again() {
+    setError(null);
+    try {
+      await api.answerSparkAgain(row.card.id);
+      await onReload();
+    } catch {
+      setError("That didn't start. Try again in a moment.");
+    }
+  }
+
+  if (editing)
+    return (
+      <div className="moment-edit">
+        <label htmlFor={`s-text-${row.card.id}`}>What was said</label>
+        <textarea id={`s-text-${row.card.id}`} rows={rowsFor(text, 2)} value={text} onChange={(e) => setText(e.target.value)} />
+        {row.context != null && (
+          <>
+            <label htmlFor={`s-ctx-${row.card.id}`}>The conversation around it</label>
+            <textarea id={`s-ctx-${row.card.id}`} rows={rowsFor(context, 4)} value={context} onChange={(e) => setContext(e.target.value)} />
+          </>
+        )}
+        {error && <p className="feedback">{error}</p>}
+        <div className="actions compact">
+          <button className="primary" disabled={saving || !text.trim()} onClick={() => void save()}>
+            {saving ? "Saving…" : "Save the correction"}
+          </button>
+          <button className="ghost small" disabled={saving} onClick={() => setEditing(false)}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="fix-said">
+      {writing ? (
+        <p className="muted small" role="status">Answering it again from your words. This takes a minute.</p>
+      ) : unapplied ? (
+        <p className="small">
+          {rw?.state === "failed" ? `The last try didn't finish: ${rw.reason}. ` : "You corrected what was said. "}
+          <button className="primary small" onClick={() => void again()}>
+            Answer it again
+          </button>
+        </p>
+      ) : rw?.state === "done" ? (
+        <p className="muted small">Answered again from your corrected words.</p>
+      ) : null}
+      {!writing && (
+        <button className="ghost small" onClick={() => setEditing(true)}>
+          Fix what was said
+        </button>
+      )}
+      {error && <p className="feedback">{error}</p>}
+    </div>
+  );
+}
+
 /**
  * A spark used to hand over the answer the moment you opened the page. Reading an answer feels
  * like learning and mostly isn't. Guessing first, even wrongly, is what makes the answer stay, so
  * the card asks before it tells. "Just show me" is always there: it's your curiosity, not a test.
  */
-function Spark({ row, onChange, onLesson }: { row: Row; onChange: (c: Card) => void; onLesson: (skillId: number) => void }) {
+function Spark({ row, onChange, onLesson, onReload }: { row: Row; onChange: (c: Card) => void; onLesson: (skillId: number) => void; onReload: () => Promise<void> }) {
   const { card, item } = row;
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -48,6 +139,7 @@ function Spark({ row, onChange, onLesson }: { row: Row; onChange: (c: Card) => v
       </p>
       <h2>{card.title}</h2>
       <p className="said">You said: "{item.sourceText}"</p>
+      <FixSaid row={row} onReload={onReload} />
 
       {!asked ? (
         <div className="guess">
@@ -127,9 +219,17 @@ function Spark({ row, onChange, onLesson }: { row: Row; onChange: (c: Card) => v
 
 export function Sparks() {
   const [rows, setRows] = useState<Row[] | null>(null);
+  const reload = async () => setRows(await api.sparks());
   useEffect(() => {
-    api.sparks().then(setRows);
+    void reload();
   }, []);
+  // While a spark is being answered again, check back until it's done.
+  const writing = rows?.some((r) => r.rewrite?.state === "writing") ?? false;
+  useEffect(() => {
+    if (!writing) return;
+    const t = setInterval(() => void reload(), 8_000);
+    return () => clearInterval(t);
+  }, [writing]);
   if (!rows) return <Loading />;
 
   return (
@@ -149,6 +249,7 @@ export function Sparks() {
           row={row}
           onChange={(card) => setRows((all) => (all ?? []).map((r) => (r.card.id === card.id ? { ...r, card } : r)))}
           onLesson={(skillId) => setRows((all) => (all ?? []).map((r) => (r.card.id === row.card.id ? { ...r, lessonSkillId: skillId } : r)))}
+          onReload={reload}
         />
       ))}
     </div>

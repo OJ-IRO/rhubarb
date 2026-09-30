@@ -139,6 +139,16 @@ export function SkillPage({ id }: { id: number }) {
         </p>
       )}
       <p className="brief">{skill.brief}</p>
+      {(d.days?.length ?? 0) > 0 && (
+        <p className="made-from">
+          <span className="muted small">Made from</span>
+          {d.days!.map((day) => (
+            <Link key={day} to={`/history/${day}`} className="day-tab">
+              {new Date(`${day}T12:00:00`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+            </Link>
+          ))}
+        </p>
+      )}
 
       <section>
         <p className="eyebrow">The ladder</p>

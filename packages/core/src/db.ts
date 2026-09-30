@@ -551,6 +551,58 @@ export class RhubarbDb {
       .all(sinceMs) as Row[]).map(rowToEvidence);
   }
 
+  // ------------------------------------------------------------------ sparks, corrected
+
+  getItem(id: number): Item | null {
+    const r = this.db.prepare("SELECT * FROM items WHERE id = ?").get(id) as Row | undefined;
+    return r ? rowToItem(r) : null;
+  }
+
+  /** The wearer corrected what Bee heard for a spark. */
+  setItemSource(id: number, text: string): void {
+    this.db.prepare("UPDATE items SET source_text = ? WHERE id = ?").run(text, id);
+  }
+
+  /** A spark answered again, from corrected words. The guess and its schedule are kept. */
+  updateCard(id: number, c: { title: string; answerMd: string; citations: Array<{ title: string; url: string }> }): void {
+    this.db.prepare("UPDATE cards SET title = ?, answer_md = ?, citations = ? WHERE id = ?").run(c.title, c.answerMd, JSON.stringify(c.citations), id);
+  }
+
+  // ------------------------------------------------------------------ days
+
+  /** One day as it happened: where, what was noticed, and what came of it. */
+  dayDetail(day: string): {
+    day: string;
+    utterances: number;
+    places: string[];
+    moments: Evidence[];
+    sparks: Array<{ card: Card; item: Item }>;
+    skills: Array<{ id: number; name: string; status: SkillStatus; kind: SkillKind; moments: number; lessonId: number | null }>;
+  } {
+    const moments = (this.db
+      .prepare("SELECT * FROM evidence WHERE source != 'calendar' AND date(spoken_at, 'localtime') = ? ORDER BY spoken_at")
+      .all(day) as Row[]).map(rowToEvidence);
+    const places = [...new Set(moments.map((m) => m.place).filter((p): p is string => Boolean(p)))];
+    const sparks = this.cardsWithItems(200).filter(({ item }) => localDayOf(Date.parse(item.spokenAt)) === day);
+    const counts = new Map<number, number>();
+    for (const m of moments) if (m.skillId && m.skillId > 0) counts.set(m.skillId, (counts.get(m.skillId) ?? 0) + 1);
+    const skills = [...counts.entries()]
+      .map(([id, n]) => {
+        const s = this.getSkill(id);
+        return s ? { id, name: s.name, status: s.status, kind: s.kind, moments: n, lessonId: this.currentLesson(id, s.level)?.id ?? null } : null;
+      })
+      .filter((s): s is NonNullable<typeof s> => Boolean(s));
+    const utterances = (this.db.prepare("SELECT COUNT(*) AS c FROM utterances WHERE date(spoken_at, 'localtime') = ?").get(day) as { c: number }).c;
+    return { day, utterances, places, moments, sparks, skills };
+  }
+
+  /** The days a skill's moments came from, newest first. */
+  skillDays(skillId: number): string[] {
+    return (this.db
+      .prepare("SELECT DISTINCT date(spoken_at, 'localtime') AS day FROM evidence WHERE skill_id = ? ORDER BY day DESC")
+      .all(skillId) as Array<{ day: string }>).map((r) => r.day);
+  }
+
   // ------------------------------------------------------------------ places
 
   /** Where a conversation happened (a landmark or neighbourhood; null for home). Fills its moments and sparks. */

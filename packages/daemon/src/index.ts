@@ -15,7 +15,7 @@ import { gradeAnswer, handleJournalReady, schedulePractice, sweepPractice, type 
 import { bestFieldRung, maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
 import { runReflection } from "./pipeline/reflect.js";
 import { afterQuietHours, nextLearningSlot, parseLearningWindows, saveLearningSlots } from "./pipeline/schedule.js";
-import { buildSpark } from "./pipeline/sparks.js";
+import { buildSpark, reanswerSpark } from "./pipeline/sparks.js";
 import { ingestStakes, runSweep } from "./pipeline/sweep.js";
 import { makePlaces } from "./pipeline/places.js";
 import { tutorReply } from "./pipeline/tutor.js";
@@ -492,6 +492,7 @@ startApi(
       },
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
       rewriteLesson: (id) => withPurpose("lessons", () => rewriteLesson(lessonDeps, id)),
+      reanswerSpark: (cardId) => withPurpose("spark answers", () => reanswerSpark({ db, log }, cardId)),
       lessonFromSpark: async (card) => {
         const item = db.cardsWithItems(200).find((r) => r.card.id === card.id)?.item ?? null;
         const e = item?.utteranceId ? db.evidenceByUtterance(item.utteranceId) : null;
