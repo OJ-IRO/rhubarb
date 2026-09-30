@@ -69,6 +69,18 @@ export interface RewriteStatus {
   reason?: string;
 }
 
+/** What Claude has cost, at list price. */
+export interface UsageSummary {
+  today: number;
+  week: number;
+  total: number;
+  since: number | null;
+  byPurpose: Array<{ purpose: string; calls: number; cost: number; input: number; output: number }>;
+  byDay: Array<{ day: string; cost: number }>;
+  /** dollars per day; 0 means no cap */
+  budget: number;
+}
+
 export interface Status {
   skills: number;
   evidence: number;
@@ -110,6 +122,7 @@ interface PreviewState {
   rows: SkillRow[];
   privacy: PrivacyView;
   cards: SparkRow[];
+  budget?: number;
   profile: Profile;
   lastQuiz?: QuizResult;
 }
@@ -144,6 +157,11 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
       if (m[2] === "priority" && body) row.priority = (JSON.parse(String(body)) as { priority: number }).priority;
     }
     return as(row ?? null);
+  }
+  if (path === "/usage") return as({ today: 0.84, week: 6.12, total: 11.4, since: Date.now() - 9 * 86_400_000, budget: st.budget ?? 3, byPurpose: [{ purpose: "lessons", calls: 38, cost: 4.1, input: 910_000, output: 88_000 }, { purpose: "spark answers", calls: 22, cost: 0.95, input: 160_000, output: 21_000 }, { purpose: "proposals and letter", calls: 9, cost: 0.61, input: 70_000, output: 12_000 }, { purpose: "sorting moments", calls: 140, cost: 0.46, input: 180_000, output: 11_000 }], byDay: [] });
+  if (path === "/usage/budget" && body) {
+    st.budget = (JSON.parse(String(body)) as { usd: number }).usd;
+    return as({ budget: st.budget });
   }
   if (path === "/privacy" && method === "GET") return as(st.privacy);
   if ((m = path.match(/^\/privacy\/moments\/(\d+)$/))) {
@@ -252,6 +270,8 @@ export const api = {
   restoreSkill: (id: number) => call<Skill>(`/skills/${id}/restore`, { method: "POST" }),
   dismissedSkills: () => call<Skill[]>("/skills/dismissed"),
   status: () => call<Status>("/status"),
+  usage: () => call<UsageSummary>("/usage"),
+  setBudget: (usd: number) => call<{ budget: number }>("/usage/budget", { method: "PUT", body: JSON.stringify({ usd }) }),
   guess: (cardId: number, text: string) => call<Card>(`/sparks/${cardId}/guess`, { method: "POST", body: JSON.stringify({ text }) }),
   progress: () => call<import("@rhubarb/core").LearningProgress>("/progress"),
   history: () => call<import("@rhubarb/core").HistoryEntry[]>("/history"),

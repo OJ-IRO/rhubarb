@@ -56,8 +56,17 @@ export async function buildSpark(deps: SparkDeps, e: Evidence, topic: string): P
   let card = await research();
   const lint = lintProse(card.answerMd);
   if (!lint.ok) {
-    log(`spark #${itemId} draft failed lint (${lint.issues.map((i) => i.rule).join(",")}); regenerating`);
-    card = await research(lint.issues.map((i) => `${i.rule}: ${i.detail}`));
+    // Fix the paragraph it has instead of searching the web all over again.
+    log(`spark #${itemId} draft failed lint (${lint.issues.map((i) => i.rule).join(",")}); revising`);
+    card = await researchThenEmit({
+      system,
+      ask: `${baseAsk}\n\nYour draft:\n${JSON.stringify(card)}\n\nThe editor rejected it for: ${lint.issues.map((i) => `${i.rule}: ${i.detail}`).join("; ")}. Return the card with those fixed, keeping the facts and sources.`,
+      schema: CardSchema,
+      emitName: "emit_card",
+      emitDescription: "Return the finished spark card.",
+      maxSearches: 0,
+      maxTokens: 3000,
+    });
   }
 
   const cardId = db.insertCard({ itemId, title: card.title, answerMd: card.answerMd, citations: card.citations });

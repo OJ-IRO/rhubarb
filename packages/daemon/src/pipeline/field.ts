@@ -1,4 +1,4 @@
-import { ALL_NUDGES, judge, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type FieldEvidence, type RhubarbDb } from "@rhubarb/core";
+import { ALL_NUDGES, classify, MODELS, lintProse, matchesSkillTerms, systemBlocks, voiceGuide, write, type BeeClient, type FieldEvidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 import { renderContext } from "./capture.js";
 import { afterQuietHours } from "./schedule.js";
@@ -21,7 +21,9 @@ export interface FieldDeps {
 
 /** Scan recent utterances for active skills' signal terms and queue candidates. Cheap; runs after each classify batch. */
 export function findFieldCandidates(db: RhubarbDb, sinceMs: number, log: (m: string) => void): number {
-  const active = db.skillsByStatus(["active"]);
+  // A one-lesson topic has no ladder to climb, so there is nothing to credit. Its terms are also
+  // the broadest ("Osaka", "Ferris wheel"): every mention of the city became a paid judgement.
+  const active = db.skillsByStatus(["active"]).filter((s) => s.kind !== "topic");
   if (active.length === 0) return 0;
   const recent = db.recentUtterances(sinceMs);
   let queued = 0;
@@ -37,7 +39,7 @@ export function findFieldCandidates(db: RhubarbDb, sinceMs: number, log: (m: str
   return queued;
 }
 
-const MAX_JUDGED_PER_TICK = 12; // each is an Opus call; a chatty day must not become hours of spend
+const MAX_JUDGED_PER_TICK = 12; // each is a model call; a chatty day must not become hours of spend
 const MAX_ATTEMPTS = 3;
 const attempts = new Map<number, number>();
 
@@ -67,7 +69,7 @@ async function judgeOne(deps: FieldDeps, fe: FieldEvidence): Promise<boolean> {
   const { db, bee, log } = deps;
   {
     const skill = db.getSkill(fe.skillId);
-    if (!skill) {
+    if (!skill || skill.kind === "topic") {
       db.setFieldVerdict(fe.id, { used: false, correct: false, level: 0, note: "" }, false);
       return false;
     }
@@ -76,7 +78,10 @@ async function judgeOne(deps: FieldDeps, fe: FieldEvidence): Promise<boolean> {
     // speaker labels. Re-read it now to use whatever labels have arrived since.
     const window = db.windowAroundUtterance(fe.utteranceId, 5);
     const context = window ? renderContext(window) : fe.context;
-    let v = await judge({
+    // A yes-or-no reading of one moment: the worker model does it well, at a fraction of Opus.
+    let v = await classify({
+      model: MODELS.worker,
+      effort: "low",
       system: systemBlocks(voiceGuide(), ROLE),
       user: `Skill: ${skill.name}\nCompetent use sounds like: ${skill.competentLooksLike}\nLadder: ${ladder.map((l) => `${l.idx + 1}. ${l.title}: ${l.outcome}`).join("; ") || "(none)"}\n\nThe moment (${fe.spokenAt}):\n"${fe.text}"\n\nAround it:\n${context ?? "(none)"}`,
       schema: Verdict,

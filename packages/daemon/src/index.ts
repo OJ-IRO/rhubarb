@@ -2,14 +2,14 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { llmRoute, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
+import { llmRoute, setSpendHooks, withPurpose, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
 import { handleAsk, topicFromSpark } from "./pipeline/asks.js";
 import { askIn, handleStreamEvent, recordAsk } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
-import { correctDoubtedLessons, generateLessonOnce, resumeMissingLessons, rewriteLesson, startSkill } from "./pipeline/lessons.js";
+import { generateLessonOnce, resumeMissingLessons, rewriteLesson, startSkill } from "./pipeline/lessons.js";
 import { writeTodayLetter } from "./pipeline/letter.js";
 import { gradeAnswer, handleJournalReady, schedulePractice, sweepPractice, type Grade } from "./pipeline/practice.js";
 import { bestFieldRung, maybeAdvance, onFieldCredited, onTeachbackGraded } from "./pipeline/progress.js";
@@ -43,6 +43,15 @@ const HOSTED = process.env.RHUBARB_ACCESS_TOKEN
 const DASHBOARD_DIST = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "dashboard", "dist");
 
 const db = new RhubarbDb(join(DATA_DIR, "rhubarb.db"));
+
+// Every Claude call is recorded with its cost, and a daily budget pauses the expensive work.
+// Set it in Settings; RHUBARB_DAILY_BUDGET_USD is the starting value. 0 means no cap.
+const DEFAULT_BUDGET = Number(process.env.RHUBARB_DAILY_BUDGET_USD ?? 3);
+setSpendHooks({
+  record: (u) => db.recordUsage(u),
+  spentToday: () => db.spentOn(new Date().toLocaleDateString("en-CA")),
+  budgetUsd: () => Number(db.getKv("daily_budget_usd") ?? DEFAULT_BUDGET),
+});
 const bee = new BeeClient();
 
 /** The wearer chooses which alarms reach their phone. Anything unset is on. */
@@ -62,7 +71,7 @@ function advanceAndContinue(skillId: number, nextLevel: number | null): void {
   const skill = db.getSkill(skillId);
   if (!skill || skill.status !== "active") return;
   log(`skill #${skillId} ${skill.name} advanced to level ${nextLevel + 1}`);
-  void generateLessonOnce(lessonDeps, skill, nextLevel).catch((e: Error) => log(`next lesson failed: ${e.message}`));
+  void withPurpose("lessons", () => generateLessonOnce(lessonDeps, skill, nextLevel)).catch((e: Error) => log(`next lesson failed: ${e.message}`));
 }
 
 const practiceDeps = {
@@ -83,7 +92,7 @@ const fieldDeps = {
 
 // Building a lesson takes minutes. Asks and sparks only start it; the lesson nudge says when it's ready.
 const startInBackground = async (skillId: number) => {
-  void startSkill(lessonDeps, skillId).catch((e: Error) => log(`startSkill ${skillId} failed: ${e.message}`));
+  void withPurpose("lessons", () => startSkill(lessonDeps, skillId)).catch((e: Error) => log(`startSkill ${skillId} failed: ${e.message}`));
 };
 
 // --- asks: "hey Bee, ..." handled one at a time, straight away
@@ -95,7 +104,7 @@ async function drainAsks(): Promise<void> {
   try {
     while (askQueue.length > 0) {
       const next = askQueue.shift()!;
-      await handleAsk({ db, log, start: startInBackground, spark: (e, topic) => classifyDeps.onSpark(e, topic) }, next.e, next.ask).catch((err: Error) =>
+      await withPurpose("asks", () => handleAsk({ db, log, start: startInBackground, spark: (e, topic) => classifyDeps.onSpark(e, topic) }, next.e, next.ask)).catch((err: Error) =>
         log(`ask #${next.e.id} failed: ${err.message}`)
       );
     }
@@ -108,7 +117,7 @@ const captureDeps = {
   db,
   log,
   onJournalReady: (journalId: string, text: string) => {
-    handleJournalReady(practiceDeps, journalId, text).catch((e: Error) => log(`grading failed: ${e.message}`));
+    withPurpose("practice and grading", () => handleJournalReady(practiceDeps, journalId, text)).catch((e: Error) => log(`grading failed: ${e.message}`));
   },
   onAsk: (e: Evidence, ask: string) => {
     askQueue.push({ e, ask });
@@ -125,7 +134,7 @@ async function drainSparks(): Promise<void> {
   try {
     while (sparkQueue.length > 0) {
       const next = sparkQueue.shift()!;
-      await buildSpark({ db, log }, next.e, next.topic).catch((err: Error) => log(`spark failed: ${err.message}`));
+      await withPurpose("spark answers", () => buildSpark({ db, log }, next.e, next.topic)).catch((err: Error) => log(`spark failed: ${err.message}`));
     }
   } finally {
     sparking = false;
@@ -161,16 +170,16 @@ function guarded(name: string, job: () => Promise<unknown>): () => Promise<void>
   };
 }
 
-const classifyTick = guarded("classify", async () => {
+const classifyTick = guarded("classify", () => withPurpose("sorting moments", async () => {
   const n = await runClassifyBatch(classifyDeps);
   if (n > 0) log(`classified ${n} evidence`);
   findFieldCandidates(db, Date.now() - 3 * CLASSIFY_INTERVAL_MS, log);
-});
+}));
 
-const fieldTick = guarded("field", () => judgeFieldEvidence(fieldDeps));
-const lessonsTick = guarded("lessons", () => resumeMissingLessons(lessonDeps));
+const fieldTick = guarded("field", () => withPurpose("real-world checks", () => judgeFieldEvidence(fieldDeps)));
+const lessonsTick = guarded("lessons", () => withPurpose("lessons", () => resumeMissingLessons(lessonDeps)));
 
-const reflectNow = guarded("reflect", async () => {
+const reflectNow = guarded("reflect", () => withPurpose("proposals and letter", async () => {
   // Calendar stakes are a nice-to-have. Their failure must not stop the reflection itself.
   await ingestStakes({ db, bee, log }).catch((e: Error) => log(`stakes skipped: ${e.message}`));
   await classifyTick();
@@ -178,7 +187,7 @@ const reflectNow = guarded("reflect", async () => {
   db.setKv("last_reflect_at", String(Date.now()));
   await nudgeProposals(created);
   await writeTodayLetter(db, log);
-});
+}));
 
 /** One alarm for new proposals: what it is, and that it wants a yes or no. */
 async function nudgeProposals(created: number[]): Promise<void> {
@@ -424,8 +433,6 @@ function rescanForAsks(days = 3): void {
   db.setKv(key, String(Date.now()));
   log(`rescan: ${found} earlier ask${found === 1 ? "" : "s"} to Bee picked back up`);
 }
-// Lessons the fact-checker still doubted get their disputed claims corrected, once.
-setTimeout(() => void correctDoubtedLessons(lessonDeps).catch((e: Error) => log(`claim correction failed: ${e.message}`)), 60_000);
 // Before this version, moments that failed to classify because Claude couldn't be reached were
 // filed as noise. Put them back once; they are judged when Claude answers.
 if (!db.getKv("requeue_unjudged_v1")) {
@@ -474,34 +481,34 @@ startApi(
       reflectNow,
       acceptSkill: async (id) => {
         // ladder + first lesson take a while; respond now, build in the background
-        void startSkill(lessonDeps, id).catch((e: Error) => log(`startSkill ${id} failed: ${e.message}`));
+        void startInBackground(id);
       },
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
-      rewriteLesson: (id) => rewriteLesson(lessonDeps, id),
+      rewriteLesson: (id) => withPurpose("lessons", () => rewriteLesson(lessonDeps, id)),
       lessonFromSpark: async (card) => {
         const item = db.cardsWithItems(200).find((r) => r.card.id === card.id)?.item ?? null;
         const e = item?.utteranceId ? db.evidenceByUtterance(item.utteranceId) : null;
-        const skillId = await topicFromSpark({ db, log, start: startInBackground }, card, e);
+        const skillId = await withPurpose("lessons", () => topicFromSpark({ db, log, start: startInBackground }, card, e));
         db.setKv(`spark_lesson:${card.id}`, String(skillId));
         return skillId;
       },
       judgeGuess: (card, guess) =>
-        classify({
+        withPurpose("practice and grading", () => classify({
           system: systemBlocks(voiceGuide(), "Someone guessed the answer to a question before being shown it. Say whether the guess was close to the real answer, and give one warm, honest sentence about it. If they were wrong, name the one thing the real answer turns on. Never say 'great guess'."),
           user: `Question: ${card.title}\n\nThe real answer:\n${card.answerMd}\n\nTheir guess: "${guess}"`,
           schema: GuessVerdict,
           maxTokens: 400,
-        }),
+        })),
       saveProfile: async (p) => {
         db.setProfile(p);
-        const slots = await parseLearningWindows(p.learningWindows).catch((e: Error) => {
+        const slots = await withPurpose("settings", () => parseLearningWindows(p.learningWindows)).catch((e: Error) => {
           log(`learning windows parse failed: ${e.message}`);
           return [];
         });
         saveLearningSlots(db, slots);
         log(`profile saved; ${slots.length} learning slots`);
       },
-      answerBeat,
+      answerBeat: (lesson, beat, idx, text) => withPurpose("practice and grading", () => answerBeat(lesson, beat, idx, text)),
       teachbackToPendant: async (lesson, beat) => {
         await schedulePractice(practiceDeps, {
           skillId: lesson.skillId,
@@ -525,9 +532,9 @@ startApi(
         return at;
       },
       completeLesson,
-      gradeQuiz,
-      retryQuizAnswer,
-      tutor: (lesson, history, onText) => tutorReply(db, lesson, history, onText),
+      gradeQuiz: (lesson, answers) => withPurpose("practice and grading", () => gradeQuiz(lesson, answers)),
+      retryQuizAnswer: (lesson, idx, text) => withPurpose("practice and grading", () => retryQuizAnswer(lesson, idx, text)),
+      tutor: (lesson, history, onText) => withPurpose("tutor chat", () => tutorReply(db, lesson, history, onText)),
     },
   },
   API_PORT,

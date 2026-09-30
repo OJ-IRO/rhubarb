@@ -243,8 +243,19 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   let out = await research();
   const lint = lintProse(deckProse(out.deck as Deck));
   if (!lint.ok) {
-    log(`lesson for #${skill.id} L${levelIdx} failed lint (${lint.issues.map((i) => i.rule).join(",")}); regenerating`);
-    out = await research(lint.issues.map((i) => `${i.rule}: ${i.detail}`));
+    // Fix the draft it already has, without searching again. Researching from scratch for a
+    // few style problems used to double the cost of a lesson.
+    log(`lesson for #${skill.id} L${levelIdx} failed lint (${lint.issues.map((i) => i.rule).join(",")}); revising the draft`);
+    out = await researchThenEmit({
+      system,
+      ask: `${baseAsk}\n\nYour draft:\n${JSON.stringify(out)}\n\nThe editor rejected it for: ${lint.issues.map((i) => `${i.rule}: ${i.detail}`).join("; ")}. Return the whole lesson with those fixed and everything else kept.`,
+      schema: LessonOut,
+      emitName: "emit_lesson",
+      emitDescription: "Return the finished deck, quiz, beats, prose, and citations.",
+      maxSearches: 0,
+      effort: "medium",
+      maxTokens: 20000,
+    });
   }
 
   // A second reader checks what code cannot: are the facts right, and is it pitched at this level?
@@ -254,22 +265,22 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     log(`lesson for #${skill.id} L${levelIdx}: second reader unavailable (${e.message})`);
     return null;
   });
-  if (opinion && !opinion.accurate) {
-    log(`lesson for #${skill.id} L${levelIdx}: second reader doubts the facts; rewriting once. ${opinion.accuracyNote}`);
-    out = await research([`a fact-checker found errors: ${opinion.accuracyNote}`, ...(opinion.rightLevel ? [] : [`pitched at the wrong level: ${opinion.levelNote}`])]);
-    opinion = await secondOpinion(skill, level, readable(out)).catch(() => null);
-  }
-  // Still doubted after a full rewrite: fix the disputed claims themselves, then read again.
+  // Doubted: fix the disputed claims in place, once, and read it once more. This used to rewrite
+  // the whole lesson with fresh research and then run two correction rounds, each read again by
+  // Opus: about five dollars for one lesson whenever the checker kept disagreeing over a detail.
+  // Whatever doubt remains is shown to the learner under "What was checked".
   let corrected = 0;
-  for (let round = 0; opinion && !opinion.accurate && round < 2; round++) {
+  if (opinion && !opinion.accurate) {
+    log(`lesson for #${skill.id} L${levelIdx}: second reader doubts the facts; correcting in place. ${opinion.accuracyNote}`);
     const fix = await correctClaims(skill, out, opinion.accuracyNote, log).catch((e: Error) => {
       log(`lesson for #${skill.id} L${levelIdx}: correction pass failed (${e.message})`);
       return null;
     });
-    if (!fix || fix.applied === 0) break;
-    out = fix.out;
-    corrected += fix.applied;
-    opinion = await secondOpinion(skill, level, readable(out)).catch(() => null);
+    if (fix && fix.applied > 0) {
+      out = fix.out;
+      corrected = fix.applied;
+      opinion = (await secondOpinion(skill, level, readable(out)).catch(() => null)) ?? opinion;
+    }
   }
 
   // Everything the writer was shown from the learner's life. A quoted moment must trace back to it.
@@ -369,7 +380,7 @@ async function correctClaims<T extends LessonText>(skill: Skill, out: T, note: s
     schema: Corrections,
     emitName: "emit_corrections",
     emitDescription: "Return the exact passages to replace and their corrections.",
-    maxSearches: 3,
+    maxSearches: 2,
     effort: "medium",
     maxTokens: 6000,
   });
@@ -547,7 +558,11 @@ export async function resumeMissingLessons(deps: LessonDeps): Promise<number> {
     const ladder = deps.db.ladderFor(skill.id);
     if (ladder.length > 0 && skill.level >= ladder.length) continue; // finished the ladder
     deps.log(`lessons: ${skill.name} has no lesson at level ${skill.level + 1}; writing it`);
-    await startSkill(deps, skill.id).catch((e: Error) => deps.log(`lessons: resume failed for ${skill.name}: ${e.message}`));
+    await startSkill(deps, skill.id).catch((e: Error) => {
+      deps.log(`lessons: resume failed for ${skill.name}: ${e.message}`);
+      // Out of budget or Claude unreachable says nothing about the lesson. Don't use up a try.
+      if (unavailableReason(e)) resumeTries.set(skill.id, tries);
+    });
     resumed++;
   }
   return resumed;

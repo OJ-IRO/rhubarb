@@ -64,6 +64,20 @@ export interface ResearchOptions<T> {
 }
 
 /**
+ * Every turn of the loop resends the whole conversation so far: the brief, each search result,
+ * each draft. Marking the end of it as cacheable means the next turn pays a tenth of the price
+ * for everything it has already seen, instead of full price again.
+ */
+function cacheUpToHere(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  const last = messages[messages.length - 1];
+  if (!last) return messages;
+  const content: Anthropic.ContentBlockParam[] = typeof last.content === "string" ? [{ type: "text", text: last.content }] : [...last.content];
+  const tail = content[content.length - 1] as Anthropic.ContentBlockParam & { cache_control?: { type: "ephemeral" } };
+  content[content.length - 1] = { ...tail, cache_control: { type: "ephemeral" } } as Anthropic.ContentBlockParam;
+  return [...messages.slice(0, -1), { ...last, content }];
+}
+
+/**
  * Writer-model tool loop: optional web searches (Tavily) then a structured result.
  * Without a TAVILY_API_KEY the model answers from its own knowledge in one forced call.
  */
@@ -93,7 +107,7 @@ export async function researchThenEmit<T>(opts: ResearchOptions<T>): Promise<T> 
   const maxSearches = opts.maxSearches ?? 3;
 
   for (let turn = 0; turn < maxSearches + 3; turn++) {
-    const res = await tracked(
+    const res = await tracked(() =>
       llm().messages.create({
         model: MODELS.writer,
         max_tokens: opts.maxTokens ?? 8000,
@@ -101,7 +115,7 @@ export async function researchThenEmit<T>(opts: ResearchOptions<T>): Promise<T> 
         thinking: { type: "adaptive" },
         output_config: { effort: opts.effort ?? "medium" },
         tools: searches < maxSearches ? [SEARCH_TOOL, emitTool] : [emitTool],
-        messages,
+        messages: cacheUpToHere(messages),
       })
     );
     if (res.stop_reason === "refusal") throw new Error("model refused research");

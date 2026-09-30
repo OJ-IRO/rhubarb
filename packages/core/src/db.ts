@@ -166,6 +166,19 @@ CREATE TABLE IF NOT EXISTS fsrs_state (
 CREATE TABLE IF NOT EXISTS forgotten_utterances (
   id INTEGER PRIMARY KEY
 );
+CREATE TABLE IF NOT EXISTS llm_usage (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  day TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  model TEXT NOT NULL,
+  input INTEGER NOT NULL,
+  output INTEGER NOT NULL,
+  cache_write INTEGER NOT NULL,
+  cache_read INTEGER NOT NULL,
+  cost REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_day ON llm_usage(day);
 CREATE TABLE IF NOT EXISTS kv (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -530,6 +543,42 @@ export class RhubarbDb {
     return (this.db
       .prepare("SELECT * FROM evidence WHERE kind = 'intent' AND route = 'skill' AND confidence = 1 AND skill_id IS NULL AND created_at >= ? ORDER BY id")
       .all(sinceMs) as Row[]).map(rowToEvidence);
+  }
+
+  // ------------------------------------------------------------------ Claude spend
+
+  recordUsage(u: { at: number; purpose: string; model: string; input: number; output: number; cacheWrite: number; cacheRead: number; cost: number }): void {
+    this.db
+      .prepare("INSERT INTO llm_usage (at, day, purpose, model, input, output, cache_write, cache_read, cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(u.at, localDayOf(u.at), u.purpose, u.model, u.input, u.output, u.cacheWrite, u.cacheRead, u.cost);
+  }
+
+  spentOn(day: string): number {
+    return (this.db.prepare("SELECT COALESCE(SUM(cost), 0) AS c FROM llm_usage WHERE day = ?").get(day) as { c: number }).c;
+  }
+
+  /** What Claude has cost: today, the last seven days, all time, by activity, and by day. */
+  usageSummary(): {
+    today: number;
+    week: number;
+    total: number;
+    since: number | null;
+    byPurpose: Array<{ purpose: string; calls: number; cost: number; input: number; output: number }>;
+    byDay: Array<{ day: string; cost: number }>;
+  } {
+    const today = localDayOf(Date.now());
+    const weekAgo = localDayOf(Date.now() - 6 * 86_400_000);
+    const one = (sql: string, ...args: unknown[]) => (this.db.prepare(sql).get(...args) as { c: number | null }).c ?? 0;
+    return {
+      today: one("SELECT SUM(cost) AS c FROM llm_usage WHERE day = ?", today),
+      week: one("SELECT SUM(cost) AS c FROM llm_usage WHERE day >= ?", weekAgo),
+      total: one("SELECT SUM(cost) AS c FROM llm_usage"),
+      since: (this.db.prepare("SELECT MIN(at) AS c FROM llm_usage").get() as { c: number | null }).c,
+      byPurpose: this.db
+        .prepare("SELECT purpose, COUNT(*) AS calls, SUM(cost) AS cost, SUM(input + cache_write + cache_read) AS input, SUM(output) AS output FROM llm_usage WHERE day >= ? GROUP BY purpose ORDER BY cost DESC")
+        .all(weekAgo) as Array<{ purpose: string; calls: number; cost: number; input: number; output: number }>,
+      byDay: this.db.prepare("SELECT day, SUM(cost) AS cost FROM llm_usage GROUP BY day ORDER BY day DESC LIMIT 14").all() as Array<{ day: string; cost: number }>,
+    };
   }
 
   /** The moment an utterance became, if it became one. */
@@ -1014,6 +1063,11 @@ export class RhubarbDb {
 }
 
 // ---------------------------------------------------------------------- row mappers
+
+/** YYYY-MM-DD in the server's own time zone, so "today" means the wearer's today. */
+function localDayOf(ms: number): string {
+  return new Date(ms).toLocaleDateString("en-CA");
+}
 
 function rowToEvidence(r: Row): Evidence {
   return {

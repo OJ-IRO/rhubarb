@@ -95,3 +95,24 @@ test("an unreachable Claude is told apart from a bad answer, so moments are held
   assert.equal(unavailableReason(new Error("model refused: sensitive")), null, "a refusal is about this item, not about Claude");
   assert.equal(unavailableReason(new Error("structured output failed schema validation twice")), null);
 });
+
+test("each call is priced from its model and token counts, and the daily budget stops calls before they are made", async () => {
+  const { costOf, setSpendHooks, tracked, withPurpose, unavailableReason } = await import("./llm.js");
+  // 100k in, 10k out on Opus 5: $0.50 + $0.25. Cached reads cost a tenth.
+  assert.equal(costOf("claude-opus-5", { input: 100_000, output: 10_000, cacheWrite: 0, cacheRead: 0 }).toFixed(2), "0.75");
+  assert.equal(costOf("claude-sonnet-5", { input: 0, output: 0, cacheWrite: 0, cacheRead: 1_000_000 }).toFixed(2), "0.20");
+
+  const seen: Array<{ purpose: string; cost: number }> = [];
+  let spent = 0;
+  setSpendHooks({ record: (u) => { seen.push({ purpose: u.purpose, cost: u.cost }); spent += u.cost; }, spentToday: () => spent, budgetUsd: () => 1 });
+  const fake = (input: number) => async () => ({ model: "claude-opus-5", usage: { input_tokens: input, output_tokens: 0 } });
+  await withPurpose("lessons", () => tracked(fake(100_000))); // $0.50
+  assert.deepEqual(seen, [{ purpose: "lessons", cost: 0.5 }]);
+  await withPurpose("lessons", () => tracked(fake(100_000))); // $1.00: now at the budget
+  let ran = false;
+  await assert.rejects(withPurpose("lessons", () => tracked(async () => { ran = true; return {}; })), (e: Error) => /budget/.test(unavailableReason(e) ?? ""));
+  assert.equal(ran, false, "the call is never made once the budget is spent");
+  // sorting what was heard may run a little past it, so nothing is lost
+  await withPurpose("sorting moments", () => tracked(fake(1000)));
+  setSpendHooks({ record: () => {}, spentToday: () => 0, budgetUsd: () => null });
+});

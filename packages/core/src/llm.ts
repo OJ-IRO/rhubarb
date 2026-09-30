@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { AnthropicBedrock } from "@anthropic-ai/bedrock-sdk";
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
@@ -38,6 +39,91 @@ export function llmRoute(): string {
   return DIRECT ? `Anthropic API (${MODELS.writer}, ${MODELS.worker})` : `Amazon Bedrock ${process.env.AWS_REGION ?? "us-east-1"} (${MODELS.writer}, ${MODELS.worker})`;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Spend: what every call cost, what it was for, and a daily budget that pauses the expensive work.
+// ---------------------------------------------------------------------------------------------
+
+const purposeStore = new AsyncLocalStorage<string>();
+
+/** Tag every Claude call made inside `fn` (across awaits) with what it was for. */
+export function withPurpose<T>(purpose: string, fn: () => Promise<T>): Promise<T> {
+  return purposeStore.run(purpose, fn);
+}
+
+export function currentPurpose(): string {
+  return purposeStore.getStore() ?? "other";
+}
+
+export interface UsageRecord {
+  at: number;
+  purpose: string;
+  model: string;
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+  /** US dollars, at list price */
+  cost: number;
+}
+
+interface SpendHooks {
+  record(u: UsageRecord): void;
+  spentToday(): number;
+  /** null or 0 means no cap */
+  budgetUsd(): number | null;
+}
+
+let spend: SpendHooks | null = null;
+export function setSpendHooks(h: SpendHooks): void {
+  spend = h;
+}
+
+/** List prices per million tokens. Cache writes cost 1.25x input, cache reads 0.1x. */
+const PRICES: Array<[RegExp, { input: number; output: number }]> = [
+  [/fable|mythos/, { input: 10, output: 50 }],
+  [/opus-5-5/, { input: 4, output: 20 }],
+  [/opus/, { input: 5, output: 25 }],
+  [/sonnet-4-[56]/, { input: 3, output: 15 }],
+  [/sonnet/, { input: 2, output: 10 }],
+  [/haiku/, { input: 1, output: 5 }],
+];
+
+export function costOf(model: string, u: { input: number; output: number; cacheWrite: number; cacheRead: number }): number {
+  const p = PRICES.find(([re]) => re.test(model))?.[1] ?? { input: 5, output: 25 };
+  return (u.input * p.input + u.cacheWrite * p.input * 1.25 + u.cacheRead * p.input * 0.1 + u.output * p.output) / 1_000_000;
+}
+
+/** Thrown before a call is made when today's budget is spent. Handled like an outage: held, not lost. */
+export class BudgetReached extends Error {}
+
+// Sorting what was heard and reading spoken asks are cheap and keep nothing from being lost, so
+// they may run a little past the budget. Everything else stops at it.
+const ESSENTIAL = new Set(["sorting moments", "asks"]);
+
+function checkBudget(): void {
+  const budget = spend?.budgetUsd();
+  if (!spend || !budget || budget <= 0) return;
+  const limit = ESSENTIAL.has(currentPurpose()) ? budget * 1.25 : budget;
+  if (spend.spentToday() >= limit) throw new BudgetReached(`today's Claude budget of $${budget.toFixed(2)} is spent, so the rest waits until tomorrow`);
+}
+
+function recordUsage(out: unknown): void {
+  const r = out as { model?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number | null; cache_read_input_tokens?: number | null } };
+  if (!spend || !r?.usage) return;
+  const u = {
+    input: r.usage.input_tokens ?? 0,
+    output: r.usage.output_tokens ?? 0,
+    cacheWrite: r.usage.cache_creation_input_tokens ?? 0,
+    cacheRead: r.usage.cache_read_input_tokens ?? 0,
+  };
+  const model = r.model ?? "unknown";
+  try {
+    spend.record({ at: Date.now(), purpose: currentPurpose(), model, ...u, cost: costOf(model, u) });
+  } catch {
+    // Accounting must never break the work it is counting.
+  }
+}
+
 /**
  * A failure about reaching Claude at all, not about this request: out of credit, the key refused,
  * rate limited, Anthropic having trouble, or the network. Work that fails this way is held and
@@ -46,6 +132,7 @@ export function llmRoute(): string {
 export function unavailableReason(e: unknown): string | null {
   const status = (e as { status?: number } | null)?.status;
   const msg = String((e as Error | null)?.message ?? e ?? "");
+  if (e instanceof BudgetReached) return msg;
   if (/credit balance is too low/i.test(msg)) return "the Anthropic account is out of credit";
   if (/not available for this account|quota|too many tokens per day/i.test(msg)) return "the account isn't allowed to use this model yet";
   if (status === 401 || status === 403) return "the API key was refused";
@@ -70,10 +157,15 @@ export function llmHealth(): LlmHealth {
   return { ...health };
 }
 
-/** Wrap any call to Claude so the dashboard can say plainly when Claude can't be reached. */
-export async function tracked<T>(call: Promise<T>): Promise<T> {
+/**
+ * Every call to Claude goes through here: the budget is checked before it is made, its cost is
+ * recorded after, and the dashboard can say plainly when Claude can't be reached.
+ */
+export async function tracked<T>(call: () => Promise<T>): Promise<T> {
   try {
-    const out = await call;
+    checkBudget();
+    const out = await call();
+    recordUsage(out);
     health.problem = null;
     health.since = null;
     health.lastOkAt = Date.now();
@@ -116,7 +208,7 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: opts.user }];
 
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await tracked(llm().messages.create({
+    const res = await tracked(() => llm().messages.create({
       model: opts.model ?? MODELS.worker,
       max_tokens: opts.maxTokens ?? 4096,
       system: opts.system,
@@ -167,16 +259,18 @@ export interface WriteOptions {
 
 /** Prose generation, streamed. Long-form defaults to the writer model at high effort. */
 export async function write(opts: WriteOptions): Promise<string> {
-  const stream = llm().messages.stream({
-    model: opts.model ?? (opts.quick ? MODELS.worker : MODELS.writer),
-    max_tokens: opts.maxTokens ?? (opts.quick ? 2000 : 16000),
-    system: opts.system,
-    thinking: { type: "adaptive" },
-    output_config: { effort: opts.effort ?? (opts.quick ? "low" : "high") },
-    messages: opts.messages,
+  const msg = await tracked(() => {
+    const stream = llm().messages.stream({
+      model: opts.model ?? (opts.quick ? MODELS.worker : MODELS.writer),
+      max_tokens: opts.maxTokens ?? (opts.quick ? 2000 : 16000),
+      system: opts.system,
+      thinking: { type: "adaptive" },
+      output_config: { effort: opts.effort ?? (opts.quick ? "low" : "high") },
+      messages: opts.messages,
+    });
+    if (opts.onText) stream.on("text", opts.onText);
+    return stream.finalMessage();
   });
-  if (opts.onText) stream.on("text", opts.onText);
-  const msg = await tracked(stream.finalMessage());
   if (msg.stop_reason === "refusal") throw new Error(`model refused: ${msg.stop_details?.explanation ?? "no explanation"}`);
   return msg.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

@@ -2638,3 +2638,57 @@ a.glance-tile:hover {
   background: var(--comb-light);
   border: 1px solid var(--comb);
 }
+
+/* ---------- what Claude costs ---------- */
+.spend-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 6px 0 14px;
+}
+.spend-tile {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--wax);
+}
+.spend-tile strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.spend-tile.over {
+  border-color: var(--bad);
+}
+.spend-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 16px;
+}
+.spend-table caption {
+  text-align: left;
+  padding-bottom: 6px;
+}
+.spend-table th,
+.spend-table td {
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+  text-align: left;
+  font-weight: normal;
+}
+.spend-table td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  padding-left: 12px;
+}
+.budget-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+.budget-row input {
+  width: 120px;
+}

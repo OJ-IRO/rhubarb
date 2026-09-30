@@ -365,6 +365,19 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
           db.updateSkill(id, { priority });
           return json(res, 200, db.getSkill(id));
         }
+        // ---- what Claude has cost, and the daily budget
+        if (head === "usage" && method === "GET" && !idStr) {
+          const budget = Number(db.getKv("daily_budget_usd") ?? process.env.RHUBARB_DAILY_BUDGET_USD ?? 3);
+          return json(res, 200, { ...db.usageSummary(), budget });
+        }
+        if (head === "usage" && idStr === "budget" && method === "PUT") {
+          const body = await readBody<{ usd?: unknown } | null>(req).catch(() => null);
+          const usd = Number(body?.usd);
+          if (!Number.isFinite(usd) || usd < 0 || usd > 500) return json(res, 400, { error: "send { usd } between 0 and 500; 0 means no cap" });
+          db.setKv("daily_budget_usd", String(Math.round(usd * 100) / 100));
+          log(`budget: daily Claude budget set to $${usd.toFixed(2)}`);
+          return json(res, 200, { budget: usd });
+        }
         if (head === "reflect" && method === "POST") {
           void actions.reflectNow();
           return json(res, 202, { ok: true });
