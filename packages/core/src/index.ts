@@ -7,3 +7,4 @@ export * from "./lessonChecks.js";
 export * from "./scheduling.js";
 export * from "./llm.js";
 export * from "./voice.js";
+export * from "./places.js";

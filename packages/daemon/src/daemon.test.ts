@@ -404,3 +404,17 @@ test("moments binned as noise because Claude was unreachable go back in the queu
   assert.deepEqual(db.pendingAsks(0).map((e) => e.id), [asked], "an ask with no lesson yet is waiting to be retried");
   db.close();
 });
+
+test("a conversation's place reaches its moments, arriving before or after them, and can be forgotten", () => {
+  const db = freshDb();
+  const deps = { db, log: () => {}, onJournalReady: () => {}, onAsk: () => {} };
+  handleUtterance(deps, "wheel", { id: 700, text: "I wonder how they built this wheel so close to the harbor", spoken_at: "2026-09-27T06:10:00.000Z" });
+  db.setConversationPlace("wheel", "Tempozan Harbor Village, Osaka"); // location arrives after the words
+  assert.equal(db.evidenceByUtterance(700)!.place, "Tempozan Harbor Village, Osaka");
+  handleUtterance(deps, "wheel", { id: 701, text: "why do they paint the gondolas different colors", spoken_at: "2026-09-27T06:11:00.000Z" });
+  assert.equal(db.evidenceByUtterance(701)!.place, "Tempozan Harbor Village, Osaka", "and before");
+  db.clearPlaces();
+  assert.equal(db.evidenceByUtterance(700)!.place, null);
+  assert.equal(db.conversationPlace("wheel"), null);
+  db.close();
+});

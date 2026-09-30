@@ -67,6 +67,15 @@ export class BeeClient {
     return this.request("GET", "/v1/todayBrief");
   }
 
+  /** Places Bee has seen the wearer spend time, with visit counts and dwell. */
+  locationClusters(): Promise<{ clusters?: Array<{ latitude?: number; longitude?: number; total_dwell_ms?: number; visit_count?: number }> }> {
+    return this.request("GET", "/v1/locations/clusters");
+  }
+
+  listConversations(limit = 50): Promise<{ conversations?: Array<{ id: number; start_time?: number; end_time?: number | null; primary_location?: { address?: string; latitude?: number; longitude?: number } | null }> }> {
+    return this.request("GET", `/v1/conversations?limit=${limit}`);
+  }
+
   recentVisits(limit = 20): Promise<{ visits?: Array<Record<string, unknown>> } & Record<string, unknown>> {
     return this.request("GET", `/v1/locations/recent?limit=${limit}`);
   }

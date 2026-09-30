@@ -17,6 +17,7 @@ import { runReflection } from "./pipeline/reflect.js";
 import { afterQuietHours, nextLearningSlot, parseLearningWindows, saveLearningSlots } from "./pipeline/schedule.js";
 import { buildSpark } from "./pipeline/sparks.js";
 import { ingestStakes, runSweep } from "./pipeline/sweep.js";
+import { makePlaces } from "./pipeline/places.js";
 import { tutorReply } from "./pipeline/tutor.js";
 
 const DATA_DIR = process.env.RHUBARB_DATA_DIR ?? join(homedir(), ".rhubarb");
@@ -372,7 +373,7 @@ const nightly = guarded("nightly", async () => {
   if (db.getKv("last_nightly") === today || new Date().getHours() < REFLECT_HOUR_LOCAL) return;
   db.setKv("last_nightly", today);
   // Bee's /v1/changes returns a 500 some nights. Reflect on what the live stream caught anyway.
-  await runSweep({ ...captureDeps, bee }).catch((e: Error) => log(`sweep failed, reflecting without it: ${e.message}`));
+  await runSweep({ ...captureDeps, bee, onPlace: (uuid, loc) => places.record(uuid, loc) }).catch((e: Error) => log(`sweep failed, reflecting without it: ${e.message}`));
   await classifyTick();
   await reflectNow();
 });
@@ -385,6 +386,9 @@ const me = await bee.me().catch((e: Error) => {
 log(`connected as ${me.first_name} ${me.last_name}; data dir ${DATA_DIR}`);
 log(`claude via ${llmRoute()}`);
 
+const places = makePlaces({ db, bee, log });
+await places.refreshHome();
+
 // What the dashboard's "listening" light reads. The last-heard time starts from the database,
 // so a restart doesn't make it look as if Rhubarb has never heard anything.
 const listening: Listening = { state: "connecting", lastHeardAt: db.lastHeardAt(), since: Date.now() };
@@ -395,6 +399,7 @@ const consumer = new BeeStreamConsumer({
     // The nightly sweep knows conversations by number, the stream by uuid. Remember the pair.
     if ((ev.type === "new-conversation" || ev.type === "update-conversation") && ev.conversation?.id && ev.conversation.conversation_uuid) {
       db.setKv(`conv:${ev.conversation.id}`, ev.conversation.conversation_uuid);
+      places.record(ev.conversation.conversation_uuid, ev.conversation.primary_location as { address?: string; latitude?: number; longitude?: number } | null);
     }
     handleStreamEvent(captureDeps, ev);
   },
@@ -440,6 +445,8 @@ if (!db.getKv("requeue_unjudged_v1")) {
   db.setKv("requeue_unjudged_v1", String(Date.now()));
   if (n > 0) log(`requeue: ${n} moment${n === 1 ? "" : "s"} filed as noise during an outage put back in the queue`);
 }
+
+setTimeout(() => void places.backfill().catch((e: Error) => log(`places backfill failed: ${e.message}`)), 8_000);
 
 // Rewrites finished before their status was recorded: mark them done so the page stops offering one.
 for (const skill of db.skillsByStatus(["active", "mastered"])) {
@@ -500,7 +507,16 @@ startApi(
           maxTokens: 400,
         })),
       saveProfile: async (p) => {
+        const hadPlaces = db.getProfile()?.usePlaces !== false;
         db.setProfile(p);
+        if (hadPlaces && p.usePlaces === false) {
+          db.clearPlaces();
+          log("places: turned off; every stored place forgotten");
+        }
+        if (!hadPlaces && p.usePlaces !== false) {
+          db.setKv("places_backfill_v1", "");
+          void places.backfill().catch((e: Error) => log(`places backfill failed: ${e.message}`));
+        }
         const slots = await withPurpose("settings", () => parseLearningWindows(p.learningWindows)).catch((e: Error) => {
           log(`learning windows parse failed: ${e.message}`);
           return [];

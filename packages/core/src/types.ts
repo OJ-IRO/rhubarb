@@ -245,6 +245,8 @@ export interface Profile {
   onboardedAt: number | null;
   /** Which alarms Rhubarb may send to the phone. Missing means all on. */
   nudges?: NudgePrefs;
+  /** Name where conversations happened (landmark or neighbourhood, never home or an address). Missing means on. */
+  usePlaces?: boolean;
 }
 
 export interface NudgePrefs {

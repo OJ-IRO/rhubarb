@@ -47,6 +47,7 @@ export function recordAsk(deps: CaptureDeps, conversationUuid: string, u: { id: 
     utteranceId: u.id,
     conversationUuid,
     speakerLabel: u.speaker ?? null,
+    place: db.conversationPlace(conversationUuid),
     source,
   });
   // Asks skip the classifier: the wearer already said what they want. The ask handler decides
@@ -121,6 +122,7 @@ export function handleUtterance(
     utteranceId: u.id,
     conversationUuid,
     speakerLabel: u.speaker ?? null,
+    place: db.conversationPlace(conversationUuid),
     source,
   });
   log(`evidence #${id} [${det.kind}] (${det.cues.join(",")}): "${u.text}"`);

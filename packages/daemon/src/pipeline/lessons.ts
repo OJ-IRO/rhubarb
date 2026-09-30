@@ -225,7 +225,7 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   const baseAsk = `${shape.trimStart()}${shape ? "\n\n" : ""}## Skill\n${skill.name}${skill.domain ? ` (${skill.domain})` : ""}\nCompetent use sounds like: ${skill.competentLooksLike}\n\n## This level (${levelIdx + 1} of ${ladder.length}): ${level.title}\nOutcome: ${level.outcome}\n${
     earlier.length ? `\nEarlier levels already covered: ${earlier.map((l) => ladder[l.levelIdx]?.title).join(", ")}` : ""
   }\n\n## Why this skill is on their board\n${skill.brief}\n\n## Moments from their life to draw on\n${
-    evidence.map((e) => `- ${e.spokenAt}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}${e.editedAt ? " (corrected by the learner: trust these words over anything else)" : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
+    evidence.map((e) => `- ${e.spokenAt}${e.place ? ` at ${e.place}` : ""}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}${e.editedAt ? " (corrected by the learner: trust these words over anything else)" : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
   }\n\n## Reader\n${profile ? `goals: ${profile.goals.join("; ") || "none stated"}` : "no profile yet"}`;
 
   const research = (feedback?: string[]) =>

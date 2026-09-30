@@ -1532,6 +1532,9 @@ button.linklike:hover:not(:disabled) {
   gap: 14px;
   margin-bottom: 14px;
 }
+.where.two-up {
+  grid-template-columns: repeat(2, 1fr);
+}
 .where .card {
   margin: 0;
   padding: 20px 22px;
@@ -2473,7 +2476,8 @@ a.glance-tile:hover {
     top: auto;
     bottom: 96px;
   }
-  .where {
+  .where,
+  .where.two-up {
     grid-template-columns: 1fr;
   }
   .forget-list li {

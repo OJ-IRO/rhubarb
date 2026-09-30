@@ -166,6 +166,11 @@ CREATE TABLE IF NOT EXISTS fsrs_state (
 CREATE TABLE IF NOT EXISTS forgotten_utterances (
   id INTEGER PRIMARY KEY
 );
+CREATE TABLE IF NOT EXISTS conversation_places (
+  conversation_uuid TEXT PRIMARY KEY,
+  place TEXT,
+  updated_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS llm_usage (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   at INTEGER NOT NULL,
@@ -406,6 +411,7 @@ export class RhubarbDb {
       this.db.prepare("DELETE FROM evidence WHERE source != 'calendar' AND date(spoken_at, 'localtime') = ?").run(day);
       this.db.prepare("DELETE FROM journals WHERE date(created_at / 1000, 'unixepoch', 'localtime') = ?").run(day);
       this.db.prepare("UPDATE practice SET answer_text = NULL WHERE answer_text IS NOT NULL AND date(created_at / 1000, 'unixepoch', 'localtime') = ?").run(day);
+      this.db.exec("DELETE FROM conversation_places WHERE conversation_uuid NOT IN (SELECT conversation_uuid FROM utterances)");
     })();
     return ids.length;
   }
@@ -418,7 +424,7 @@ export class RhubarbDb {
   eraseEverything(): void {
     this.db.transaction(() => {
       this.db.exec("INSERT OR IGNORE INTO forgotten_utterances (id) SELECT id FROM utterances");
-      for (const t of ["fsrs_state", "cards", "items", "field_evidence", "practice", "lesson_sessions", "lessons", "ladder_levels", "evidence", "skills", "journals", "utterances"]) {
+      for (const t of ["fsrs_state", "cards", "items", "field_evidence", "practice", "lesson_sessions", "lessons", "ladder_levels", "evidence", "skills", "journals", "utterances", "conversation_places"]) {
         this.db.exec(`DELETE FROM ${t}`);
       }
       this.db.prepare("DELETE FROM kv WHERE key IN ('today_letter', 'today_letter_date', 'stakes_seen')").run();
@@ -543,6 +549,31 @@ export class RhubarbDb {
     return (this.db
       .prepare("SELECT * FROM evidence WHERE kind = 'intent' AND route = 'skill' AND confidence = 1 AND skill_id IS NULL AND created_at >= ? ORDER BY id")
       .all(sinceMs) as Row[]).map(rowToEvidence);
+  }
+
+  // ------------------------------------------------------------------ places
+
+  /** Where a conversation happened (a landmark or neighbourhood; null for home). Fills its moments and sparks. */
+  setConversationPlace(conversationUuid: string, place: string | null): void {
+    this.db
+      .prepare("INSERT INTO conversation_places (conversation_uuid, place, updated_at) VALUES (?, ?, ?) ON CONFLICT(conversation_uuid) DO UPDATE SET place = excluded.place, updated_at = excluded.updated_at")
+      .run(conversationUuid, place, Date.now());
+    this.db.prepare("UPDATE evidence SET place = ? WHERE conversation_uuid = ?").run(place, conversationUuid);
+    this.db.prepare("UPDATE items SET place = ? WHERE conversation_uuid = ?").run(place, conversationUuid);
+  }
+
+  conversationPlace(conversationUuid: string): string | null {
+    const r = this.db.prepare("SELECT place FROM conversation_places WHERE conversation_uuid = ?").get(conversationUuid) as { place: string | null } | undefined;
+    return r?.place ?? null;
+  }
+
+  /** The wearer turned places off: forget every one. */
+  clearPlaces(): void {
+    this.db.transaction(() => {
+      this.db.exec("DELETE FROM conversation_places");
+      this.db.exec("UPDATE evidence SET place = NULL WHERE source != 'calendar'");
+      this.db.exec("UPDATE items SET place = NULL");
+    })();
   }
 
   // ------------------------------------------------------------------ Claude spend

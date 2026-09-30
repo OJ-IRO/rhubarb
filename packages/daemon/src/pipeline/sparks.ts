@@ -39,9 +39,10 @@ export async function buildSpark(deps: SparkDeps, e: Evidence, topic: string): P
     spokenAt: e.spokenAt,
     speakerLabel: e.speakerLabel,
   });
+  if (e.place) db.setItemPlace(itemId, e.place);
 
   const system = systemBlocks(voiceGuide(), ROLE);
-  const baseAsk = `Spark: "${topic}"\nWhat they actually said: "${e.text}"\n\nWhat was going on when they said it:\n${e.context ?? "(no context)"}`;
+  const baseAsk = `Spark: "${topic}"${e.place ? `\nWhere they were: ${e.place}` : ""}\nWhat they actually said: "${e.text}"\n\nWhat was going on when they said it:\n${e.context ?? "(no context)"}`;
   const research = (feedback?: string[]) =>
     researchThenEmit({
       system,

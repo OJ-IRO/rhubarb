@@ -87,7 +87,7 @@ export function Privacy() {
 
       <section>
         <p className="eyebrow">What Rhubarb won't touch</p>
-        <div className="where" data-tour="privacy-top">
+        <div className="where two-up" data-tour="privacy-top">
           <article className="card">
             <h3>It never has your voice</h3>
             <p>Rhubarb receives text from your Bee, never sound. There is no audio here to store, leak or replay, of you or of anyone near you.</p>
@@ -96,6 +96,12 @@ export function Privacy() {
             <h3>Private moments are left alone</h3>
             <p>
               A hard moment, something about your health, your own legal or family matters, a password or card number read aloud: Rhubarb drops these on arrival. The words aren't kept, no lesson is built on them, and no AI model ever sees them.
+            </p>
+          </article>
+          <article className="card">
+            <h3>It never keeps an address</h3>
+            <p>
+              Bee knows where each conversation happened. Rhubarb keeps only a landmark or a neighbourhood, never a street or map point, and nothing at all near where you spend most of your time. You can turn places off in <Link to="/settings">Settings</Link>, which forgets them all.
             </p>
           </article>
           <article className="card">

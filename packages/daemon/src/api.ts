@@ -74,6 +74,7 @@ const ProfileIn = z.object({
   timezone: z.string().max(80).default(() => Intl.DateTimeFormat().resolvedOptions().timeZone),
   onboardedAt: z.number().nullable().default(null),
   nudges: z.object({ lessons: z.boolean(), feedback: z.boolean(), credits: z.boolean(), brief: z.boolean() }).optional(),
+  usePlaces: z.boolean().optional(),
 });
 
 function json(res: ServerResponse, status: number, body: unknown): void {

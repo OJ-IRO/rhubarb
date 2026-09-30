@@ -36,7 +36,7 @@ export async function handleAsk(deps: AskDeps, e: Evidence, ask: string): Promis
   const out = await classify({
     model: MODELS.worker,
     system: systemBlocks(voiceGuide(), ROLE),
-    user: `They said: "${e.text}"\nThe ask: "${ask}"\nSpoken at: ${e.spokenAt}\n\nAround it:\n${e.context ?? "(nothing)"}`,
+    user: `They said: "${e.text}"\nThe ask: "${ask}"\nSpoken at: ${e.spokenAt}${e.place ? `\nWhere: ${e.place}` : ""}\n\nAround it:\n${e.context ?? "(nothing)"}`,
     schema: AskOut,
     maxTokens: 1500,
   });

@@ -4,12 +4,15 @@ import { handleUtterance, type CaptureDeps } from "./capture.js";
 
 export interface SweepDeps extends CaptureDeps {
   bee: BeeClient;
+  /** Where the conversation happened, when Bee knows. */
+  onPlace?: (conversationUuid: string, loc: { address?: string; latitude?: number; longitude?: number }) => void;
 }
 
 type RestUtterance = { id: number; text: string; spoken_at: string | number; speaker?: string | null };
 
 interface ConversationDetail {
   id?: number;
+  primary_location?: { address?: string; latitude?: number; longitude?: number } | null;
   conversation_uuid?: string;
   start_time?: number | string;
   end_time?: number | string | null;
@@ -41,7 +44,7 @@ function unwrap(raw: Record<string, unknown> | null): ConversationDetail | null 
 }
 
 /** Which stream conversation this REST one is, by the words we already stored in its time span. */
-function streamUuidFor(db: RhubarbDb, detail: ConversationDetail): string | null {
+export function streamUuidFor(db: RhubarbDb, detail: ConversationDetail): string | null {
   const known = detail.id ? db.getKv(`conv:${detail.id}`) : null;
   if (known) return known;
   const from = iso(detail.start_time);
@@ -84,6 +87,7 @@ export async function runSweep(deps: SweepDeps): Promise<{ conversations: number
     );
     if (!detail) continue;
     const uuid = detail.conversation_uuid ?? streamUuidFor(db, detail) ?? `bee-${detail.id ?? convId}`;
+    if (detail.primary_location) deps.onPlace?.(uuid, detail.primary_location);
     const list = detail.utterances ?? detail.transcriptions?.flatMap((t) => t.utterances ?? []) ?? [];
     for (const u of list) {
       const spokenAt = iso(u?.spoken_at);

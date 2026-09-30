@@ -252,6 +252,29 @@ export function Settings() {
       <Spend onSaved={(message) => setToast({ message })} />
 
       <section>
+        <p className="eyebrow">Where things happened</p>
+        <ul className="toggles">
+          <li>
+            <span>
+              <strong>Name the place</strong>
+              <span className="muted">
+                Moments and lessons say where a conversation happened, like "Osaka Castle Park, Osaka". Only a landmark or a neighbourhood, never an address, and never anywhere near home. Turning this off forgets every place already saved.
+              </span>
+            </span>
+            <button
+              role="switch"
+              aria-checked={p.usePlaces !== false}
+              aria-label="Name the place"
+              className={p.usePlaces !== false ? "switch on" : "switch"}
+              onClick={() => save({ usePlaces: p.usePlaces === false }, p.usePlaces === false ? "On. New conversations get a place." : "Off. Every saved place is forgotten.")}
+            >
+              <span className="switch-knob" />
+            </button>
+          </li>
+        </ul>
+      </section>
+
+      <section>
         <p className="eyebrow">Your Bee and your data</p>
         <p>
           Everything Rhubarb holds is on {where.hosted ? where.name : "this computer"}. See what it has, and forget any of it, on the <Link to="/privacy">privacy page</Link>. To connect a different Bee, run <code>bee login</code> {where.hosted ? "on the server" : "in a terminal"} and restart Rhubarb.
