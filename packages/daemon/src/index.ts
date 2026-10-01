@@ -184,8 +184,10 @@ const reflectNow = guarded("reflect", () => withPurpose("proposals and letter", 
   // Calendar stakes are a nice-to-have. Their failure must not stop the reflection itself.
   await ingestStakes({ db, bee, log }).catch((e: Error) => log(`stakes skipped: ${e.message}`));
   await classifyTick();
-  const { created } = await runReflection({ db, log });
+  // Recorded before the attempt, so a pass that fails waits its turn instead of retrying (and
+  // paying) every half hour.
   db.setKv("last_reflect_at", String(Date.now()));
+  const { created } = await runReflection({ db, log });
   await nudgeProposals(created);
   await writeTodayLetter(db, log);
 }));

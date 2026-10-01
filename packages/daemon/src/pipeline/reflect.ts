@@ -2,8 +2,11 @@ import { classify, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evid
 import { z } from "zod";
 
 const SkillOut = z.object({
+  // Optional with a default: a reply that leaves it out is still a usable proposal, and a strict
+  // field here failed the whole night's reflection twice over.
   kind: z
     .enum(["skill", "topic"])
+    .default("skill")
     .describe("skill: a capability built over weeks (a language, negotiating). topic: one lesson's worth, something they kept circling and would enjoy understanding properly (the history of a place, how a machine works)"),
   existingId: z.number().nullable().describe("id of an existing skill this evidence belongs to, or null for a new skill"),
   name: z.string().describe("short, specific skill name, e.g. 'Kubernetes rolling deployments' not 'DevOps'"),

@@ -206,6 +206,7 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
   const schema = z.toJSONSchema(opts.schema) as Record<string, unknown>;
   delete schema.$schema;
   const messages: Anthropic.MessageParam[] = [{ role: "user", content: opts.user }];
+  let lastIssue = "";
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await tracked(() => llm().messages.create({
@@ -228,6 +229,11 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
     if (!call) throw new Error("model did not call the emit tool");
     const parsed = opts.schema.safeParse(call.input);
     if (parsed.success) return parsed.data;
+    // Say which field was wrong, so a failure in the logs can be fixed instead of guessed at.
+    lastIssue = parsed.error.issues
+      .slice(0, 3)
+      .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+      .join("; ");
     messages.push(
       { role: "assistant", content: res.content },
       {
@@ -243,7 +249,7 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
       }
     );
   }
-  throw new Error("structured output failed schema validation twice");
+  throw new Error(`structured output failed schema validation twice (${lastIssue})`);
 }
 
 export interface WriteOptions {
