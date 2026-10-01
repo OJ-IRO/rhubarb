@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import type { Familiarity } from "@rhubarb/core";
 import { api, type Skill, type SkillRow } from "../api";
+import { StartingPoint } from "../components/Reading";
 import { HexBadge, HexLevels, Loading } from "../components/Hex";
 import { Meter, StatusChip } from "../components/Meter";
 import { Toast, type ToastState } from "../components/Toast";
@@ -20,10 +22,20 @@ function Origin({ s }: { s: SkillRow }) {
   );
 }
 
-function Action({ s, busy, onAccept }: { s: SkillRow; busy: boolean; onAccept: () => void }) {
+function Action({ s, busy, onAccept }: { s: SkillRow; busy: boolean; onAccept: (f: Familiarity) => void }) {
+  const [asking, setAsking] = useState(false);
+  if (s.status === "proposed" && asking)
+    return (
+      <div className="accept-ask">
+        <StartingPoint value={null} onChange={(f) => onAccept(f)} label="Yes. How much do you know already?" />
+        <button className="ghost small" disabled={busy} onClick={() => setAsking(false)}>
+          Cancel
+        </button>
+      </div>
+    );
   if (s.status === "proposed")
     return (
-      <button className="primary" disabled={busy} onClick={onAccept}>
+      <button className="primary" disabled={busy} onClick={() => setAsking(true)}>
         {busy ? "Starting…" : s.kind === "topic" ? "Yes, write it" : "Yes, teach me this"}
       </button>
     );
@@ -38,6 +50,44 @@ function Action({ s, busy, onAccept }: { s: SkillRow; busy: boolean; onAccept: (
     <Link to={`/skills/${s.id}`} className="button">
       Look back
     </Link>
+  );
+}
+
+/** Start a lesson on anything: type an idea, or paste a line from a conversation. Saying it is the yes. */
+function StartLesson({ onStarted }: { onStarted: (name: string) => void }) {
+  const [idea, setIdea] = useState("");
+  const [start, setStart] = useState<Familiarity | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function go() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.startFromIdea(idea.trim(), start);
+      onStarted(idea.trim());
+      setIdea("");
+      setStart(null);
+    } catch {
+      setError("That didn't start. Try again in a moment.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="start-lesson card">
+      <label htmlFor="idea">
+        <strong>Start a lesson on anything</strong>
+      </label>
+      <p className="muted small">Type an idea, or paste a line from a conversation you had. It's written for you in a few minutes.</p>
+      <textarea id="idea" rows={2} value={idea} onChange={(e) => setIdea(e.target.value)} placeholder="ordering at a konbini, or how ferris wheels stay balanced" />
+      <StartingPoint value={start} onChange={setStart} />
+      {error && <p className="feedback">{error}</p>}
+      <button className="primary" disabled={busy || idea.trim().length < 3} onClick={() => void go()}>
+        {busy ? "Starting…" : "Start it"}
+      </button>
+    </section>
   );
 }
 
@@ -86,6 +136,13 @@ export function Board() {
       <h1 className="title">The board</h1>
       <p className="muted lead">What your conversations suggest you might want to learn, in the order Rhubarb would take them. Say yes or no to each. Anything you ask for out loud, "Hey Rhubarb, teach me…", starts on its own.</p>
 
+      <StartLesson
+        onStarted={(name) => {
+          setToast({ message: `Writing "${name}" now. Your Bee buzzes when it's ready.` });
+          void load();
+        }}
+      />
+
       {ranked.length === 0 && (
         <div className="empty">
           <p>
@@ -103,7 +160,7 @@ export function Board() {
             <article key={s.id} className={`spot spot-${i + 1}`}>
               <div className="spot-top">
                 <HexBadge n={i + 1} tone={i === 0 ? "honey" : "wax"} size={42} />
-                <span className="chips">
+                <span className="status-chips">
                   <Origin s={s} />
                   <StatusChip status={s.status} />
                 </span>
@@ -121,7 +178,7 @@ export function Board() {
                 </span>
               </p>
               <div className="actions">
-                <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
+                <Action s={s} busy={busy === s.id} onAccept={(f) => act(s.id, () => api.acceptSkill(s.id, f))} />
                 {s.status === "proposed" && (
                   <button className="ghost small" disabled={busy === s.id} onClick={() => setAside(s)}>
                     Not this
@@ -158,7 +215,7 @@ export function Board() {
                     {s.brief}
                   </p>
                   <div className="actions compact">
-                    <Action s={s} busy={busy === s.id} onAccept={() => act(s.id, () => api.acceptSkill(s.id))} />
+                    <Action s={s} busy={busy === s.id} onAccept={(f) => act(s.id, () => api.acceptSkill(s.id, f))} />
                     {s.status === "proposed" && (
                       <button className="ghost small" disabled={busy === s.id} onClick={() => setAside(s)}>
                         Not this

@@ -6,6 +6,7 @@ import { applyReading, readReading, type Reading } from "../lib/reading";
 import { Link } from "../router";
 import { ListInput, STYLES, WINDOWS, splitWindows } from "./Onboarding";
 import { useWhere } from "../lib/where";
+import { languagesIn, ReadingPicker } from "../components/Reading";
 
 const ALL: NudgePrefs = { lessons: true, feedback: true, credits: true, brief: true };
 
@@ -250,6 +251,21 @@ export function Settings() {
       </section>
 
       <Spend onSaved={(message) => setToast({ message })} />
+
+      {languagesIn(p.goals).length > 0 && (
+        <section>
+          <p className="eyebrow">Reading help</p>
+          <p className="muted">Every lesson, letter and spark spells out as much of the language as you need, and no more.</p>
+          {languagesIn(p.goals).map((lang) => (
+            <ReadingPicker
+              key={lang}
+              lang={lang}
+              value={p.reading?.[lang]}
+              onChange={(v) => void save({ reading: { ...(p.reading ?? {}), [lang]: v } }, "Saved. The next lesson follows it.")}
+            />
+          ))}
+        </section>
+      )}
 
       <section>
         <p className="eyebrow">Where things happened</p>

@@ -25,6 +25,7 @@ import type {
   LearningProgress,
   PrivacySummary,
   ProgressPoint,
+  Familiarity,
   SkillKind,
   SkillOrigin,
   SkillStatus,
@@ -227,6 +228,7 @@ export class RhubarbDb {
     const scols = (this.db.prepare("PRAGMA table_info(skills)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!scols.includes("kind")) this.db.exec("ALTER TABLE skills ADD COLUMN kind TEXT NOT NULL DEFAULT 'skill'");
     if (!scols.includes("origin")) this.db.exec("ALTER TABLE skills ADD COLUMN origin TEXT NOT NULL DEFAULT 'noticed'");
+    if (!scols.includes("familiarity")) this.db.exec("ALTER TABLE skills ADD COLUMN familiarity TEXT");
     const ecols = (this.db.prepare("PRAGMA table_info(evidence)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!ecols.includes("edited_at")) this.db.exec("ALTER TABLE evidence ADD COLUMN edited_at INTEGER");
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_utterances_spoken ON utterances(spoken_at)");
@@ -518,14 +520,15 @@ export class RhubarbDb {
     brief: string;
     kind?: SkillKind;
     origin?: SkillOrigin;
+    familiarity?: Familiarity | null;
   }): number {
     const now = Date.now();
     const res = this.db
       .prepare(
-        `INSERT INTO skills (name, domain, competent_looks_like, terms, priority, brief, kind, origin, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO skills (name, domain, competent_looks_like, terms, priority, brief, kind, origin, familiarity, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
-      .run(s.name, s.domain, s.competentLooksLike, JSON.stringify(s.terms), s.priority, s.brief, s.kind ?? "skill", s.origin ?? "noticed", now, now);
+      .run(s.name, s.domain, s.competentLooksLike, JSON.stringify(s.terms), s.priority, s.brief, s.kind ?? "skill", s.origin ?? "noticed", s.familiarity ?? null, now, now);
     return Number(res.lastInsertRowid);
   }
 
@@ -700,7 +703,7 @@ export class RhubarbDb {
     return r ?? null;
   }
 
-  updateSkill(id: number, patch: Partial<Pick<Skill, "name" | "domain" | "competentLooksLike" | "priority" | "brief" | "status" | "level">> & { terms?: string[] }): void {
+  updateSkill(id: number, patch: Partial<Pick<Skill, "name" | "domain" | "competentLooksLike" | "priority" | "brief" | "status" | "level" | "familiarity">> & { terms?: string[] }): void {
     const sets: string[] = [];
     const vals: unknown[] = [];
     const map: Record<string, string> = {
@@ -711,6 +714,7 @@ export class RhubarbDb {
       brief: "brief",
       status: "status",
       level: "level",
+      familiarity: "familiarity",
     };
     for (const [k, col] of Object.entries(map)) {
       if (k in patch) {
@@ -1187,6 +1191,7 @@ function rowToSkill(r: Row): Skill {
     level: r.level as number,
     kind: ((r.kind as string) ?? "skill") as SkillKind,
     origin: ((r.origin as string) ?? "noticed") as SkillOrigin,
+    familiarity: ((r.familiarity as string) ?? null) as Familiarity | null,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
   };

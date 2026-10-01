@@ -164,6 +164,12 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   if (path === "/status") return as({ hosted: null, skills: st.rows.length, evidence: 14, openPractice: 1, listening: { state: "connected", lastHeardAt: Date.now() - 2 * 60_000, since: Date.now() - 3 * 3600_000 } });
   if (path === "/skills" && method === "GET") return as(st.rows.filter((s) => s.status !== "dismissed"));
   if (path === "/skills/dismissed") return as(st.rows.filter((s) => s.status === "dismissed"));
+  if (path === "/skills/start" && body) {
+    const { idea, familiarity } = JSON.parse(String(body)) as { idea: string; familiarity: import("@rhubarb/core").Familiarity | null };
+    const id = Math.max(...st.rows.map((r) => r.id)) + 1;
+    st.rows.push({ ...st.rows[0], id, name: idea.charAt(0).toUpperCase() + idea.slice(1), brief: `You asked for this on the board. Rhubarb is writing it now.`, status: "active", priority: 92, kind: "topic", origin: "asked", familiarity, level: 0, evidenceCount: 0, ladderLength: 1, lessonReady: false, lessonId: null });
+    return as({ skillId: id });
+  }
   if ((m = path.match(/^\/skills\/(\d+)\/(accept|dismiss|restore|priority)$/))) {
     const row = st.rows.find((s) => s.id === Number(m![1]));
     if (row) {
@@ -312,7 +318,9 @@ export const api = {
   saveProfile: (p: Profile) => call<Profile>("/profile", { method: "PUT", body: JSON.stringify(p) }),
   skills: () => call<SkillRow[]>("/skills"),
   skill: (id: number) => call<SkillDetail>(`/skills/${id}`),
-  acceptSkill: (id: number) => call<Skill>(`/skills/${id}/accept`, { method: "POST" }),
+  acceptSkill: (id: number, familiarity?: import("@rhubarb/core").Familiarity | null) => call<Skill>(`/skills/${id}/accept`, { method: "POST", body: JSON.stringify({ familiarity: familiarity ?? null }) }),
+  /** Start a lesson on anything typed on the board. */
+  startFromIdea: (idea: string, familiarity: import("@rhubarb/core").Familiarity | null) => call<{ skillId: number }>("/skills/start", { method: "POST", body: JSON.stringify({ idea, familiarity }) }),
   dismissSkill: (id: number) => call<Skill>(`/skills/${id}/dismiss`, { method: "POST" }),
   restoreSkill: (id: number) => call<Skill>(`/skills/${id}/restore`, { method: "POST" }),
   dismissedSkills: () => call<Skill[]>("/skills/dismissed"),

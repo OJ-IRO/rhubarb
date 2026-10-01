@@ -87,6 +87,10 @@ export interface Evidence {
 }
 
 export type SkillStatus = "proposed" | "active" | "dismissed" | "mastered";
+/** How well someone reads a language they are learning: decides how much reading help every lesson gives. */
+export type ReadingLevel = "none" | "basic" | "most" | "fluent";
+/** What they said they already knew when they said yes. */
+export type Familiarity = "new" | "some" | "comfortable";
 /** skill: a capability built over weeks, on a ladder. topic: one lesson on something they wanted to understand. */
 export type SkillKind = "skill" | "topic";
 /** noticed: Rhubarb inferred it from conversation and asks yes or no. asked: they asked Bee for it out loud. */
@@ -108,6 +112,7 @@ export interface Skill {
   level: number;
   kind: SkillKind;
   origin: SkillOrigin;
+  familiarity: Familiarity | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -247,6 +252,8 @@ export interface Profile {
   nudges?: NudgePrefs;
   /** Name where conversations happened (landmark or neighbourhood, never home or an address). Missing means on. */
   usePlaces?: boolean;
+  /** How well they read each language they are learning. Missing means "basic". */
+  reading?: Partial<Record<"japanese" | "korean" | "chinese", ReadingLevel>>;
 }
 
 export interface NudgePrefs {

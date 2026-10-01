@@ -1,4 +1,4 @@
-import { classify, lintProse, MODELS, systemBlocks, voiceGuide, type Evidence, type RhubarbDb } from "@rhubarb/core";
+import { classify, lintProse, MODELS, systemBlocks, voiceGuide, type Evidence, type Familiarity, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 /**
@@ -96,6 +96,42 @@ export async function topicFromSpark(deps: Pick<AskDeps, "db" | "log" | "start">
   });
   if (e) db.assignEvidenceToSkill([e.id], id);
   log(`spark "${card.title}" -> topic #${id} ${out.name}; writing it now`);
+  await deps.start(id);
+  return id;
+}
+
+const IdeaOut = AskOut.omit({ route: true }).extend({
+  route: z.enum(["topic", "skill"]).default("topic").describe("topic: one lesson will cover it. skill: something to get better at over weeks."),
+});
+
+/**
+ * Typed on the board: "ordering at a konbini", or a line pasted from a conversation. Same as
+ * asking out loud: saying it is the yes, so it starts at once, pitched where they said they are.
+ */
+export async function skillFromIdea(deps: Pick<AskDeps, "db" | "log" | "start">, idea: string, familiarity: Familiarity | null): Promise<number> {
+  const { db, log } = deps;
+  const out = await classify({
+    model: MODELS.worker,
+    system: systemBlocks(
+      voiceGuide(),
+      "A reader typed something they want a lesson on: a topic, a skill, or a line from a conversation they had. Name it specifically and write the brief. They asked for it, so it always becomes a lesson. Never use their name."
+    ),
+    user: `What they typed:\n${idea}`,
+    schema: IdeaOut,
+    maxTokens: 1500,
+  });
+  const id = db.insertSkill({
+    name: out.name,
+    domain: out.domain,
+    competentLooksLike: out.competentLooksLike,
+    terms: out.terms,
+    priority: 92,
+    brief: out.brief.trim(),
+    kind: out.route,
+    origin: "asked",
+    familiarity,
+  });
+  log(`idea -> ${out.route} #${id} ${out.name}; writing it now`);
   await deps.start(id);
   return id;
 }

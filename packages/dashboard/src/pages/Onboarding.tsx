@@ -1,3 +1,4 @@
+import { languagesIn, ReadingPicker } from "../components/Reading";
 import { useState } from "react";
 import { HexLevels } from "../components/Hex";
 import { api, type Profile } from "../api";
@@ -78,6 +79,7 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
   const windows = [...picks, ...(otherOn ? [other.trim()] : [])].filter(Boolean).join(", ");
   const [goals, setGoals] = useState<string[]>(initial?.goals ?? []);
   const [offLimits, setOffLimits] = useState<string[]>(initial?.offLimits ?? []);
+  const [reading, setReading] = useState<NonNullable<Profile["reading"]>>(initial?.reading ?? {});
   const [saving, setSaving] = useState(false);
 
   async function finish() {
@@ -89,6 +91,7 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
       learningWindows: windows,
       goals,
       offLimits,
+      reading,
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       onboardedAt: initial?.onboardedAt ?? null,
     };
@@ -149,6 +152,9 @@ export function Onboarding({ onDone, initial }: { onDone: (p: Profile) => void; 
       <h2>Anything you already know you want to get better at?</h2>
       <p className="muted">Rhubarb will listen for these specifically. Leave it empty and it will work from what it hears.</p>
       <ListInput items={goals} onChange={setGoals} placeholder="public speaking, or reading a balance sheet" addLabel="Add" />
+      {languagesIn(goals).map((lang) => (
+        <ReadingPicker key={lang} lang={lang} value={reading[lang]} onChange={(v) => setReading((r) => ({ ...r, [lang]: v }))} />
+      ))}
     </section>,
     <section key="off" className="ask">
       <h2>Anything Rhubarb should never touch?</h2>

@@ -1,4 +1,4 @@
-import { initCardSchedule, lintProse, systemBlocks, textSimilarity, unavailableReason, voiceGuide, type Evidence, type RhubarbDb } from "@rhubarb/core";
+import { initCardSchedule, lintProse, readingNote, systemBlocks, textSimilarity, unavailableReason, voiceGuide, type Evidence, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 import { researchThenEmit } from "./research.js";
 
@@ -41,7 +41,7 @@ export async function buildSpark(deps: SparkDeps, e: Evidence, topic: string): P
   });
   if (e.place) db.setItemPlace(itemId, e.place);
 
-  const card = await writeCard(log, { label: `#${itemId}`, topic, text: e.text, context: e.context, place: e.place });
+  const card = await writeCard(log, { label: `#${itemId}`, topic, text: e.text, context: e.context, place: e.place, reading: readingNote(db.getProfile()) });
 
   const cardId = db.insertCard({ itemId, title: card.title, answerMd: card.answerMd, citations: card.citations });
   initCardSchedule(db, cardId);
@@ -54,9 +54,9 @@ type CardOut = z.infer<typeof CardSchema>;
 /** Research and write one spark card, fixing its style once without searching again. */
 async function writeCard(
   log: (m: string) => void,
-  m: { label: string; topic: string | null; text: string; context: string | null; place: string | null }
+  m: { label: string; topic: string | null; text: string; context: string | null; place: string | null; reading: string }
 ): Promise<CardOut> {
-  const system = systemBlocks(voiceGuide(), ROLE);
+  const system = systemBlocks(voiceGuide(), m.reading ? `${ROLE}\n\n${m.reading}` : ROLE);
   const baseAsk = `${m.topic ? `Spark: "${m.topic}"` : "Spark: work out what they were wondering from their own words below."}${m.place ? `\nWhere they were: ${m.place}` : ""}\nWhat they actually said: "${m.text}"\n\nWhat was going on when they said it:\n${m.context ?? "(no context)"}`;
   let card = await researchThenEmit({
     system,
@@ -103,7 +103,7 @@ export async function reanswerSpark(deps: SparkDeps, cardId: number): Promise<vo
   const key = `spark_rewrite:${cardId}`;
   db.setKv(key, JSON.stringify({ state: "writing", at: Date.now() } satisfies SparkRewrite));
   try {
-    const out = await writeCard(log, { label: `card #${cardId}`, topic: null, text: item.sourceText, context: e?.context ?? null, place: item.place });
+    const out = await writeCard(log, { label: `card #${cardId}`, topic: null, text: item.sourceText, context: e?.context ?? null, place: item.place, reading: readingNote(db.getProfile()) });
     db.updateCard(cardId, out);
     db.setKv(key, JSON.stringify({ state: "done", at: Date.now() } satisfies SparkRewrite));
     log(`spark card #${cardId} answered again from the corrected words: ${out.title}`);

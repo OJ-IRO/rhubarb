@@ -14,6 +14,8 @@ import {
   type Slide,
   type RhubarbDb,
   applyTextEdits,
+  familiarityNote,
+  readingNote,
   unavailableReason,
   checkLesson,
   withoutInventedQuotes,
@@ -121,7 +123,7 @@ Then a quiz of 4 to 7 questions that test understanding, not vocabulary: mostly 
 
 Then four beats in order: checkin, scenario (from their week), teachback (spoken aloud), mission (something to try in a real conversation tomorrow). And bodyMd: the lesson as flowing prose.
 
-Every word follows the writing guide. The reader's own moments are the examples.`;
+Every word follows the writing guide. The reader's own moments are the examples.${readingNote(profile) ? `\n\n${readingNote(profile)} This applies to every card, the quiz, its answer choices and explanations, and the beats.` : ""}`;
 }
 
 export interface LessonDeps {
@@ -143,7 +145,7 @@ export async function ensureLadder(deps: LessonDeps, skill: Skill): Promise<void
     model: MODELS.writer,
     effort: "medium",
     system: LADDER_ROLE,
-    user: `Skill: ${skill.name}\nDomain: ${skill.domain ?? "(unspecified)"}\nWhat competent use sounds like: ${skill.competentLooksLike}\nWhy it matters to them:\n${skill.brief}`,
+    user: `Skill: ${skill.name}\nDomain: ${skill.domain ?? "(unspecified)"}\nWhat competent use sounds like: ${skill.competentLooksLike}\nWhy it matters to them:\n${skill.brief}${skill.familiarity ? `\n\nWhere they start: ${familiarityNote(skill.familiarity)} Start the ladder at their level, not below it.` : ""}`,
     schema: Ladder,
     maxTokens: 3000,
   });
@@ -223,11 +225,13 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
     skill.kind === "topic"
       ? `\n\n## Shape\nThis is a single lesson on one topic from their day, not a rung on a ladder. Tell the whole story in one deck: where it came from, how it works, why it matters, and the one surprising thing worth repeating to a friend.${skill.origin === "asked" ? " They asked for this out loud, so open by answering what they asked." : ""}`
       : "";
-  const baseAsk = `${shape.trimStart()}${shape ? "\n\n" : ""}## Skill\n${skill.name}${skill.domain ? ` (${skill.domain})` : ""}\nCompetent use sounds like: ${skill.competentLooksLike}\n\n## This level (${levelIdx + 1} of ${ladder.length}): ${level.title}\nOutcome: ${level.outcome}\n${
+  const start = familiarityNote(skill.familiarity);
+  const own = evidence.length === 0 ? "\n\n## No moments recorded\nThey started this lesson themselves from an idea, so there is no moment of theirs to quote. Don't invent one: use a clearly labelled example situation instead." : "";
+  const baseAsk = `${shape.trimStart()}${shape ? "\n\n" : ""}${start ? `## Where they start\n${start}\n\n` : ""}## Skill\n${skill.name}${skill.domain ? ` (${skill.domain})` : ""}\nCompetent use sounds like: ${skill.competentLooksLike}\n\n## This level (${levelIdx + 1} of ${ladder.length}): ${level.title}\nOutcome: ${level.outcome}\n${
     earlier.length ? `\nEarlier levels already covered: ${earlier.map((l) => ladder[l.levelIdx]?.title).join(", ")}` : ""
   }\n\n## Why this skill is on their board\n${skill.brief}\n\n## Moments from their life to draw on\n${
     evidence.map((e) => `- ${e.spokenAt}${e.place ? ` at ${e.place}` : ""}${e.speakerLabel ? ` (${e.speakerLabel})` : ""}${e.editedAt ? " (corrected by the learner: trust these words over anything else)" : ""}: "${e.text}"${e.context ? `\n  around it:\n  ${e.context.replace(/\n/g, "\n  ")}` : ""}`).join("\n") || "(none recorded)"
-  }\n\n## Reader\n${profile ? `goals: ${profile.goals.join("; ") || "none stated"}` : "no profile yet"}`;
+  }${own}\n\n## Reader\n${profile ? `goals: ${profile.goals.join("; ") || "none stated"}` : "no profile yet"}`;
 
   const research = (feedback?: string[]) =>
     researchThenEmit({

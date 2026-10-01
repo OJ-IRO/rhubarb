@@ -199,3 +199,49 @@ export function matchesSkillTerms(text: string, terms: string[]): string[] {
     return new RegExp(`(?<![a-z0-9])${escaped}(?![a-z0-9])`).test(t);
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Reading help: how much of a language to spell out, by how well the reader reads it.
+// ---------------------------------------------------------------------------------------------
+
+const READING: Record<ScriptLanguage, Record<"none" | "basic" | "most" | "fluent", string>> = {
+  japanese: {
+    none: "The reader can't read Japanese yet. Every time Japanese appears, write the Japanese, then romaji in parentheses, then the English meaning, for example 駅の前 (eki no mae, \"in front of the station\"). Never leave Japanese without romaji and English.",
+    basic: "The reader reads kana but few kanji. After every kanji word, give its reading in hiragana in parentheses, for example 駅(えき)の前(まえ), and give the English meaning of any new word or phrase. No romaji.",
+    most: "The reader reads most everyday kanji. Give hiragana readings only for uncommon kanji, and English only for new or tricky words.",
+    fluent: "The reader reads Japanese fluently. Write Japanese plainly, with no readings or translations.",
+  },
+  korean: {
+    none: "The reader can't read Hangul yet. Every time Korean appears, write the Hangul, then the romanization in parentheses, then the English meaning.",
+    basic: "The reader sounds out Hangul slowly. Give the English meaning of every new word or phrase. No romanization.",
+    most: "The reader reads most everyday Korean. Give English only for new or tricky words.",
+    fluent: "The reader reads Korean fluently. No romanization or translations.",
+  },
+  chinese: {
+    none: "The reader can't read Chinese yet. Every time Chinese appears, write the characters, then pinyin with tone marks in parentheses, then the English meaning.",
+    basic: "The reader knows some characters. Give pinyin with tone marks after every word and the English meaning of new words.",
+    most: "The reader reads most everyday characters. Give pinyin only for uncommon characters, and English only for new or tricky words.",
+    fluent: "The reader reads Chinese fluently. No pinyin or translations.",
+  },
+};
+
+/**
+ * One paragraph for any writer that might put a learned language on the page: how much reading
+ * help this reader needs. Empty when they are not learning a language with its own script.
+ */
+export function readingNote(profile: { goals: string[]; reading?: Partial<Record<ScriptLanguage, "none" | "basic" | "most" | "fluent">> } | null): string {
+  if (!profile) return "";
+  const notes = goalLanguages(profile.goals).map((lang) => READING[lang][profile.reading?.[lang] ?? "basic"]);
+  return notes.length ? `Reading help: ${notes.join(" ")}` : "";
+}
+
+const FAMILIARITY = {
+  new: "They said they are new to this: assume nothing, define every term the first time, and start from the very beginning.",
+  some: "They said they know some of this already: skip the basics they would already have, and build from there.",
+  comfortable: "They said they are comfortable with this: skip the basics, go to the nuance, the mistakes even capable people make, and what experts know.",
+} as const;
+
+/** One sentence telling a writer where this learner is starting from. */
+export function familiarityNote(f: "new" | "some" | "comfortable" | null | undefined): string {
+  return f ? FAMILIARITY[f] : "";
+}

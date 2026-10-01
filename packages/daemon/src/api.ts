@@ -2,7 +2,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
-import type { Card, Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
+import type { Card, Familiarity, Lesson, LessonBeat, Profile, Skill, RhubarbDb } from "@rhubarb/core";
 import { llmHealth } from "@rhubarb/core";
 import { z } from "zod";
 
@@ -17,7 +17,9 @@ export interface ApiDeps {
   nextSlot?: () => Date;
   actions: {
     reflectNow: () => Promise<void>;
-    acceptSkill: (id: number) => Promise<void>;
+    acceptSkill: (id: number, familiarity?: Familiarity | null) => Promise<void>;
+    /** A lesson the reader typed an idea for. Returns the new skill's id; writing carries on behind. */
+    startFromIdea?: (idea: string, familiarity: Familiarity | null) => Promise<number>;
     dismissSkill: (id: number) => Promise<void>;
     /** Write the current lesson again from corrected moments. Returns at once; the lesson nudge says when it is ready. */
     rewriteLesson?: (skillId: number) => Promise<void>;
@@ -77,6 +79,7 @@ const ProfileIn = z.object({
   onboardedAt: z.number().nullable().default(null),
   nudges: z.object({ lessons: z.boolean(), feedback: z.boolean(), credits: z.boolean(), brief: z.boolean() }).optional(),
   usePlaces: z.boolean().optional(),
+  reading: z.object({ japanese: z.enum(["none", "basic", "most", "fluent"]).optional(), korean: z.enum(["none", "basic", "most", "fluent"]).optional(), chinese: z.enum(["none", "basic", "most", "fluent"]).optional() }).optional(),
 });
 
 function json(res: ServerResponse, status: number, body: unknown): void {
@@ -157,6 +160,10 @@ button{margin-top:14px;width:100%;font:inherit;padding:10px;border-radius:10px;b
 <input type="password" name="token" autocomplete="current-password" autofocus aria-label="Access token"><button type="submit">Open</button></form></body></html>`;
 
 const sparkLessonsStarting = new Set<number>();
+
+function familiarityFrom(v: unknown): Familiarity | null {
+  return v === "new" || v === "some" || v === "comfortable" ? v : null;
+}
 
 export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): Server {
   const { db, log, actions } = deps;
@@ -356,8 +363,18 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
           void actions.rewriteLesson(id).catch((e: Error) => log(`rewrite ${id} failed: ${e.message}`));
           return json(res, 202, { ok: true });
         }
+        // Typed on the board: start a lesson on anything.
+        if (head === "skills" && idStr === "start" && method === "POST" && !tail) {
+          if (!actions.startFromIdea) return json(res, 501, { error: "not available" });
+          const body = await readBody<{ idea?: unknown; familiarity?: unknown } | null>(req).catch(() => null);
+          const idea = typeof body?.idea === "string" ? body.idea.trim().slice(0, 2000) : "";
+          if (idea.length < 3) return json(res, 400, { error: "say what you want to learn" });
+          const skillId = await actions.startFromIdea(idea, familiarityFrom(body?.familiarity));
+          return json(res, 200, { skillId });
+        }
         if (head === "skills" && idStr && tail === "accept" && method === "POST") {
-          await actions.acceptSkill(id);
+          const body = await readBody<{ familiarity?: unknown } | null>(req).catch(() => null);
+          await actions.acceptSkill(id, familiarityFrom(body?.familiarity));
           return json(res, 200, db.getSkill(id));
         }
         if (head === "skills" && idStr && tail === "dismiss" && method === "POST") {

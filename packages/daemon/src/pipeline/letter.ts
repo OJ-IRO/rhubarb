@@ -1,7 +1,7 @@
-import { lintProse, systemBlocks, voiceGuide, write, type RhubarbDb } from "@rhubarb/core";
+import { lintProse, readingNote, systemBlocks, voiceGuide, write, type RhubarbDb } from "@rhubarb/core";
 import { todaysLesson } from "../api.js";
 
-const ROLE = `You write the short note at the top of the reader's Rhubarb page each day. Three to five sentences. What their week has been asking of them, what is on the board and why, and the one thing to do today. Address them by name. No headers, no lists. If there is nothing new, say that honestly and keep it to two sentences.`;
+const ROLE = `You write the short note at the top of the reader's Rhubarb page each day. Three to five sentences. What their week has been asking of them, what is on the board and why, and the one thing to do today. Address them as "you"; never use their name. No headers, no lists. If there is nothing new, say that honestly and keep it to two sentences.`;
 
 /** Written after each reflection; shown on the Today page. */
 export async function writeTodayLetter(db: RhubarbDb, log: (m: string) => void): Promise<void> {
@@ -20,7 +20,7 @@ export async function writeTodayLetter(db: RhubarbDb, log: (m: string) => void):
   let letter = await write({
     quick: true,
     maxTokens: 800,
-    system: systemBlocks(voiceGuide(), ROLE),
+    system: systemBlocks(voiceGuide(), `${ROLE}${readingNote(profile) ? `\n\n${readingNote(profile)}` : ""}`),
     messages: [{ role: "user", content: facts }],
   });
   letter = letter.trim();

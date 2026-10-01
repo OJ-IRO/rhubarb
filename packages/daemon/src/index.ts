@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { llmRoute, setSpendHooks, withPurpose, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
-import { handleAsk, topicFromSpark } from "./pipeline/asks.js";
+import { handleAsk, skillFromIdea, topicFromSpark } from "./pipeline/asks.js";
 import { askIn, handleStreamEvent, recordAsk } from "./pipeline/capture.js";
 import { runClassifyBatch } from "./pipeline/classify.js";
 import { findFieldCandidates, judgeFieldEvidence } from "./pipeline/field.js";
@@ -488,10 +488,12 @@ startApi(
     nextSlot: () => nextLearningSlot(db),
     actions: {
       reflectNow,
-      acceptSkill: async (id) => {
+      acceptSkill: async (id, familiarity) => {
+        if (familiarity) db.updateSkill(id, { familiarity });
         // ladder + first lesson take a while; respond now, build in the background
         void startInBackground(id);
       },
+      startFromIdea: (idea, familiarity) => withPurpose("lessons", () => skillFromIdea({ db, log, start: startInBackground }, idea, familiarity)),
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
       rewriteLesson: (id) => withPurpose("lessons", () => rewriteLesson(lessonDeps, id)),
       reanswerSpark: (cardId) => withPurpose("spark answers", () => reanswerSpark({ db, log }, cardId)),

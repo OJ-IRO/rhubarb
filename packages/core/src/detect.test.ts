@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { directAsk, goalLanguages, isBareAddress, stage1Detect } from "./detect.js";
+import { directAsk, goalLanguages, isBareAddress, readingNote, stage1Detect } from "./detect.js";
 
 // Speech recognition gives no question marks and drops apostrophes, so these read the way Bee sends them.
 const kind = (text: string) => {
@@ -115,4 +115,12 @@ test("each call is priced from its model and token counts, and the daily budget 
   // sorting what was heard may run a little past it, so nothing is lost
   await withPurpose("sorting moments", () => tracked(fake(1000)));
   setSpendHooks({ record: () => {}, spentToday: () => 0, budgetUsd: () => null });
+});
+
+test("reading help follows the language and how well they read it", () => {
+  const goals = ["conversational Japanese for daily life in Japan"];
+  assert.match(readingNote({ goals, reading: { japanese: "none" } }), /romaji/);
+  assert.match(readingNote({ goals }), /hiragana in parentheses/, "unset means some help, not none");
+  assert.match(readingNote({ goals, reading: { japanese: "fluent" } }), /no readings or translations/);
+  assert.equal(readingNote({ goals: ["negotiate better"] }), "", "no script language, no note");
 });

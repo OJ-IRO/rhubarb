@@ -1,4 +1,4 @@
-import { classify, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evidence, type Profile, type Skill, type RhubarbDb } from "@rhubarb/core";
+import { classify, readingNote, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evidence, type Profile, type Skill, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 const SkillOut = z.object({
@@ -58,7 +58,8 @@ function renderSkills(list: Skill[]): string {
 
 function renderProfile(p: Profile | null): string {
   if (!p) return "No profile yet: assume a curious generalist with no stated goals or off-limits topics.";
-  return `Learning style: ${p.style}\nSession length: ${p.sessionMinutes} minutes\nWhen they like to learn: ${p.learningWindows}\nGoals they already named: ${p.goals.join("; ") || "(none)"}\nOff-limits topics: ${p.offLimits.join("; ") || "(none)"}`;
+  const reading = readingNote(p);
+  return `Learning style: ${p.style}\nSession length: ${p.sessionMinutes} minutes\nWhen they like to learn: ${p.learningWindows}\nGoals they already named: ${p.goals.join("; ") || "(none)"}\nOff-limits topics: ${p.offLimits.join("; ") || "(none)"}${reading ? `\n${reading} (This applies to the briefs too.)` : ""}`;
 }
 
 async function fixBrief(brief: string, reasons: string[]): Promise<string> {
