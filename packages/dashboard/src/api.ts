@@ -164,10 +164,16 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
   if (path === "/status") return as({ hosted: null, skills: st.rows.length, evidence: 14, openPractice: 1, listening: { state: "connected", lastHeardAt: Date.now() - 2 * 60_000, since: Date.now() - 3 * 3600_000 } });
   if (path === "/skills" && method === "GET") return as(st.rows.filter((s) => s.status !== "dismissed"));
   if (path === "/skills/dismissed") return as(st.rows.filter((s) => s.status === "dismissed"));
+  if ((m = path.match(/^\/skills\/(\d+)\/reading$/)) && body) {
+    const reading = (JSON.parse(String(body)) as { reading: import("@rhubarb/core").ReadingLevel }).reading;
+    const row = st.rows.find((r) => r.id === Number(m![1]));
+    if (row) row.reading = reading;
+    return as(row ?? null);
+  }
   if (path === "/skills/start" && body) {
     const { idea, familiarity } = JSON.parse(String(body)) as { idea: string; familiarity: import("@rhubarb/core").Familiarity | null };
     const id = Math.max(...st.rows.map((r) => r.id)) + 1;
-    st.rows.push({ ...st.rows[0], id, name: idea.charAt(0).toUpperCase() + idea.slice(1), brief: `You asked for this on the board. Rhubarb is writing it now.`, status: "active", priority: 92, kind: "topic", origin: "asked", familiarity, level: 0, evidenceCount: 0, ladderLength: 1, lessonReady: false, lessonId: null });
+    st.rows.push({ ...st.rows[0], id, name: idea.charAt(0).toUpperCase() + idea.slice(1), brief: `You asked for this on the board. Rhubarb is writing it now.`, status: "active", priority: 92, kind: "topic", origin: "asked", familiarity, reading: null, level: 0, evidenceCount: 0, ladderLength: 1, lessonReady: false, lessonId: null });
     return as({ skillId: id });
   }
   if ((m = path.match(/^\/skills\/(\d+)\/(accept|dismiss|restore|priority)$/))) {
@@ -281,7 +287,12 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     return as(row?.card ?? null);
   }
   // A copy, as a real server would send: handing back the same object hides changes from React.
-  if (/^\/skills\/\d+$/.test(path)) return as({ ...structuredClone(f.skillDetail), days: [...new Set(f.evidence.map((e) => localDay(e.spokenAt)))].sort().reverse() });
+  if ((m = path.match(/^\/skills\/(\d+)$/))) {
+    // The plan that was clicked, around the sample lesson and moments.
+    const row = st.rows.find((r) => r.id === Number(m![1]));
+    const detail = structuredClone(f.skillDetail);
+    return as({ ...detail, skill: row ? { ...detail.skill, ...row } : detail.skill, days: [...new Set(f.evidence.map((e) => localDay(e.spokenAt)))].sort().reverse() });
+  }
   if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
   if (/^\/lessons\/\d+\/session$/.test(path)) return as({ id: 1, lessonId: 1, startedAt: Date.now(), completedAt: null, responses: "{}", tutor: "[]" });
   if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the gate right. The part you'd add for level two is what happens when it never opens: the rollout stalls, it doesn't break.", score: 4 });
@@ -318,9 +329,13 @@ export const api = {
   saveProfile: (p: Profile) => call<Profile>("/profile", { method: "PUT", body: JSON.stringify(p) }),
   skills: () => call<SkillRow[]>("/skills"),
   skill: (id: number) => call<SkillDetail>(`/skills/${id}`),
-  acceptSkill: (id: number, familiarity?: import("@rhubarb/core").Familiarity | null) => call<Skill>(`/skills/${id}/accept`, { method: "POST", body: JSON.stringify({ familiarity: familiarity ?? null }) }),
+  acceptSkill: (id: number, familiarity?: import("@rhubarb/core").Familiarity | null, reading?: import("@rhubarb/core").ReadingLevel | null) =>
+    call<Skill>(`/skills/${id}/accept`, { method: "POST", body: JSON.stringify({ familiarity: familiarity ?? null, reading: reading ?? null }) }),
   /** Start a lesson on anything typed on the board. */
-  startFromIdea: (idea: string, familiarity: import("@rhubarb/core").Familiarity | null) => call<{ skillId: number }>("/skills/start", { method: "POST", body: JSON.stringify({ idea, familiarity }) }),
+  startFromIdea: (idea: string, familiarity: import("@rhubarb/core").Familiarity | null, reading?: import("@rhubarb/core").ReadingLevel | null) =>
+    call<{ skillId: number }>("/skills/start", { method: "POST", body: JSON.stringify({ idea, familiarity, reading: reading ?? null }) }),
+  /** How much reading help one language plan gives. */
+  setPlanReading: (id: number, reading: import("@rhubarb/core").ReadingLevel) => call<Skill>(`/skills/${id}/reading`, { method: "PUT", body: JSON.stringify({ reading }) }),
   dismissSkill: (id: number) => call<Skill>(`/skills/${id}/dismiss`, { method: "POST" }),
   restoreSkill: (id: number) => call<Skill>(`/skills/${id}/restore`, { method: "POST" }),
   dismissedSkills: () => call<Skill[]>("/skills/dismissed"),

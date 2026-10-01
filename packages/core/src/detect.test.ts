@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { directAsk, goalLanguages, isBareAddress, readingNote, stage1Detect } from "./detect.js";
+import { directAsk, goalLanguages, isBareAddress, readingNote, readingNoteFor, stage1Detect } from "./detect.js";
 
 // Speech recognition gives no question marks and drops apostrophes, so these read the way Bee sends them.
 const kind = (text: string) => {
@@ -110,17 +110,20 @@ test("each call is priced from its model and token counts, and the daily budget 
   assert.deepEqual(seen, [{ purpose: "lessons", cost: 0.5 }]);
   await withPurpose("lessons", () => tracked(fake(100_000))); // $1.00: now at the budget
   let ran = false;
-  await assert.rejects(withPurpose("lessons", () => tracked(async () => { ran = true; return {}; })), (e: Error) => /budget/.test(unavailableReason(e) ?? ""));
+  await assert.rejects(withPurpose("lessons", () => tracked(async () => { ran = true; return {}; })), (e: Error) => /writing limit/.test(unavailableReason(e) ?? ""));
   assert.equal(ran, false, "the call is never made once the budget is spent");
   // sorting what was heard may run a little past it, so nothing is lost
   await withPurpose("sorting moments", () => tracked(fake(1000)));
   setSpendHooks({ record: () => {}, spentToday: () => 0, budgetUsd: () => null });
 });
 
-test("reading help follows the language and how well they read it", () => {
-  const goals = ["conversational Japanese for daily life in Japan"];
-  assert.match(readingNote({ goals, reading: { japanese: "none" } }), /romaji/);
-  assert.match(readingNote({ goals }), /hiragana in parentheses/, "unset means some help, not none");
-  assert.match(readingNote({ goals, reading: { japanese: "fluent" } }), /no readings or translations/);
-  assert.equal(readingNote({ goals: ["negotiate better"] }), "", "no script language, no note");
+test("reading help is chosen per plan, and writing outside a plan follows the latest language plan", () => {
+  const phone = { name: "Japanese phone calls for deliveries", domain: "Japanese", brief: "", reading: "none" as const, updatedAt: 2 };
+  assert.match(readingNoteFor(phone), /romaji/);
+  assert.match(readingNoteFor({ ...phone, reading: null }), /hiragana in parentheses/, "unset means some help");
+  assert.equal(readingNoteFor({ name: "Salary negotiation", domain: null, brief: "", reading: null }), "", "not a language plan");
+  const older = { ...phone, name: "Keigo at work", reading: "fluent" as const, updatedAt: 1 };
+  assert.match(readingNote([older, phone]), /romaji/, "the most recently touched plan wins");
+  assert.match(readingNote([], ["conversational Japanese"]), /hiragana/, "a goal alone gets some help");
+  assert.equal(readingNote([], ["negotiate better"]), "");
 });

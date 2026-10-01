@@ -26,6 +26,7 @@ import type {
   PrivacySummary,
   ProgressPoint,
   Familiarity,
+  ReadingLevel,
   SkillKind,
   SkillOrigin,
   SkillStatus,
@@ -229,6 +230,7 @@ export class RhubarbDb {
     if (!scols.includes("kind")) this.db.exec("ALTER TABLE skills ADD COLUMN kind TEXT NOT NULL DEFAULT 'skill'");
     if (!scols.includes("origin")) this.db.exec("ALTER TABLE skills ADD COLUMN origin TEXT NOT NULL DEFAULT 'noticed'");
     if (!scols.includes("familiarity")) this.db.exec("ALTER TABLE skills ADD COLUMN familiarity TEXT");
+    if (!scols.includes("reading")) this.db.exec("ALTER TABLE skills ADD COLUMN reading TEXT");
     const ecols = (this.db.prepare("PRAGMA table_info(evidence)").all() as Array<{ name: string }>).map((c) => c.name);
     if (!ecols.includes("edited_at")) this.db.exec("ALTER TABLE evidence ADD COLUMN edited_at INTEGER");
     this.db.exec("CREATE INDEX IF NOT EXISTS idx_utterances_spoken ON utterances(spoken_at)");
@@ -703,7 +705,7 @@ export class RhubarbDb {
     return r ?? null;
   }
 
-  updateSkill(id: number, patch: Partial<Pick<Skill, "name" | "domain" | "competentLooksLike" | "priority" | "brief" | "status" | "level" | "familiarity">> & { terms?: string[] }): void {
+  updateSkill(id: number, patch: Partial<Pick<Skill, "name" | "domain" | "competentLooksLike" | "priority" | "brief" | "status" | "level" | "familiarity" | "reading">> & { terms?: string[] }): void {
     const sets: string[] = [];
     const vals: unknown[] = [];
     const map: Record<string, string> = {
@@ -715,6 +717,7 @@ export class RhubarbDb {
       status: "status",
       level: "level",
       familiarity: "familiarity",
+      reading: "reading",
     };
     for (const [k, col] of Object.entries(map)) {
       if (k in patch) {
@@ -1192,6 +1195,7 @@ function rowToSkill(r: Row): Skill {
     kind: ((r.kind as string) ?? "skill") as SkillKind,
     origin: ((r.origin as string) ?? "noticed") as SkillOrigin,
     familiarity: ((r.familiarity as string) ?? null) as Familiarity | null,
+    reading: ((r.reading as string) ?? null) as ReadingLevel | null,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
   };

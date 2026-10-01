@@ -56,9 +56,8 @@ function renderSkills(list: Skill[]): string {
   return list.map((s) => `- id ${s.id} | ${s.kind} | ${s.name} | status ${s.status} | level ${s.level} | priority ${s.priority}`).join("\n");
 }
 
-function renderProfile(p: Profile | null): string {
+function renderProfile(p: Profile | null, reading: string): string {
   if (!p) return "No profile yet: assume a curious generalist with no stated goals or off-limits topics.";
-  const reading = readingNote(p);
   return `Learning style: ${p.style}\nSession length: ${p.sessionMinutes} minutes\nWhen they like to learn: ${p.learningWindows}\nGoals they already named: ${p.goals.join("; ") || "(none)"}\nOff-limits topics: ${p.offLimits.join("; ") || "(none)"}${reading ? `\n${reading} (This applies to the briefs too.)` : ""}`;
 }
 
@@ -84,7 +83,8 @@ export async function runReflection(deps: ReflectDeps): Promise<{ touched: numbe
   const existing = db.skillsByStatus(["proposed", "active"]);
   const profile = db.getProfile();
 
-  const user = `## The person\n${renderProfile(profile)}\n\n## Skills already on their board\n${renderSkills(existing)}\n\n## New evidence since last reflection\n${renderEvidence(evidence)}\n\nToday is ${new Date().toDateString()}.`;
+  const reading = readingNote(existing, profile?.goals ?? []);
+  const user = `## The person\n${renderProfile(profile, reading)}\n\n## Skills already on their board\n${renderSkills(existing)}\n\n## New evidence since last reflection\n${renderEvidence(evidence)}\n\nToday is ${new Date().toDateString()}.`;
 
   const out = await classify({
     model: MODELS.writer,

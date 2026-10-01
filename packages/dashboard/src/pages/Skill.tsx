@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import type { ReadingLevel } from "@rhubarb/core";
 import { api, when, type Evidence, type SkillDetail } from "../api";
+import { planLanguage, ReadingPicker, type ScriptLanguage } from "../components/Reading";
 import { HexLevels, HexNode, Loading } from "../components/Hex";
 import { Link } from "../router";
 
@@ -91,6 +93,49 @@ function Moment({ e, onSaved }: { e: Evidence; onSaved: (e: Evidence) => void })
   );
 }
 
+/**
+ * Reading help belongs to the plan, not the person: someone can read kana for phone calls and
+ * still want romaji for a dialect they've never seen. Changing it shapes the next lesson, and the
+ * current one can be written again to match.
+ */
+function PlanReading({ skillId, lang, value, hasLesson, onSaved, onRewrite }: { skillId: number; lang: ScriptLanguage; value: ReadingLevel | null; hasLesson: boolean; onSaved: (r: ReadingLevel) => void; onRewrite: () => Promise<void> }) {
+  const [changed, setChanged] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
+  return (
+    <section className="plan-reading">
+      <ReadingPicker
+        lang={lang}
+        value={value}
+        question="Reading help for this plan"
+        onChange={async (r) => {
+          await api.setPlanReading(skillId, r);
+          onSaved(r);
+          setChanged(true);
+        }}
+      />
+      {changed && (
+        <p className="muted small">
+          Saved. The next lesson follows it.{" "}
+          {hasLesson && (
+            <button
+              className="ghost small"
+              disabled={rewriting}
+              onClick={async () => {
+                setRewriting(true);
+                await onRewrite();
+                setChanged(false);
+                setRewriting(false);
+              }}
+            >
+              {rewriting ? "Starting…" : "Rewrite the current lesson with it"}
+            </button>
+          )}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export function SkillPage({ id }: { id: number }) {
   const [d, setD] = useState<SkillDetail | null>(null);
   const [asking, setAsking] = useState(false);
@@ -139,6 +184,19 @@ export function SkillPage({ id }: { id: number }) {
         </p>
       )}
       <p className="brief">{skill.brief}</p>
+      {planLanguage(skill) && skill.status !== "proposed" && (
+        <PlanReading
+          skillId={skill.id}
+          lang={planLanguage(skill)!}
+          value={skill.reading}
+          hasLesson={lessons.length > 0}
+          onSaved={(reading) => setD({ ...d, skill: { ...skill, reading } })}
+          onRewrite={async () => {
+            await api.rewriteLesson(skill.id);
+            setD(await api.skill(id));
+          }}
+        />
+      )}
       {(d.days?.length ?? 0) > 0 && (
         <p className="made-from">
           <span className="muted small">Made from</span>

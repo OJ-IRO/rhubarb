@@ -225,13 +225,32 @@ const READING: Record<ScriptLanguage, Record<"none" | "basic" | "most" | "fluent
   },
 };
 
+type Level = "none" | "basic" | "most" | "fluent";
+type PlanLike = { name: string; domain: string | null; brief: string; reading: Level | null; status?: string; updatedAt?: number };
+
+/** Which script language a plan is about, judged from its name, domain and brief. */
+export function planLanguage(plan: { name: string; domain: string | null; brief: string }): ScriptLanguage | null {
+  return goalLanguages([plan.name, plan.domain ?? "", plan.brief])[0] ?? null;
+}
+
+/** Reading help for one plan, at the level chosen for it (some help when unset). Empty if it isn't a language plan. */
+export function readingNoteFor(plan: PlanLike): string {
+  const lang = planLanguage(plan);
+  return lang ? `Reading help: ${READING[lang][plan.reading ?? "basic"]}` : "";
+}
+
 /**
- * One paragraph for any writer that might put a learned language on the page: how much reading
- * help this reader needs. Empty when they are not learning a language with its own script.
+ * For writing that isn't tied to one plan (the morning letter, sparks, proposal briefs): follow
+ * the most recently touched language plan of each language, and give some help where there is none.
  */
-export function readingNote(profile: { goals: string[]; reading?: Partial<Record<ScriptLanguage, "none" | "basic" | "most" | "fluent">> } | null): string {
-  if (!profile) return "";
-  const notes = goalLanguages(profile.goals).map((lang) => READING[lang][profile.reading?.[lang] ?? "basic"]);
+export function readingNote(plans: PlanLike[], goals: string[] = []): string {
+  const byLang = new Map<ScriptLanguage, Level>();
+  for (const p of [...plans].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))) {
+    const lang = planLanguage(p);
+    if (lang && !byLang.has(lang)) byLang.set(lang, p.reading ?? "basic");
+  }
+  for (const lang of goalLanguages(goals)) if (!byLang.has(lang)) byLang.set(lang, "basic");
+  const notes = [...byLang].map(([lang, level]) => READING[lang][level]);
   return notes.length ? `Reading help: ${notes.join(" ")}` : "";
 }
 

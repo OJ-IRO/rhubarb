@@ -113,6 +113,8 @@ export interface Skill {
   kind: SkillKind;
   origin: SkillOrigin;
   familiarity: Familiarity | null;
+  /** For a language plan: how well they read it, chosen for this plan. Null means some help. */
+  reading: ReadingLevel | null;
   createdAt: number;
   updatedAt: number;
 }

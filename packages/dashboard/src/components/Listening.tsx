@@ -70,7 +70,7 @@ export function ListeningLight() {
         >
           <span className="listening-dot" aria-hidden="true" />
           <span>
-            {/budget/.test(claude.problem) ? "Paused" : `Can't reach Claude${claude.since ? ` since ${ago(now - claude.since)}` : ""}`}: {claude.problem}. Nothing is lost.
+            {/writing limit/.test(claude.problem) ? "Paused" : `Can't reach Claude${claude.since ? ` since ${ago(now - claude.since)}` : ""}`}: {claude.problem}. Nothing is lost.
           </span>
         </p>
       )}

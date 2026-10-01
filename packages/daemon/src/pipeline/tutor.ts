@@ -1,4 +1,4 @@
-import { systemBlocks, voiceGuide, write, type Lesson, type RhubarbDb, readingNote } from "@rhubarb/core";
+import { systemBlocks, voiceGuide, write, type Lesson, type RhubarbDb, readingNoteFor } from "@rhubarb/core";
 
 export interface TutorMsg {
   role: "user" | "assistant";
@@ -14,7 +14,7 @@ export async function tutorReply(db: RhubarbDb, lesson: Lesson, history: TutorMs
   const profile = db.getProfile();
   const context = `## Skill\n${skill?.name ?? "(unknown)"}\n\n## The lesson they are reading\n${lesson.bodyMd}\n\n## Moments from their week\n${
     evidence.map((e) => `- ${e.spokenAt}: "${e.text}"`).join("\n") || "(none)"
-  }\n\n## Reader\n${profile ? `prefers ${profile.style} teaching` : "no profile"}${readingNote(profile) ? `\n${readingNote(profile)}` : ""}`;
+  }\n\n## Reader\n${profile ? `prefers ${profile.style} teaching` : "no profile"}${skill && readingNoteFor(skill) ? `\n${readingNoteFor(skill)}` : ""}`;
 
   return write({
     quick: true,

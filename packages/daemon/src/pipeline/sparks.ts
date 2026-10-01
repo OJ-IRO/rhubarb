@@ -41,7 +41,7 @@ export async function buildSpark(deps: SparkDeps, e: Evidence, topic: string): P
   });
   if (e.place) db.setItemPlace(itemId, e.place);
 
-  const card = await writeCard(log, { label: `#${itemId}`, topic, text: e.text, context: e.context, place: e.place, reading: readingNote(db.getProfile()) });
+  const card = await writeCard(log, { label: `#${itemId}`, topic, text: e.text, context: e.context, place: e.place, reading: readerNote(db) });
 
   const cardId = db.insertCard({ itemId, title: card.title, answerMd: card.answerMd, citations: card.citations });
   initCardSchedule(db, cardId);
@@ -50,6 +50,11 @@ export async function buildSpark(deps: SparkDeps, e: Evidence, topic: string): P
 }
 
 type CardOut = z.infer<typeof CardSchema>;
+
+/** Reading help for a spark: follow the reader's latest language plan. */
+function readerNote(db: RhubarbDb): string {
+  return readingNote(db.skillsByStatus(["active", "proposed", "mastered"]), db.getProfile()?.goals ?? []);
+}
 
 /** Research and write one spark card, fixing its style once without searching again. */
 async function writeCard(
@@ -103,7 +108,7 @@ export async function reanswerSpark(deps: SparkDeps, cardId: number): Promise<vo
   const key = `spark_rewrite:${cardId}`;
   db.setKv(key, JSON.stringify({ state: "writing", at: Date.now() } satisfies SparkRewrite));
   try {
-    const out = await writeCard(log, { label: `card #${cardId}`, topic: null, text: item.sourceText, context: e?.context ?? null, place: item.place, reading: readingNote(db.getProfile()) });
+    const out = await writeCard(log, { label: `card #${cardId}`, topic: null, text: item.sourceText, context: e?.context ?? null, place: item.place, reading: readerNote(db) });
     db.updateCard(cardId, out);
     db.setKv(key, JSON.stringify({ state: "done", at: Date.now() } satisfies SparkRewrite));
     log(`spark card #${cardId} answered again from the corrected words: ${out.title}`);

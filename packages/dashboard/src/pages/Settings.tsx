@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-import { api, type NudgePrefs, type Profile, type UsageSummary } from "../api";
+import { api, type NudgePrefs, type Profile } from "../api";
 import { Loading } from "../components/Hex";
 import { Toast, type ToastState } from "../components/Toast";
 import { applyReading, readReading, type Reading } from "../lib/reading";
 import { Link } from "../router";
 import { ListInput, STYLES, WINDOWS, splitWindows } from "./Onboarding";
 import { useWhere } from "../lib/where";
-import { languagesIn, ReadingPicker } from "../components/Reading";
 
 const ALL: NudgePrefs = { lessons: true, feedback: true, credits: true, brief: true };
 
@@ -21,81 +20,6 @@ const NUDGE_ROWS: Array<{ key: keyof NudgePrefs; title: string; body: string }> 
  * Everything about you, edited in place. Each section saves itself, so nothing is lost by
  * leaving halfway. The six-question walk-through on first run is the same data, asked once.
  */
-const dollars = (n: number) => (n < 0.01 && n > 0 ? "under 1¢" : `$${n.toFixed(2)}`);
-
-/**
- * What Claude has cost, and a daily cap. Lessons are the expensive part; the cap pauses them and
- * everything else that isn't cheap once the day's budget is spent. Nothing is lost: the work waits
- * until tomorrow.
- */
-function Spend({ onSaved }: { onSaved: (msg: string) => void }) {
-  const [u, setU] = useState<UsageSummary | null>(null);
-  const [draft, setDraft] = useState("");
-  useEffect(() => {
-    api.usage().then((x) => {
-      setU(x);
-      setDraft(String(x.budget));
-    });
-  }, []);
-  if (!u) return null;
-  const over = u.budget > 0 && u.today >= u.budget;
-
-  async function saveBudget() {
-    const usd = Number(draft);
-    if (!Number.isFinite(usd) || usd < 0) return;
-    const { budget } = await api.setBudget(usd);
-    setU({ ...u!, budget });
-    onSaved(budget === 0 ? "No daily cap. Every call still gets counted here." : `Daily budget set to $${budget.toFixed(2)}.`);
-  }
-
-  return (
-    <section>
-      <p className="eyebrow">What Claude costs</p>
-      <div className="spend-tiles">
-        <div className={over ? "spend-tile over" : "spend-tile"}>
-          <span className="muted small">Today</span>
-          <strong>{dollars(u.today)}</strong>
-          {u.budget > 0 && <span className="muted small">of ${u.budget.toFixed(2)}</span>}
-        </div>
-        <div className="spend-tile">
-          <span className="muted small">Last 7 days</span>
-          <strong>{dollars(u.week)}</strong>
-        </div>
-        <div className="spend-tile">
-          <span className="muted small">Since counting began</span>
-          <strong>{dollars(u.total)}</strong>
-        </div>
-      </div>
-      {u.byPurpose.length > 0 ? (
-        <table className="spend-table">
-          <caption className="muted small">The last 7 days, by what it was for</caption>
-          <tbody>
-            {u.byPurpose.map((r) => (
-              <tr key={r.purpose}>
-                <th scope="row">{r.purpose}</th>
-                <td className="muted small">{r.calls} {r.calls === 1 ? "call" : "calls"}</td>
-                <td>{dollars(r.cost)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p className="muted small">Nothing counted yet. Every call to Claude from now on shows up here with what it was for.</p>
-      )}
-      <label htmlFor="budget">Daily budget, in dollars</label>
-      <div className="budget-row">
-        <input id="budget" type="number" min={0} step={0.5} inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)} />
-        <button onClick={() => void saveBudget()} disabled={draft === String(u.budget) || draft === ""}>
-          Save
-        </button>
-      </div>
-      <p className="muted small">
-        Once a day's spend reaches this, lessons, answers and proposals wait until tomorrow. Sorting what Bee heard keeps going a little past it, so nothing is lost. 0 means no cap. Prices are Anthropic's list prices.
-      </p>
-    </section>
-  );
-}
-
 export function Settings() {
   const [p, setP] = useState<Profile | null | undefined>(undefined);
   const [reading, setReading] = useState<Reading>(readReading);
@@ -249,23 +173,6 @@ export function Settings() {
         <span className="muted">Topics Rhubarb hears but must never turn into lessons or keep notes about.</span>
         <ListInput items={p.offLimits} onChange={(offLimits) => void save({ offLimits }, "Rhubarb will leave that alone.")} placeholder="my health, or family finances" addLabel="Add" />
       </section>
-
-      <Spend onSaved={(message) => setToast({ message })} />
-
-      {languagesIn(p.goals).length > 0 && (
-        <section>
-          <p className="eyebrow">Reading help</p>
-          <p className="muted">Every lesson, letter and spark spells out as much of the language as you need, and no more.</p>
-          {languagesIn(p.goals).map((lang) => (
-            <ReadingPicker
-              key={lang}
-              lang={lang}
-              value={p.reading?.[lang]}
-              onChange={(v) => void save({ reading: { ...(p.reading ?? {}), [lang]: v } }, "Saved. The next lesson follows it.")}
-            />
-          ))}
-        </section>
-      )}
 
       <section>
         <p className="eyebrow">Where things happened</p>

@@ -2814,3 +2814,12 @@ a.glance-tile:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+.plan-reading {
+  margin: 4px 0 18px;
+}
+.plan-reading .reading-pick {
+  margin-top: 0;
+}
+.plan-reading p.muted {
+  margin: 8px 0 0;
+}

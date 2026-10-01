@@ -493,7 +493,7 @@ startApi(
         // ladder + first lesson take a while; respond now, build in the background
         void startInBackground(id);
       },
-      startFromIdea: (idea, familiarity) => withPurpose("lessons", () => skillFromIdea({ db, log, start: startInBackground }, idea, familiarity)),
+      startFromIdea: (idea, familiarity, reading) => withPurpose("lessons", () => skillFromIdea({ db, log, start: startInBackground }, idea, familiarity, reading)),
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
       rewriteLesson: (id) => withPurpose("lessons", () => rewriteLesson(lessonDeps, id)),
       reanswerSpark: (cardId) => withPurpose("spark answers", () => reanswerSpark({ db, log }, cardId)),

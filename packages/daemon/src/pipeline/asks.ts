@@ -1,4 +1,4 @@
-import { classify, lintProse, MODELS, systemBlocks, voiceGuide, type Evidence, type Familiarity, type RhubarbDb } from "@rhubarb/core";
+import { classify, lintProse, MODELS, systemBlocks, voiceGuide, type Evidence, type Familiarity, type ReadingLevel, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 /**
@@ -108,7 +108,7 @@ const IdeaOut = AskOut.omit({ route: true }).extend({
  * Typed on the board: "ordering at a konbini", or a line pasted from a conversation. Same as
  * asking out loud: saying it is the yes, so it starts at once, pitched where they said they are.
  */
-export async function skillFromIdea(deps: Pick<AskDeps, "db" | "log" | "start">, idea: string, familiarity: Familiarity | null): Promise<number> {
+export async function skillFromIdea(deps: Pick<AskDeps, "db" | "log" | "start">, idea: string, familiarity: Familiarity | null, reading: ReadingLevel | null = null): Promise<number> {
   const { db, log } = deps;
   const out = await classify({
     model: MODELS.worker,
@@ -131,6 +131,7 @@ export async function skillFromIdea(deps: Pick<AskDeps, "db" | "log" | "start">,
     origin: "asked",
     familiarity,
   });
+  if (reading) db.updateSkill(id, { reading });
   log(`idea -> ${out.route} #${id} ${out.name}; writing it now`);
   await deps.start(id);
   return id;

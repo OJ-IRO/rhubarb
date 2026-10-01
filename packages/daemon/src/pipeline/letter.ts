@@ -10,6 +10,7 @@ export async function writeTodayLetter(db: RhubarbDb, log: (m: string) => void):
   const active = db.skillsByStatus(["active"]);
   const lesson = todaysLesson(db);
   const sparks = db.cardsWithItems(5);
+  const reading = readingNote([...proposed, ...active], profile?.goals ?? []);
 
   const facts = `Today: ${new Date().toDateString()}\n\nProposed skills waiting for a decision:\n${
     proposed.map((s) => `- ${s.name} (priority ${s.priority}): ${s.brief}`).join("\n") || "(none)"
@@ -20,7 +21,7 @@ export async function writeTodayLetter(db: RhubarbDb, log: (m: string) => void):
   let letter = await write({
     quick: true,
     maxTokens: 800,
-    system: systemBlocks(voiceGuide(), `${ROLE}${readingNote(profile) ? `\n\n${readingNote(profile)}` : ""}`),
+    system: systemBlocks(voiceGuide(), `${ROLE}${reading ? `\n\n${reading}` : ""}`),
     messages: [{ role: "user", content: facts }],
   });
   letter = letter.trim();

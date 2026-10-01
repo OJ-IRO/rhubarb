@@ -2,6 +2,11 @@ import type { Familiarity, ReadingLevel } from "@rhubarb/core";
 
 export type ScriptLanguage = "japanese" | "korean" | "chinese";
 
+/** Which language a plan is about, from its name, domain and brief: the same rule the server uses. */
+export function planLanguage(p: { name: string; domain: string | null; brief: string }): ScriptLanguage | null {
+  return languagesIn([p.name, p.domain ?? "", p.brief])[0] ?? null;
+}
+
 /** The same rule the server uses: which learned languages have a script of their own. */
 export function languagesIn(goals: string[]): ScriptLanguage[] {
   const text = goals.join(" ").toLowerCase();
@@ -36,11 +41,11 @@ const LEVELS: Record<ScriptLanguage, Array<{ id: ReadingLevel; name: string; blu
 };
 
 /** How well they read a language: decides how much reading help every lesson, letter and spark gives. */
-export function ReadingPicker({ lang, value, onChange }: { lang: ScriptLanguage; value: ReadingLevel | undefined; onChange: (v: ReadingLevel) => void }) {
+export function ReadingPicker({ lang, value, onChange, question }: { lang: ScriptLanguage; value: ReadingLevel | null | undefined; onChange: (v: ReadingLevel) => void; question?: string }) {
   const current = value ?? "basic";
   return (
     <div className="reading-pick">
-      <p className="reading-q">How well do you read {NAME[lang]}?</p>
+      <p className="reading-q">{question ?? `How well do you read ${NAME[lang]} for this?`}</p>
       <div className="choices row" role="radiogroup" aria-label={`How well you read ${NAME[lang]}`}>
         {LEVELS[lang].map((l) => (
           <button key={l.id} role="radio" aria-checked={current === l.id} className={current === l.id ? "choice on" : "choice"} onClick={() => onChange(l.id)}>

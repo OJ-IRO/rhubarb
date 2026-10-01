@@ -104,7 +104,7 @@ function checkBudget(): void {
   const budget = spend?.budgetUsd();
   if (!spend || !budget || budget <= 0) return;
   const limit = ESSENTIAL.has(currentPurpose()) ? budget * 1.25 : budget;
-  if (spend.spentToday() >= limit) throw new BudgetReached(`today's Claude budget of $${budget.toFixed(2)} is spent, so the rest waits until tomorrow`);
+  if (spend.spentToday() >= limit) throw new BudgetReached("today's writing limit is reached, so new lessons and answers wait until tomorrow");
 }
 
 function recordUsage(out: unknown): void {

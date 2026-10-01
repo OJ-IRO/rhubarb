@@ -36,6 +36,7 @@ const mk = (id: number, name: string, priority: number, status: Skill["status"],
   kind: "skill",
   origin: "noticed",
   familiarity: null,
+  reading: null,
   createdAt: now - 5 * d,
   updatedAt: now - h,
 });

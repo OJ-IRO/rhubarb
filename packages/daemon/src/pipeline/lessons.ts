@@ -15,7 +15,7 @@ import {
   type RhubarbDb,
   applyTextEdits,
   familiarityNote,
-  readingNote,
+  readingNoteFor,
   unavailableReason,
   checkLesson,
   withoutInventedQuotes,
@@ -102,7 +102,7 @@ const STYLE_NOTES: Record<Profile["style"], string> = {
   analogy: "Teach through one strong analogy carried through the whole lesson, then explicitly show where the analogy stops holding.",
 };
 
-function lessonRole(profile: Profile | null): string {
+function lessonRole(profile: Profile | null, reading: string): string {
   const style = profile?.style ?? "story";
   const minutes = profile?.sessionMinutes ?? 10;
   return `You design Rhubarb lessons as a deck of cards. One reader, one skill, one level of the ladder. About ${minutes} minutes to work through.
@@ -123,7 +123,7 @@ Then a quiz of 4 to 7 questions that test understanding, not vocabulary: mostly 
 
 Then four beats in order: checkin, scenario (from their week), teachback (spoken aloud), mission (something to try in a real conversation tomorrow). And bodyMd: the lesson as flowing prose.
 
-Every word follows the writing guide. The reader's own moments are the examples.${readingNote(profile) ? `\n\n${readingNote(profile)} This applies to every card, the quiz, its answer choices and explanations, and the beats.` : ""}`;
+Every word follows the writing guide. The reader's own moments are the examples.${reading ? `\n\n${reading} This applies to every card, the quiz, its answer choices and explanations, and the beats.` : ""}`;
 }
 
 export interface LessonDeps {
@@ -220,7 +220,8 @@ export async function generateLesson(deps: LessonDeps, skill: Skill, levelIdx: n
   const evidence = db.evidenceForSkill(skill.id);
   const earlier = db.lessonsForSkill(skill.id).filter((l) => l.levelIdx < levelIdx);
 
-  const system = systemBlocks(voiceGuide(), lessonRole(profile));
+  // Reading help is chosen per plan: the same person may read kana for one and want romaji for another.
+  const system = systemBlocks(voiceGuide(), lessonRole(profile, readingNoteFor(skill)));
   const shape =
     skill.kind === "topic"
       ? `\n\n## Shape\nThis is a single lesson on one topic from their day, not a rung on a ladder. Tell the whole story in one deck: where it came from, how it works, why it matters, and the one surprising thing worth repeating to a friend.${skill.origin === "asked" ? " They asked for this out loud, so open by answering what they asked." : ""}`
