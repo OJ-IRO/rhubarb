@@ -1,5 +1,5 @@
 import type { DayReview } from "@rhubarb/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type DayDetail } from "../api";
 import { shortDay } from "./DaySelect";
 
@@ -11,8 +11,7 @@ import { shortDay } from "./DaySelect";
 export function ReviewCard({ day, initial, onDone }: { day: string; initial?: DayReview | null; onDone?: () => void }) {
   const [r, setR] = useState<DayReview | null | undefined>(initial);
   const [moments, setMoments] = useState<DayDetail["moments"]>([]);
-  const [shown, setShown] = useState<Set<number>>(new Set());
-  const [saving, setSaving] = useState(false);
+  const [open, setOpen] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,17 +86,45 @@ export function ReviewCard({ day, initial, onDone }: { day: string; initial?: Da
     );
   }
 
-  const set = (id: number, patch: Partial<DayReview["findings"][number]>) => setR({ ...r, findings: r.findings.map((f) => (f.id === id ? { ...f, ...patch } : f)) });
-  const answer = (id: number, text: string) => setR({ ...r, questions: r.questions.map((q) => (q.id === id ? { ...q, answer: text } : q)) });
-  const marked = r.findings.filter((f) => f.verdict).length;
+  const checks = r.findings.length + r.questions.length;
+  return (
+    <>
+      <section className="card review-banner">
+        <div>
+          <p className="eyebrow">{label}</p>
+          <p className="review-banner-line">
+            <strong>
+              {checks} quick {checks === 1 ? "check" : "checks"}
+            </strong>{" "}
+            <span className="muted">before Rhubarb suggests anything new.</span>
+          </p>
+        </div>
+        <button className="primary" onClick={() => setOpen(true)}>
+          Look it over
+        </button>
+      </section>
+      {error && <p className="feedback">{error}</p>}
+      {open && (
+        <ReviewDialog
+          review={r}
+          moments={moments}
+          onMoment={(m) => setMoments((all) => all.map((x) => (x.id === m.id ? m : x)))}
+          onClose={async (next, done) => {
+            setOpen(false);
+            setR(next);
+            await save(next, done);
+          }}
+        />
+      )}
+    </>
+  );
 
-  async function save(done: boolean) {
-    setSaving(true);
+  async function save(next: DayReview, done: boolean) {
     setError(null);
     try {
       const out = await api.saveReview(day, {
-        findings: r!.findings.map((f) => ({ id: f.id, verdict: f.verdict, correction: f.correction })),
-        questions: r!.questions.map((q) => ({ id: q.id, answer: q.answer })),
+        findings: next.findings.map((f) => ({ id: f.id, verdict: f.verdict, correction: f.correction })),
+        questions: next.questions.map((q) => ({ id: q.id, answer: q.answer })),
         done,
       });
       setR(out.review);
@@ -107,76 +134,151 @@ export function ReviewCard({ day, initial, onDone }: { day: string; initial?: Da
       }
     } catch {
       setError("That didn't save. Try again in a moment.");
-    } finally {
-      setSaving(false);
     }
   }
+}
+
+/**
+ * The review, one thing at a time: each finding gets its own step (Right moves straight on; Not
+ * quite asks what really happened), then the questions, then a summary. Closing keeps the answers.
+ */
+function ReviewDialog({ review, moments, onMoment, onClose }: { review: DayReview; moments: DayDetail["moments"]; onMoment: (m: DayDetail["moments"][number]) => void; onClose: (r: DayReview, done: boolean) => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [r, setR] = useState(review);
+  const firstOpen = r.findings.findIndex((f) => !f.verdict);
+  const [step, setStep] = useState(firstOpen < 0 ? r.findings.length : firstOpen);
+  const [heard, setHeard] = useState(false);
+  const total = r.findings.length + (r.questions.length ? 1 : 0) + 1;
+  const onQuestions = step === r.findings.length && r.questions.length > 0;
+  const onSummary = step >= r.findings.length + (r.questions.length ? 1 : 0);
+
+  useEffect(() => {
+    const d = ref.current;
+    if (d && !d.open) d.showModal?.();
+  }, []);
+  useEffect(() => setHeard(false), [step]);
+
+  const setF = (id: number, patch: Partial<DayReview["findings"][number]>) => setR((x) => ({ ...x, findings: x.findings.map((f) => (f.id === id ? { ...f, ...patch } : f)) }));
+  const next = () => setStep((s) => Math.min(s + 1, total - 1));
+  const back = () => setStep((s) => Math.max(s - 1, 0));
+  const close = (done = false) => {
+    ref.current?.close?.();
+    onClose(r, done);
+  };
+
+  const f = step < r.findings.length ? r.findings[step] : null;
+  const lines = f ? moments.filter((m) => f.momentIds.includes(m.id)) : [];
+  const right = r.findings.filter((x) => x.verdict === "right").length;
+  const wrong = r.findings.filter((x) => x.verdict === "wrong").length;
+  const skipped = r.findings.length - right - wrong;
 
   return (
-    <section className="card review-card">
-      <p className="eyebrow">{label}</p>
-      <h2>Is this what happened?</h2>
-      <p className="muted">
-        Rhubarb's first reading of your day. Bee can mishear and can't tell voices apart, so nothing gets suggested until you've had a look.
-      </p>
+    <dialog ref={ref} className="review-dialog" aria-label="Review your day" onCancel={(e) => { e.preventDefault(); close(); }}>
+      <div className="review-dialog-head">
+        <span className="muted small">
+          {step + 1} of {total}
+        </span>
+        <span className="review-progress" aria-hidden="true">
+          {Array.from({ length: total }, (_, i) => (
+            <span key={i} className={i < step ? "done" : i === step ? "now" : ""} />
+          ))}
+        </span>
+        <button className="ghost small" onClick={() => close()} aria-label="Close and keep my answers">
+          Close
+        </button>
+      </div>
 
-      <ol className="findings">
-        {r.findings.map((f) => {
-          const lines = moments.filter((m) => f.momentIds.includes(m.id));
-          return (
-            <li key={f.id} className={f.verdict ? `finding ${f.verdict}` : "finding"}>
-              <p className="claim">{f.claim}</p>
-              {f.unsure && <p className="muted small">Not sure: {f.unsure}</p>}
-              <div className="verdict" role="group" aria-label="Is this right?">
-                <button className={f.verdict === "right" ? "chip on" : "chip"} aria-pressed={f.verdict === "right"} onClick={() => set(f.id, { verdict: f.verdict === "right" ? null : "right" })}>
-                  Right
-                </button>
-                <button className={f.verdict === "wrong" ? "chip on" : "chip"} aria-pressed={f.verdict === "wrong"} onClick={() => set(f.id, { verdict: f.verdict === "wrong" ? null : "wrong" })}>
-                  Not quite
-                </button>
-                {lines.length > 0 && (
-                  <button className="ghost small" onClick={() => setShown((s) => new Set(s.has(f.id) ? [...s].filter((x) => x !== f.id) : [...s, f.id]))}>
-                    {shown.has(f.id) ? "Hide what Bee heard" : "What Bee heard"}
-                  </button>
-                )}
-              </div>
-              {f.verdict === "wrong" && (
-                <textarea
-                  rows={2}
-                  aria-label="What really happened"
-                  placeholder="What really happened? Rhubarb will go by this."
-                  value={f.correction ?? ""}
-                  onChange={(e) => set(f.id, { correction: e.target.value })}
-                />
-              )}
-              {shown.has(f.id) && <HeardLines lines={lines} onFixed={(m) => setMoments((all) => all.map((x) => (x.id === m.id ? m : x)))} />}
-            </li>
-          );
-        })}
-      </ol>
+      {f && (
+        <div className="review-step">
+          <p className="eyebrow">Is this what happened?</p>
+          <p className="review-claim">{f.claim}</p>
+          {f.unsure && <p className="muted small">Not sure: {f.unsure}</p>}
+          {lines.length > 0 && (
+            <button className="ghost small" onClick={() => setHeard(!heard)}>
+              {heard ? "Hide what Bee heard" : "What Bee heard"}
+            </button>
+          )}
+          {heard && <HeardLines lines={lines} onFixed={onMoment} />}
+          {f.verdict === "wrong" && (
+            <textarea
+              autoFocus
+              rows={3}
+              aria-label="What really happened"
+              placeholder="What really happened? Rhubarb will go by this."
+              value={f.correction ?? ""}
+              onChange={(e) => setF(f.id, { correction: e.target.value })}
+            />
+          )}
+          <div className="review-choices">
+            <button
+              className={f.verdict === "right" ? "primary" : "choice-btn"}
+              onClick={() => {
+                setF(f.id, { verdict: "right", correction: null });
+                next();
+              }}
+            >
+              Right
+            </button>
+            <button className={f.verdict === "wrong" ? "primary" : "choice-btn"} onClick={() => setF(f.id, { verdict: "wrong" })}>
+              Not quite
+            </button>
+            {f.verdict === "wrong" && (
+              <button className="ghost small" onClick={next}>
+                Next
+              </button>
+            )}
+            {!f.verdict && (
+              <button className="ghost small" onClick={next}>
+                Skip
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
-      {r.questions.length > 0 && (
-        <div className="review-questions">
+      {onQuestions && (
+        <div className="review-step">
           <p className="eyebrow">A few questions</p>
           {r.questions.map((q) => (
             <label key={q.id} className="review-q">
               <span>{q.text}</span>
-              <input value={q.answer ?? ""} onChange={(e) => answer(q.id, e.target.value)} placeholder="A word or two is plenty" />
+              <input
+                value={q.answer ?? ""}
+                onChange={(e) => setR((x) => ({ ...x, questions: x.questions.map((y) => (y.id === q.id ? { ...y, answer: e.target.value } : y)) }))}
+                placeholder="A word or two is plenty"
+              />
             </label>
           ))}
+          <div className="review-choices">
+            <button className="primary" onClick={next}>
+              Next
+            </button>
+          </div>
         </div>
       )}
 
-      {error && <p className="feedback">{error}</p>}
-      <div className="actions">
-        <button className="primary" disabled={saving} onClick={() => void save(true)}>
-          {saving ? "Saving…" : marked === r.findings.length ? "Done, suggest what to learn" : `Done (${r.findings.length - marked} left unmarked)`}
+      {onSummary && (
+        <div className="review-step">
+          <p className="eyebrow">That's it</p>
+          <p className="review-claim">
+            {right} confirmed{wrong ? `, ${wrong} corrected` : ""}
+            {skipped ? `, ${skipped} skipped` : ""}.
+          </p>
+          <p className="muted">Rhubarb suggests what to learn from what you confirmed, and leaves the rest alone.</p>
+          <div className="review-choices">
+            <button className="primary" onClick={() => close(true)}>
+              Done, suggest what to learn
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step > 0 && (
+        <button className="ghost small review-back" onClick={back}>
+          Back
         </button>
-        <button className="ghost small" disabled={saving} onClick={() => void save(false)}>
-          Save for later
-        </button>
-      </div>
-    </section>
+      )}
+    </dialog>
   );
 }
 
