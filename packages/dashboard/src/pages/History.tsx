@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { api, localDay, when, type DayDetail, type HistoryEntry } from "../api";
+import { api, when, type DayDetail, type HistoryEntry } from "../api";
 import { Loading } from "../components/Hex";
 import { StatusChip } from "../components/Meter";
-import { Link } from "../router";
+import { DaySelect, longDay } from "../components/DaySelect";
+import { Link, go } from "../router";
 
 const KIND: Record<HistoryEntry["kind"], string> = { lesson: "lesson", answer: "out loud", credit: "for real", spark: "spark", level: "level" };
 
@@ -25,45 +26,10 @@ const KIND_LABEL: Record<string, string> = {
   stake: "on your calendar",
 };
 
-/** "Today", "Yesterday", or "Sat 27" for a YYYY-MM-DD day. */
-function shortDay(day: string): string {
-  const today = localDay(Date.now());
-  const yesterday = localDay(Date.now() - 86_400_000);
-  if (day === today) return "Today";
-  if (day === yesterday) return "Yesterday";
-  const d = new Date(`${day}T12:00:00`);
-  return `${d.toLocaleDateString("en-US", { weekday: "short" })} ${d.getDate()}`;
-}
-
-function longDay(day: string): string {
-  return new Date(`${day}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
-}
-
-/** A row of days at the top: pick one to see what it held and what came of it. */
-function DayTabs({ current }: { current?: string }) {
-  const [days, setDays] = useState<Array<{ day: string; moments: number }> | null>(null);
-  useEffect(() => {
-    api.days().then(setDays);
-  }, []);
-  if (!days || days.length === 0) return null;
-  return (
-    <nav className="day-tabs" aria-label="Pick a day">
-      <Link to="/history" className={current ? "day-tab" : "day-tab active"}>
-        Everything
-      </Link>
-      {days.map((d) => (
-        <Link key={d.day} to={`/history/${d.day}`} className={current === d.day ? "day-tab active" : "day-tab"}>
-          {shortDay(d.day)}
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
 const MOMENTS_SHOWN = 12;
 
 /** One day: where you were, what Rhubarb noticed, and the plans and answers that came of it. */
-function DayView({ day }: { day: string }) {
+export function DayView({ day, heading = true }: { day: string; heading?: boolean }) {
   const [d, setD] = useState<DayDetail | null>(null);
   const [all, setAll] = useState(false);
   useEffect(() => {
@@ -76,7 +42,7 @@ function DayView({ day }: { day: string }) {
 
   return (
     <div className="day-view">
-      <h2 className="day-title">{longDay(day)}</h2>
+      {heading && <h2 className="day-title">{longDay(day)}</h2>}
       <p className="muted">
         {d.utterances.toLocaleString()} {d.utterances === 1 ? "line" : "lines"} heard · {d.moments.length} {d.moments.length === 1 ? "moment" : "moments"} noticed
       </p>
@@ -159,8 +125,10 @@ export function History({ day }: { day?: string }) {
   if (day)
     return (
       <div className="history">
-        <h1 className="title">Looking back</h1>
-        <DayTabs current={day} />
+        <div className="day-head">
+          <h1 className="title">Looking back</h1>
+          <DaySelect value={day} everything="Everything" onChange={(d) => go(d ? `/history/${d}` : "/history")} />
+        </div>
         <DayView day={day} />
       </div>
     );
@@ -176,9 +144,11 @@ export function History({ day }: { day?: string }) {
 
   return (
     <div className="history">
-      <h1 className="title">Looking back</h1>
-      <DayTabs />
-      <p className="muted lead">What you've finished, said out loud, and used for real, newest first. Pick a day above to see what it held and what came of it.</p>
+      <div className="day-head">
+        <h1 className="title">Looking back</h1>
+        <DaySelect value="" everything="Everything" onChange={(d) => go(d ? `/history/${d}` : "/history")} />
+      </div>
+      <p className="muted lead">What you've finished, said out loud, and used for real, newest first. Pick a day to see what it held and what came of it.</p>
       {rows.length === 0 && (
         <p className="muted">Nothing yet. This fills in the first time you finish a lesson, answer out loud, or use a skill in a real conversation.</p>
       )}

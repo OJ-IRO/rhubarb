@@ -25,8 +25,11 @@ import type {
   LearningProgress,
   PrivacySummary,
   ProgressPoint,
+  DayReview,
   Familiarity,
   ReadingLevel,
+  ReviewFinding,
+  ReviewQuestion,
   SkillKind,
   SkillOrigin,
   SkillStatus,
@@ -167,6 +170,15 @@ CREATE TABLE IF NOT EXISTS fsrs_state (
 );
 CREATE TABLE IF NOT EXISTS forgotten_utterances (
   id INTEGER PRIMARY KEY
+);
+CREATE TABLE IF NOT EXISTS day_reviews (
+  day TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  findings TEXT NOT NULL DEFAULT '[]',
+  questions TEXT NOT NULL DEFAULT '[]',
+  reason TEXT,
+  created_at INTEGER NOT NULL,
+  done_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS conversation_places (
   conversation_uuid TEXT PRIMARY KEY,
@@ -606,6 +618,64 @@ export class RhubarbDb {
     return (this.db
       .prepare("SELECT DISTINCT date(spoken_at, 'localtime') AS day FROM evidence WHERE skill_id = ? ORDER BY day DESC")
       .all(skillId) as Array<{ day: string }>).map((r) => r.day);
+  }
+
+  // ------------------------------------------------------------------ day reviews
+
+  getReview(day: string): DayReview | null {
+    const r = this.db.prepare("SELECT * FROM day_reviews WHERE day = ?").get(day) as Row | undefined;
+    return r ? rowToReview(r) : null;
+  }
+
+  /** The most recent review still waiting for the reader, if any. */
+  openReview(): DayReview | null {
+    const r = this.db.prepare("SELECT * FROM day_reviews WHERE status IN ('open', 'building') ORDER BY day DESC LIMIT 1").get() as Row | undefined;
+    return r ? rowToReview(r) : null;
+  }
+
+  saveReview(r: { day: string; status: DayReview["status"]; findings?: ReviewFinding[]; questions?: ReviewQuestion[]; reason?: string | null; doneAt?: number | null }): void {
+    const was = this.getReview(r.day);
+    this.db
+      .prepare(
+        `INSERT INTO day_reviews (day, status, findings, questions, reason, created_at, done_at) VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(day) DO UPDATE SET status = excluded.status, findings = excluded.findings, questions = excluded.questions, reason = excluded.reason, done_at = excluded.done_at`
+      )
+      .run(
+        r.day,
+        r.status,
+        JSON.stringify(r.findings ?? was?.findings ?? []),
+        JSON.stringify(r.questions ?? was?.questions ?? []),
+        r.reason ?? null,
+        was?.createdAt ?? Date.now(),
+        r.doneAt ?? was?.doneAt ?? null
+      );
+  }
+
+  /** What the reader confirmed, corrected and answered in recent reviews: the most trusted facts there are. */
+  reviewNotes(sinceDay: string): string[] {
+    const rows = (this.db.prepare("SELECT * FROM day_reviews WHERE status = 'done' AND day >= ? ORDER BY day").all(sinceDay) as Row[]).map(rowToReview);
+    const notes: string[] = [];
+    for (const r of rows) {
+      for (const f of r.findings) {
+        if (f.verdict === "right") notes.push(`${r.day}: confirmed: ${f.claim}`);
+        if (f.verdict === "wrong") notes.push(`${r.day}: NOT what happened: ${f.claim}${f.correction ? ` What really happened: ${f.correction}` : ""}`);
+      }
+      for (const q of r.questions) if (q.answer?.trim()) notes.push(`${r.day}: asked "${q.text}", they said: ${q.answer.trim()}`);
+    }
+    return notes;
+  }
+
+  /** Days whose review is still waiting, so their moments are held back from proposals for now. */
+  heldDays(): Set<string> {
+    const cutoff = Date.now() - 48 * 3600_000;
+    return new Set((this.db.prepare("SELECT day FROM day_reviews WHERE status IN ('open', 'building') AND created_at > ?").all(cutoff) as Array<{ day: string }>).map((r) => r.day));
+  }
+
+  /** A finding the reader said was wrong: its moments stop counting toward any plan. */
+  dropMoments(ids: number[]): void {
+    // also moments not yet sorted (route still empty), so the classifier doesn't bring them back
+    const stmt = this.db.prepare("UPDATE evidence SET route = 'noise', stage = 'classified', skill_id = -1 WHERE id = ?");
+    this.db.transaction((all: number[]) => all.forEach((id) => stmt.run(id)))(ids);
   }
 
   // ------------------------------------------------------------------ places
@@ -1154,8 +1224,20 @@ export class RhubarbDb {
 
 // ---------------------------------------------------------------------- row mappers
 
+function rowToReview(r: Row): DayReview {
+  return {
+    day: r.day as string,
+    status: r.status as DayReview["status"],
+    findings: JSON.parse((r.findings as string) ?? "[]") as ReviewFinding[],
+    questions: JSON.parse((r.questions as string) ?? "[]") as ReviewQuestion[],
+    reason: (r.reason as string) ?? null,
+    createdAt: r.created_at as number,
+    doneAt: (r.done_at as number) ?? null,
+  };
+}
+
 /** YYYY-MM-DD in the server's own time zone, so "today" means the wearer's today. */
-function localDayOf(ms: number): string {
+export function localDayOf(ms: number): string {
   return new Date(ms).toLocaleDateString("en-CA");
 }
 

@@ -2,7 +2,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { extname, join, normalize } from "node:path";
-import type { Card, Familiarity, Lesson, LessonBeat, Profile, ReadingLevel, Skill, RhubarbDb } from "@rhubarb/core";
+import type { Card, DayReview, Familiarity, Lesson, LessonBeat, Profile, ReadingLevel, Skill, RhubarbDb } from "@rhubarb/core";
 import { llmHealth } from "@rhubarb/core";
 import { z } from "zod";
 
@@ -23,6 +23,10 @@ export interface ApiDeps {
     dismissSkill: (id: number) => Promise<void>;
     /** Write the current lesson again from corrected moments. Returns at once; the lesson nudge says when it is ready. */
     rewriteLesson?: (skillId: number) => Promise<void>;
+    /** Write the day review now (runs in the background; poll the review). */
+    buildReview?: (day: string) => Promise<void>;
+    /** The reader finished a day review: apply it and propose from what was confirmed. */
+    finishReview?: (review: DayReview) => Promise<{ dropped: number; setAside: string[] }>;
     /** "Teach me the whole thing": a spark becomes a one-lesson topic. Returns the new skill id. */
     lessonFromSpark?: (card: Card) => Promise<number>;
     /** Answer a spark again after its words were corrected. Returns when written. */
@@ -401,6 +405,41 @@ export function startApi(deps: ApiDeps, port: number, hosted?: HostedOptions): S
           db.updateSkill(id, { priority });
           return json(res, 200, db.getSkill(id));
         }
+        // ---- the day review
+        if (head === "review" && method === "GET" && !idStr) return json(res, 200, db.openReview());
+        if (head === "review" && idStr && /^\d{4}-\d{2}-\d{2}$/.test(idStr)) {
+          const day = idStr;
+          if (method === "GET" && !tail) return json(res, 200, db.getReview(day));
+          if (method === "POST" && tail === "build") {
+            if (!actions.buildReview) return json(res, 501, { error: "not available" });
+            const was = db.getReview(day);
+            if (was?.status === "building") return json(res, 202, was);
+            void actions.buildReview(day).catch((e: Error) => log(`review ${day} failed: ${e.message}`));
+            return json(res, 202, { day, status: "building" });
+          }
+          if (method === "PUT" && !tail) {
+            const r = db.getReview(day);
+            if (!r || r.status === "building") return json(res, 404, { error: "no review for that day" });
+            const body = await readBody<{ findings?: Array<{ id?: unknown; verdict?: unknown; correction?: unknown }>; questions?: Array<{ id?: unknown; answer?: unknown }>; done?: unknown } | null>(req).catch(() => null);
+            for (const f of Array.isArray(body?.findings) ? body!.findings : []) {
+              const hit = r.findings.find((x) => x.id === f.id);
+              if (!hit) continue;
+              if (f.verdict === "right" || f.verdict === "wrong" || f.verdict === null) hit.verdict = f.verdict;
+              if (typeof f.correction === "string") hit.correction = f.correction.trim().slice(0, 1000) || null;
+            }
+            for (const q of Array.isArray(body?.questions) ? body!.questions : []) {
+              const hit = r.questions.find((x) => x.id === q.id);
+              if (hit && typeof q.answer === "string") hit.answer = q.answer.trim().slice(0, 1000) || null;
+            }
+            if (body?.done === true && actions.finishReview) {
+              const out = await actions.finishReview(r);
+              return json(res, 200, { review: db.getReview(day), ...out });
+            }
+            db.saveReview({ day, status: r.status, findings: r.findings, questions: r.questions });
+            return json(res, 200, { review: db.getReview(day) });
+          }
+        }
+
         // ---- one day at a time: where, what was noticed, what came of it
         if (head === "days" && method === "GET" && !idStr) return json(res, 200, db.capturedDays(90));
         if (head === "days" && idStr && method === "GET") {

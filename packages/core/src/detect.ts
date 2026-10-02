@@ -163,10 +163,10 @@ export function stage1Detect(text: string, hints: DetectHints = {}): Stage1Resul
   // A line in a language they are learning is exposure even when no English cue fires. Spoken
   // Japanese has no spaces, so the word count below would drop every one of these.
   const lang = scriptLanguage(text);
-  if (lang) {
-    if (hints.languages?.includes(lang) && text.replace(/\s+/g, "").length >= 6) return { matched: true, kind: "exposure", cues: [lang] };
-    return { matched: false, kind: "exposure", cues };
-  }
+  if (lang && hints.languages?.includes(lang) && text.replace(/\s+/g, "").length >= 6) return { matched: true, kind: "exposure", cues: [lang] };
+  // Otherwise a line with some Japanese in it is still read for its English: "why did the clerk
+  // say 結婚" is a question. Only a line with no Latin words at all stops here.
+  if (lang && !/[a-z]{2,}/i.test(text)) return { matched: false, kind: "exposure", cues };
 
   if (t.split(/\s+/).length < 4) return { matched: false, kind: "question", cues };
   if (ASSISTANT_ADDRESS.test(t)) return { matched: false, kind: "question", cues };

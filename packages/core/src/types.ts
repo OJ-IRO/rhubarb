@@ -353,3 +353,33 @@ export interface PrivacySummary {
   /** ISO time of the oldest line held, or null if there is none */
   since: string | null;
 }
+
+/** One thing Rhubarb thinks happened on a day, put to the reader before anything is proposed from it. */
+export interface ReviewFinding {
+  id: number;
+  /** what Rhubarb thinks happened, phrased so it can be answered right or wrong */
+  claim: string;
+  momentIds: number[];
+  /** what it is unsure about: who spoke, what a word was, what was meant */
+  unsure: string | null;
+  verdict: "right" | "wrong" | null;
+  /** what really happened, in the reader's words */
+  correction: string | null;
+}
+
+export interface ReviewQuestion {
+  id: number;
+  text: string;
+  answer: string | null;
+}
+
+/** The end-of-day check: findings to confirm or fix, and a few questions, before proposals are made. */
+export interface DayReview {
+  day: string;
+  status: "building" | "open" | "done" | "failed";
+  findings: ReviewFinding[];
+  questions: ReviewQuestion[];
+  createdAt: number;
+  doneAt: number | null;
+  reason?: string | null;
+}

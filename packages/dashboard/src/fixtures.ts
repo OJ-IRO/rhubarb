@@ -367,3 +367,22 @@ export const history: HistoryEntry[] = [
   { at: now - 4 * d, kind: "spark", title: "Wondered: How honeybees turn nectar into honey", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
   { at: now - 6 * d, kind: "answer", title: "Explained it out loud: Conversational Japanese", detail: "2 of 5. The order was right and the politeness level was not. Say the verb last and you're most of the way there.", skillId: 4, lessonId: null, score: 2 },
 ];
+
+/** A day review as the server writes one: claims to mark right or wrong, and a few questions. */
+export function sampleReview(day: string): import("@rhubarb/core").DayReview {
+  return {
+    day,
+    status: "open",
+    createdAt: now - 10 * h,
+    doneAt: null,
+    findings: [
+      { id: 1, claim: "In the platform standup, Maya said the rollout was \"halfway through the pods\" and you asked what that meant.", momentIds: [1], unsure: null, verdict: null, correction: null },
+      { id: 2, claim: "You said you want to understand how your team's deploys work before Thursday's sync.", momentIds: [2], unsure: null, verdict: null, correction: null },
+      { id: 3, claim: "You said rolling deploys and blue-green deploys are the same thing.", momentIds: [3], unsure: "This may have been someone else at the table: the transcript can't tell voices apart.", verdict: null, correction: null },
+    ],
+    questions: [
+      { id: 1, text: "Is Thursday's sync somewhere you'll need to explain the rollout, or just follow it?", answer: null },
+      { id: 2, text: "Do you want to get comfortable with deploys, or only enough for this one meeting?", answer: null },
+    ],
+  };
+}

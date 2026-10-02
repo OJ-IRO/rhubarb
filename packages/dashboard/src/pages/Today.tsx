@@ -1,15 +1,42 @@
+import type { DayReview } from "@rhubarb/core";
 import { useEffect, useState } from "react";
-import { api, isPreview, when, type Today as TodayData } from "../api";
+import { api, isPreview, localDay, when, type Today as TodayData } from "../api";
+import { DaySelect, longDay } from "../components/DaySelect";
+import { ReviewCard } from "../components/DayReview";
 import { GettingStarted } from "../components/GettingStarted";
 import { HexBadge, HexLevels, Loading } from "../components/Hex";
-import { Link } from "../router";
+import { DayView } from "./History";
+import { Link, go } from "../router";
 
-export function Today() {
+const goToDay = (d: string) => go(d === localDay(Date.now()) ? "/" : `/day/${d}`);
+
+/** An earlier day: its review, where you were, what was noticed, and what came of it. */
+function PastDay({ day }: { day: string }) {
+  return (
+    <div>
+      <div className="day-head">
+        <h1 className="title">{longDay(day)}</h1>
+        <DaySelect value={day} onChange={goToDay} />
+      </div>
+      <ReviewCard day={day} />
+      <DayView day={day} heading={false} />
+    </div>
+  );
+}
+
+export function Today({ day }: { day?: string }) {
+  if (day && day !== localDay(Date.now())) return <PastDay day={day} />;
+  return <TodayPage />;
+}
+
+function TodayPage() {
   const [data, setData] = useState<TodayData | null>(null);
+  const [open, setOpen] = useState<DayReview | null | undefined>(undefined);
   const [reflecting, setReflecting] = useState(false);
 
   const load = () => api.today().then(setData);
   useEffect(() => {
+    api.openReview().then(setOpen).catch(() => setOpen(null));
     void load();
     const t = setInterval(load, 30_000);
     return () => clearInterval(t);
@@ -31,9 +58,13 @@ export function Today() {
 
   return (
     <div>
-      <h1 className="title">
-        Good {greeting.toLowerCase()}.
-      </h1>
+      <div className="day-head">
+        <h1 className="title">Good {greeting.toLowerCase()}.</h1>
+        <DaySelect value={localDay(Date.now())} onChange={goToDay} />
+      </div>
+
+      {/* A day waiting on its review comes first: nothing below is built on it until it's checked. */}
+      {open && <ReviewCard day={open.day} initial={open} onDone={() => setTimeout(() => void load(), 1500)} />}
 
       {data.letter ? (
         <p className="letter">{data.letter}</p>

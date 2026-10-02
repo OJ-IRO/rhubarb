@@ -75,6 +75,8 @@ test("a line in a language they are learning counts, even with no English cue", 
   assert.equal(stage1Detect("すみません、これをください").matched, false);
   // too short to be a real exchange
   assert.equal(stage1Detect("うん", hints).matched, false);
+  // a mixed line is still read for its English question, goal or not
+  assert.equal(kind("why did the clerk say 結婚 when I asked about the passport"), "question");
 });
 
 test("'hey Rhubarb' works too, however the recogniser spells it", () => {

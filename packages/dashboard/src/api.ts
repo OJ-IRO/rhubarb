@@ -139,6 +139,7 @@ interface PreviewState {
   privacy: PrivacyView;
   cards: SparkRow[];
   budget?: number;
+  review?: import("@rhubarb/core").DayReview | null;
   profile: Profile;
   lastQuiz?: QuizResult;
 }
@@ -150,7 +151,7 @@ let pv: PreviewState | null = null;
  * Reloading the page puts the sample content back.
  */
 function previewState(f: typeof import("./fixtures")): PreviewState {
-  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy), cards: structuredClone(f.cards), profile: structuredClone(f.profile) };
+  pv ??= { rows: structuredClone(f.skillRows), privacy: structuredClone(f.privacy), cards: structuredClone(f.cards), profile: structuredClone(f.profile), review: f.sampleReview(localDay(Date.now() - 86_400_000)) };
   return pv;
 }
 
@@ -185,6 +186,23 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
       if (m[2] === "priority" && body) row.priority = (JSON.parse(String(body)) as { priority: number }).priority;
     }
     return as(row ?? null);
+  }
+  if (path === "/review" && method === "GET") return as(st.review && st.review.status !== "done" ? st.review : null);
+  if ((m = path.match(/^\/review\/(\d{4}-\d{2}-\d{2})(\/build)?$/))) {
+    const day = m[1];
+    if (m[2]) {
+      st.review = { ...f.sampleReview(day), status: "building" };
+      setTimeout(() => (st.review = f.sampleReview(day)), 2500);
+      return as({ day, status: "building" });
+    }
+    if (method === "PUT" && body && st.review) {
+      const patch = JSON.parse(String(body)) as { findings: Array<{ id: number; verdict: "right" | "wrong" | null; correction: string | null }>; questions: Array<{ id: number; answer: string | null }>; done?: boolean };
+      for (const p of patch.findings) Object.assign(st.review.findings.find((x) => x.id === p.id) ?? {}, p);
+      for (const q of patch.questions) Object.assign(st.review.questions.find((x) => x.id === q.id) ?? {}, q);
+      if (patch.done) Object.assign(st.review, { status: "done", doneAt: Date.now() });
+      return as({ review: st.review, dropped: patch.findings.filter((x) => x.verdict === "wrong").length, setAside: [] });
+    }
+    return as(st.review?.day === day ? st.review : null);
   }
   if (path === "/days") return as(st.privacy.days);
   if ((m = path.match(/^\/days\/(\d{4}-\d{2}-\d{2})$/))) {
@@ -362,6 +380,12 @@ export const api = {
   /** Answer a spark again from the corrected words. */
   answerSparkAgain: (cardId: number) => call<{ ok: boolean }>(`/sparks/${cardId}/answer-again`, { method: "POST" }),
   days: () => call<Array<{ day: string; utterances: number; moments: number }>>("/days"),
+  /** The most recent day review still waiting, if any. */
+  openReview: () => call<import("@rhubarb/core").DayReview | null>("/review"),
+  review: (day: string) => call<import("@rhubarb/core").DayReview | null>(`/review/${day}`),
+  buildReview: (day: string) => call<{ day: string; status: string }>(`/review/${day}/build`, { method: "POST" }),
+  saveReview: (day: string, patch: { findings: Array<{ id: number; verdict: "right" | "wrong" | null; correction: string | null }>; questions: Array<{ id: number; answer: string | null }>; done?: boolean }) =>
+    call<{ review: import("@rhubarb/core").DayReview; dropped?: number; setAside?: string[] }>(`/review/${day}`, { method: "PUT", body: JSON.stringify(patch) }),
   day: (day: string) => call<DayDetail>(`/days/${day}`),
   sparkLesson: (cardId: number) => call<{ skillId: number }>(`/sparks/${cardId}/lesson`, { method: "POST" }),
   lesson: (id: number) => call<LessonView>(`/lessons/${id}`),

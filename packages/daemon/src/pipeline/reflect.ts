@@ -1,4 +1,4 @@
-import { classify, readingNote, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evidence, type Profile, type Skill, type RhubarbDb } from "@rhubarb/core";
+import { classify, localDayOf, readingNote, lintProse, MODELS, systemBlocks, voiceGuide, write, type Evidence, type Profile, type Skill, type RhubarbDb } from "@rhubarb/core";
 import { z } from "zod";
 
 const SkillOut = z.object({
@@ -33,7 +33,8 @@ Rules:
 - Respect off-limits topics from the profile absolutely: never create a skill in one, and put that evidence in drop.
 - The brief is written to the reader in the house voice. Cite the actual moments: what they said, roughly when, who was there if known. Say why now. End with what it would take.
 - Prefer three to six proposals on the board at once. Fewer, sharper ones beat a long list.
-- The brief never uses the person's name.`;
+- The brief never uses the person's name.
+- Where the reader confirmed or corrected something, that is what happened. Never build a proposal on something they said was wrong. State nothing as fact that they haven't confirmed; where a brief rests on an unconfirmed moment, say what was heard, not what it means.`;
 
 export interface ReflectDeps {
   db: RhubarbDb;
@@ -75,7 +76,10 @@ async function fixBrief(brief: string, reasons: string[]): Promise<string> {
 /** Cluster unassigned evidence into proposals, rank, and write briefs. Returns ids of proposals created or updated, and which were new. */
 export async function runReflection(deps: ReflectDeps): Promise<{ touched: number[]; created: number[] }> {
   const { db, log } = deps;
-  const evidence = db.unassignedSkillEvidence();
+  // A day still waiting for its review is held back (for up to two days): proposals come from what
+  // the reader confirmed, not from a first guess. Spoken asks already started on their own.
+  const held = db.heldDays();
+  const evidence = db.unassignedSkillEvidence().filter((e) => !held.has(localDayOf(Date.parse(e.spokenAt))));
   if (evidence.length === 0) {
     log("reflect: nothing new to reflect on");
     return { touched: [], created: [] };
@@ -84,7 +88,8 @@ export async function runReflection(deps: ReflectDeps): Promise<{ touched: numbe
   const profile = db.getProfile();
 
   const reading = readingNote(existing, profile?.goals ?? []);
-  const user = `## The person\n${renderProfile(profile, reading)}\n\n## Skills already on their board\n${renderSkills(existing)}\n\n## New evidence since last reflection\n${renderEvidence(evidence)}\n\nToday is ${new Date().toDateString()}.`;
+  const notes = db.reviewNotes(localDayOf(Date.now() - 14 * 86_400_000));
+  const user = `${notes.length ? `## What the reader confirmed, corrected and answered (trust this over the moments)\n${notes.map((n) => `- ${n}`).join("\n")}\n\n` : ""}## The person\n${renderProfile(profile, reading)}\n\n## Skills already on their board\n${renderSkills(existing)}\n\n## New evidence since last reflection\n${renderEvidence(evidence)}\n\nToday is ${new Date().toDateString()}.`;
 
   const out = await classify({
     model: MODELS.writer,

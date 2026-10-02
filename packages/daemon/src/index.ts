@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { llmRoute, setSpendHooks, withPurpose, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
+import { llmRoute, localDayOf, setSpendHooks, withPurpose, classify, BeeClient, BeeStreamConsumer, RhubarbDb, judge, lintProse, systemBlocks, voiceGuide, write, type Evidence, type Practice, ALL_NUDGES, type NudgePrefs } from "@rhubarb/core";
 import { z } from "zod";
 import { startApi, type Listening } from "./api.js";
 import { handleAsk, skillFromIdea, topicFromSpark } from "./pipeline/asks.js";
@@ -18,6 +18,7 @@ import { afterQuietHours, nextLearningSlot, parseLearningWindows, saveLearningSl
 import { buildSpark, reanswerSpark } from "./pipeline/sparks.js";
 import { ingestStakes, runSweep } from "./pipeline/sweep.js";
 import { makePlaces } from "./pipeline/places.js";
+import { buildReview, finishReview } from "./pipeline/review.js";
 import { tutorReply } from "./pipeline/tutor.js";
 
 const DATA_DIR = process.env.RHUBARB_DATA_DIR ?? join(homedir(), ".rhubarb");
@@ -28,11 +29,6 @@ const PRACTICE_SWEEP_MS = 60_000;
 const NIGHTLY_CHECK_MS = 10 * 60_000;
 const FIELD_INTERVAL_MS = 15 * 60_000;
 const REFLECT_HOUR_LOCAL = 3;
-// Proposals are made during the day too, a few hours after the conversations that prompted them,
-// so a yes or no can happen while the moment is still fresh.
-const DAY_REFLECT_EVERY_MS = 3 * 3600_000;
-const DAY_REFLECT_FROM_HOUR = 9;
-const DAY_REFLECT_UNTIL_HOUR = 21;
 // One proposal alarm at most this often. A buzzing wrist is how people come to hate a device.
 const PROPOSAL_NUDGE_GAP_MS = 3 * 3600_000;
 const API_PORT = Number(process.env.PORT ?? process.env.RHUBARB_PORT ?? 4242);
@@ -211,15 +207,19 @@ async function nudgeProposals(created: number[]): Promise<void> {
     .catch((e: Error) => log(`proposal nudge failed: ${e.message}`));
 }
 
-/** Daytime pass: only when there is something new, only in waking hours, at most every few hours. */
-const dayReflectTick = guarded("day-reflect", async () => {
-  const h = new Date().getHours();
-  if (h < DAY_REFLECT_FROM_HOUR || h >= DAY_REFLECT_UNTIL_HOUR) return;
-  if (Date.now() - Number(db.getKv("last_reflect_at") ?? 0) < DAY_REFLECT_EVERY_MS) return;
-  await classifyTick();
-  if (db.unassignedSkillEvidence().length === 0) return;
-  log("day-reflect: new moments since the last pass; proposing");
-  await reflectNow();
+// --- the day review: what Rhubarb thinks happened, put to the reader before anything is proposed
+const REVIEW_HOUR_LOCAL = 20;
+const reviewTick = guarded("review", async () => {
+  if (new Date().getHours() < REVIEW_HOUR_LOCAL) return;
+  const day = localDayOf(Date.now());
+  if (db.getReview(day)) return;
+  const review = await withPurpose("day review", () => buildReview({ db, log }, day));
+  if (review && review.findings.length > 0 && nudgeOn(db, "brief")) {
+    const n = review.findings.length + review.questions.length;
+    await bee
+      .createTodo(`Your day review is ready: ${n} quick check${n === 1 ? "" : "s"} before Rhubarb suggests anything new.`, afterQuietHours(new Date(Date.now() + 60_000)).toISOString())
+      .catch((e: Error) => log(`review nudge failed: ${e.message}`));
+  }
 });
 
 // --- in-page lesson interactions
@@ -375,6 +375,9 @@ const nightly = guarded("nightly", async () => {
   if (db.getKv("last_nightly") === today || new Date().getHours() < REFLECT_HOUR_LOCAL) return;
   db.setKv("last_nightly", today);
   // Bee's /v1/changes returns a 500 some nights. Reflect on what the live stream caught anyway.
+  // A day that ended without its review gets one now, so it's waiting in the morning.
+  const yesterday = localDayOf(Date.now() - 12 * 3600_000);
+  if (!db.getReview(yesterday)) await withPurpose("day review", () => buildReview({ db, log }, yesterday)).catch((e: Error) => log(`review for ${yesterday} failed: ${e.message}`));
   await runSweep({ ...captureDeps, bee, onPlace: (uuid, loc) => places.record(uuid, loc) }).catch((e: Error) => log(`sweep failed, reflecting without it: ${e.message}`));
   await classifyTick();
   await reflectNow();
@@ -420,7 +423,7 @@ const timers = [
   setInterval(() => void nightly(), NIGHTLY_CHECK_MS),
   setInterval(() => void fieldTick(), FIELD_INTERVAL_MS),
   setInterval(() => void lessonsTick(), 30 * 60_000),
-  setInterval(() => void dayReflectTick(), 30 * 60_000),
+  setInterval(() => void reviewTick(), 15 * 60_000),
 ];
 void classifyTick();
 // A restart mid-generation leaves a skill with no lesson and nothing writing one. Pick those up.
@@ -496,6 +499,14 @@ startApi(
       startFromIdea: (idea, familiarity, reading) => withPurpose("lessons", () => skillFromIdea({ db, log, start: startInBackground }, idea, familiarity, reading)),
       dismissSkill: async (id) => db.updateSkill(id, { status: "dismissed" }),
       rewriteLesson: (id) => withPurpose("lessons", () => rewriteLesson(lessonDeps, id)),
+      buildReview: (day) => withPurpose("day review", () => buildReview({ db, log }, day)).then(() => undefined),
+      finishReview: async (review) => {
+        const out = finishReview(db, review);
+        log(`review: ${review.day} done; ${out.dropped} moments dropped${out.setAside.length ? `, set aside: ${out.setAside.join(", ")}` : ""}`);
+        // Now, and only now, propose from what was confirmed.
+        void reflectNow();
+        return out;
+      },
       reanswerSpark: (cardId) => withPurpose("spark answers", () => reanswerSpark({ db, log }, cardId)),
       lessonFromSpark: async (card) => {
         const item = db.cardsWithItems(200).find((r) => r.card.id === card.id)?.item ?? null;

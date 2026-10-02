@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { api, type SkillRow } from "../api";
 import type { CombCell } from "../components/Comb3D";
 import { Loading } from "../components/Hex";
-import { hexSpiral, wrapLabel } from "../lib/hexLayout";
+import { hexSpiral } from "../lib/hexLayout";
 import { Link, go } from "../router";
 
 // three.js is only fetched when someone opens this page. The import is started as soon as the
@@ -53,7 +53,6 @@ function FlatComb({ cells, skills, onHover }: { cells: CombCell[]; skills: Map<n
         const x = c.x * R;
         const y = c.y * R;
         const clipId = `clip-${c.id}`;
-        const lines = wrapLabel(c.name);
         return (
           <g key={c.id} onMouseEnter={() => onHover(c.id)} onMouseLeave={() => onHover(null)} onClick={() => go(`/skills/${c.id}`)} style={{ cursor: "pointer" }}>
             <title>{`${c.name}: ${standing(skills.get(c.id)!)}`}</title>
@@ -64,12 +63,8 @@ function FlatComb({ cells, skills, onHover }: { cells: CombCell[]; skills: Map<n
             </defs>
             <polygon points={hexPoints(x, y, R - 3)} className={c.waiting ? "cell proposed" : "cell"} />
             <rect x={x - R} y={y + R - 2 * R * c.fill} width={2 * R} height={2 * R} className="honey" clipPath={`url(#${clipId})`} />
-            <text x={x} y={y - (lines.length - 1) * 6.5 + 4} textAnchor="middle" className="cell-label">
-              {lines.map((line, i) => (
-                <tspan key={i} x={x} dy={i === 0 ? 0 : 13}>
-                  {line}
-                </tspan>
-              ))}
+            <text x={x} y={y + 7} textAnchor="middle" className="cell-num">
+              {cells.indexOf(c) + 1}
             </text>
           </g>
         );
@@ -106,7 +101,6 @@ export function Honeycomb() {
   }, [ordered.length]);
 
   if (!skills) return <Loading />;
-  const pointed = hover === null ? null : byId.get(hover) ?? null;
   const flatComb = <FlatComb cells={cells} skills={byId} onHover={setHover} />;
 
   return (
@@ -123,24 +117,32 @@ export function Honeycomb() {
           </Link>
         </div>
       ) : (
-        <>
-          {flat ? (
-            flatComb
-          ) : (
-            <Suspense fallback={<Loading label="Building your comb" />}>
-              <Comb3D cells={cells} ghosts={ghosts} hovered={hover} onHover={setHover} onOpen={(id) => go(`/skills/${id}`)} onFail={() => setFlat(true)} />
-            </Suspense>
-          )}
-          <p className="comb-caption muted" aria-live="polite">
-            {pointed ? (
-              <>
-                <strong>{pointed.name}</strong> · {standing(pointed)}
-              </>
+        <div className="comb-layout">
+          <div className="comb-stage">
+            {flat ? (
+              flatComb
             ) : (
-              "Point at a cell to see where you stand. The pale, shallow ones are waiting for your decision."
+              <Suspense fallback={<Loading label="Building your comb" />}>
+                <Comb3D cells={cells} ghosts={ghosts} hovered={hover} onHover={setHover} onOpen={(id) => go(`/skills/${id}`)} onFail={() => setFlat(true)} />
+              </Suspense>
             )}
-          </p>
-        </>
+          </div>
+          {/* The key: the full name of every cell, where you stand, and how full it is. */}
+          <ol className="comb-key" aria-label="What each cell is">
+            {ordered.map((s, i) => (
+              <li key={s.id} className={[hover === s.id ? "on" : "", s.status === "proposed" ? "waiting" : ""].join(" ").trim()} onMouseEnter={() => setHover(s.id)} onMouseLeave={() => setHover(null)}>
+                <span className="comb-key-num">{i + 1}</span>
+                <span className="comb-key-body">
+                  <Link to={`/skills/${s.id}`}>{s.name}</Link>
+                  <span className="muted small">{standing(s)}</span>
+                  <span className="comb-key-fill" aria-hidden="true">
+                    <span style={{ width: `${Math.round(fillOf(s) * 100)}%` }} />
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
     </div>
   );

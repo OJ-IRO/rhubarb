@@ -436,3 +436,36 @@ test("a day shows where you were, what was noticed, and the plans it fed; a plan
   assert.deepEqual(db.skillDays(skill), ["2026-09-28", "2026-09-27"]);
   db.close();
 });
+
+// ---- the day review
+
+import { finishReview } from "./pipeline/review.js";
+
+test("a day under review is held back from proposals; finishing it drops what was wrong and keeps what was confirmed", () => {
+  const db = freshDb();
+  const deps = { db, log: () => {}, onJournalReady: () => {}, onAsk: () => {} };
+  const day = new Date().toLocaleDateString("en-CA");
+  const at = (h: number) => new Date(`${day}T${String(h).padStart(2, "0")}:00:00`).toISOString();
+  handleUtterance(deps, "c", { id: 901, text: "how do I ask for the tax-free form at the counter", spoken_at: at(10) });
+  handleUtterance(deps, "c", { id: 902, text: "why did the clerk say 結婚 when I asked about the passport", spoken_at: at(10) });
+  const [a, b] = [db.evidenceByUtterance(901)!.id, db.evidenceByUtterance(902)!.id];
+  const skill = db.insertSkill({ name: "Marriage vocabulary", domain: "Japanese", competentLooksLike: "", terms: [], priority: 40, brief: "" });
+  db.assignEvidenceToSkill([b], skill);
+
+  db.saveReview({ day, status: "open", findings: [
+    { id: 1, claim: "At the tax-free counter you asked how to get the form", momentIds: [a], unsure: null, verdict: "right", correction: null },
+    { id: 2, claim: "The clerk said 結婚 (marriage)", momentIds: [b], unsure: "might be misheard", verdict: "wrong", correction: "It was 決済, payment" },
+  ], questions: [{ id: 1, text: "Do you want to handle tax-free paperwork on your own?", answer: "yes" }] });
+  assert.ok(db.heldDays().has(day), "an open review holds its day back");
+
+  const out = finishReview(db, db.getReview(day)!);
+  assert.equal(db.getReview(day)!.status, "done");
+  assert.equal(db.heldDays().has(day), false);
+  assert.equal(db.evidenceById(b)!.route, "noise", "a wrong finding's moment stops counting");
+  assert.deepEqual(out.setAside, ["Marriage vocabulary"], "a proposal with nothing true under it is set aside");
+  const notes = db.reviewNotes(day).join("\n");
+  assert.match(notes, /confirmed: At the tax-free counter/);
+  assert.match(notes, /NOT what happened: The clerk said 結婚.*決済, payment/);
+  assert.match(notes, /handle tax-free paperwork.*yes/);
+  db.close();
+});
