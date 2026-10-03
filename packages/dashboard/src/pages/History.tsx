@@ -3,7 +3,7 @@ import { api, when, type DayDetail, type HistoryEntry } from "../api";
 import { Loading } from "../components/Hex";
 import { StatusChip } from "../components/Meter";
 import { DaySelect, longDay } from "../components/DaySelect";
-import { Link, go } from "../router";
+import { Link, cardClick, go } from "../router";
 
 const KIND: Record<HistoryEntry["kind"], string> = { lesson: "lesson", answer: "out loud", credit: "for real", spark: "spark", level: "level" };
 
@@ -60,7 +60,7 @@ export function DayView({ day, heading = true }: { day: string; heading?: boolea
         <p className="eyebrow">What came of it</p>
         {d.skills.length === 0 && d.sparks.length === 0 && <p className="muted">Nothing from this day turned into a plan or an answer yet.</p>}
         {d.skills.map((s) => (
-          <article key={s.id} className="card day-plan">
+          <article key={s.id} className="card day-plan clickable" {...cardClick(`/skills/${s.id}`)}>
             <div className="rank-head">
               <h3>
                 <Link to={`/skills/${s.id}`}>{s.name}</Link>
@@ -80,7 +80,7 @@ export function DayView({ day, heading = true }: { day: string; heading?: boolea
           </article>
         ))}
         {d.sparks.map(({ card }) => (
-          <article key={card.id} className="card day-plan">
+          <article key={card.id} className="card day-plan clickable" {...cardClick("/sparks")}>
             <div className="rank-head">
               <h3>
                 <Link to="/sparks">{card.title}</Link>

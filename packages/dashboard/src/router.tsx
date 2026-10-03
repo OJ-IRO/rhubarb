@@ -57,3 +57,21 @@ export function Link({ to, children, className, tour }: { to: string; children: 
     </a>
   );
 }
+
+/**
+ * Make a whole card open a page when clicked anywhere, not just on its title text. Clicks on the
+ * card's own buttons, links and fields still do their own thing.
+ */
+export function cardClick(path: string) {
+  return {
+    onClick: (e: { target: EventTarget | null }) => {
+      if ((e.target as HTMLElement | null)?.closest("button, a, input, textarea, select, label, [data-noclick]")) return;
+      go(path);
+    },
+    role: "link" as const,
+    tabIndex: 0,
+    onKeyDown: (e: { key: string; target: EventTarget | null }) => {
+      if (e.key === "Enter" && e.target === (e as unknown as { currentTarget: EventTarget }).currentTarget) go(path);
+    },
+  };
+}

@@ -5,7 +5,7 @@ import { languagesIn, planLanguage, ReadingPicker, StartingPoint } from "../comp
 import { HexBadge, HexLevels, Loading } from "../components/Hex";
 import { Meter, StatusChip } from "../components/Meter";
 import { Toast, type ToastState } from "../components/Toast";
-import { Link } from "../router";
+import { Link, cardClick } from "../router";
 
 function firstSentence(s: string): string {
   const m = s.match(/^.*?[.!?](\s|$)/);
@@ -172,7 +172,7 @@ export function Board() {
       {top.length > 0 && (
         <section className="spotlight" data-tour="board-top">
           {top.map((s, i) => (
-            <article key={s.id} className={`spot spot-${i + 1}`}>
+            <article key={s.id} className={`spot spot-${i + 1} clickable`} {...cardClick(`/skills/${s.id}`)}>
               <div className="spot-top">
                 <HexBadge n={i + 1} tone={i === 0 ? "honey" : "wax"} size={42} />
                 <span className="status-chips">
@@ -212,7 +212,7 @@ export function Board() {
             const idx = i + 4;
             const expanded = open === s.id;
             return (
-              <article key={s.id} className="rank-row">
+              <article key={s.id} className="rank-row clickable" {...cardClick(`/skills/${s.id}`)}>
                 <div className="rank-num">
                   <HexBadge n={idx} size={34} />
                 </div>
@@ -226,7 +226,7 @@ export function Board() {
                     <span className="muted small">{s.evidenceCount} moments</span>
                   </div>
                   <Meter value={s.priority} />
-                  <p className={expanded ? "brief" : "brief clamp"} onClick={() => setOpen(expanded ? null : s.id)}>
+                  <p className={expanded ? "brief" : "brief clamp"} data-noclick onClick={() => setOpen(expanded ? null : s.id)}>
                     {s.brief}
                   </p>
                   <div className="actions compact">

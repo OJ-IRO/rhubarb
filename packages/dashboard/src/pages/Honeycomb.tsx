@@ -3,7 +3,7 @@ import { api, type SkillRow } from "../api";
 import type { CombCell } from "../components/Comb3D";
 import { Loading } from "../components/Hex";
 import { hexSpiral } from "../lib/hexLayout";
-import { Link, go } from "../router";
+import { Link, cardClick, go } from "../router";
 
 // three.js is only fetched when someone opens this page. The import is started as soon as the
 // app loads so it is usually cached by the time anyone clicks; and while it is still on its way
@@ -130,7 +130,13 @@ export function Honeycomb() {
           {/* The key: the full name of every cell, where you stand, and how full it is. */}
           <ol className="comb-key" aria-label="What each cell is">
             {ordered.map((s, i) => (
-              <li key={s.id} className={[hover === s.id ? "on" : "", s.status === "proposed" ? "waiting" : ""].join(" ").trim()} onMouseEnter={() => setHover(s.id)} onMouseLeave={() => setHover(null)}>
+              <li
+                key={s.id}
+                className={["clickable", hover === s.id ? "on" : "", s.status === "proposed" ? "waiting" : ""].join(" ").trim()}
+                onMouseEnter={() => setHover(s.id)}
+                onMouseLeave={() => setHover(null)}
+                {...cardClick(`/skills/${s.id}`)}
+              >
                 <span className="comb-key-num">{i + 1}</span>
                 <span className="comb-key-body">
                   <Link to={`/skills/${s.id}`}>{s.name}</Link>
