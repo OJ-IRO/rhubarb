@@ -31,9 +31,17 @@ function stepsFor(demo: boolean): Step[] {
   return STEPS.filter((s) => !s.path.startsWith("/lessons")).map((s) => (s.target === "listening" ? { ...s, body: OWN_FIRST } : s));
 }
 
+/**
+ * The judges' demo plays the tour every time it's opened (once per tab, so a refresh mid-way
+ * doesn't restart it). Someone's own Rhubarb plays it once, ever.
+ */
+function store(): Storage {
+  return import.meta.env.VITE_DEMO ? sessionStorage : localStorage;
+}
+
 export function tourSeen(): boolean {
   try {
-    return localStorage.getItem(KEY) === "done";
+    return store().getItem(KEY) === "done";
   } catch {
     return true; // no storage, no nagging
   }
@@ -41,7 +49,7 @@ export function tourSeen(): boolean {
 
 export function resetTour(): void {
   try {
-    localStorage.removeItem(KEY);
+    store().removeItem(KEY);
   } catch {
     /* nothing to reset */
   }
@@ -61,7 +69,7 @@ export function Tour({ onClose }: { onClose: () => void }) {
 
   const finish = useCallback(() => {
     try {
-      localStorage.setItem(KEY, "done");
+      store().setItem(KEY, "done");
     } catch {
       /* fine */
     }
