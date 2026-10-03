@@ -21,7 +21,7 @@ function dayName(day: string): string {
 
 const big = (n: number) => n.toLocaleString();
 
-export function Privacy() {
+export function Privacy({ embedded = false }: { embedded?: boolean }) {
   const [view, setView] = useState<PrivacyView | null>(null);
   const [askDay, setAskDay] = useState<string | null>(null);
   const [askAll, setAskAll] = useState(false);
@@ -55,8 +55,14 @@ export function Privacy() {
 
   return (
     <div className="privacy">
-      <h1 className="title">Privacy and safety</h1>
-      <p className="muted lead">What Rhubarb is holding, where your words go, what it refuses to learn from, and how to make it forget.</p>
+      {embedded ? (
+        <p className="muted">What Rhubarb is holding, where your words go, what it refuses to learn from, and how to make it forget.</p>
+      ) : (
+        <>
+          <h1 className="title">Privacy and safety</h1>
+          <p className="muted lead">What Rhubarb is holding, where your words go, what it refuses to learn from, and how to make it forget.</p>
+        </>
+      )}
 
       <section>
         <p className="eyebrow">Where your words go</p>

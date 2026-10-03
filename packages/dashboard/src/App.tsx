@@ -4,14 +4,11 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { BrandMark, Loading } from "./components/Hex";
 import { ListeningLight } from "./components/Listening";
 import { Tour, resetTour, tourSeen } from "./components/Tour";
-import { Board } from "./pages/Board";
-import { Evidence } from "./pages/Evidence";
 import { History } from "./pages/History";
+import { Learning } from "./pages/Learning";
 import { Settings } from "./pages/Settings";
-import { Honeycomb } from "./pages/Honeycomb";
 import { LessonPage } from "./pages/Lesson";
 import { Onboarding } from "./pages/Onboarding";
-import { Privacy } from "./pages/Privacy";
 import { SkillPage } from "./pages/Skill";
 import { Sparks } from "./pages/Sparks";
 import { Today } from "./pages/Today";
@@ -19,22 +16,19 @@ import { Link, go, match, useRoute } from "./router";
 
 const NAV = [
   ["/", "Your day"],
-  ["/board", "Board"],
+  ["/learning", "Learning"],
   ["/sparks", "Sparks"],
-  ["/honeycomb", "Honeycomb"],
-  ["/evidence", "Evidence"],
   ["/history", "Looking back"],
 ] as const;
 
 function titleFor(path: string): string {
-  if (path === "/board") return "The board";
+  if (path === "/learning" || path === "/board" || path === "/honeycomb") return "Learning";
   if (path === "/sparks") return "Sparks";
-  if (path === "/honeycomb") return "Honeycomb";
   if (path === "/welcome") return "Set up";
   if (path === "/settings") return "Settings";
   if (path.startsWith("/history")) return "Looking back";
-  if (path === "/privacy") return "Privacy and safety";
-  if (path === "/evidence") return "Evidence";
+  if (path === "/privacy") return "Settings";
+  if (path === "/evidence") return "Looking back";
   if (path.startsWith("/lessons")) return "Lesson";
   if (path.startsWith("/skills")) return "Skill";
   if (path.startsWith("/day/")) return "Your day";
@@ -121,11 +115,12 @@ export function App() {
   let page: React.ReactNode;
   let params: Record<string, string> | null;
   if (route.path === "/welcome") page = <Onboarding onDone={(p) => { setProfile(p); go("/"); }} initial={profile} />;
-  else if (route.path === "/board") page = <Board />;
+  // Old addresses still land somewhere sensible: the board and honeycomb are Learning now,
+  // evidence lives in Looking back, privacy in Settings.
+  else if (route.path === "/learning" || route.path === "/board" || route.path === "/honeycomb") page = <Learning />;
   else if (route.path === "/sparks") page = <Sparks />;
-  else if (route.path === "/honeycomb") page = <Honeycomb />;
-  else if (route.path === "/privacy") page = <Privacy />;
-  else if (route.path === "/evidence") page = <Evidence />;
+  else if (route.path === "/privacy") page = <Settings />;
+  else if (route.path === "/evidence") page = <History />;
   else if (route.path === "/history") page = <History />;
   else if ((params = match("/history/:day", route.path))) page = <History day={params.day} />;
   else if ((params = match("/day/:day", route.path))) page = <Today day={params.day} />;
@@ -154,7 +149,7 @@ export function App() {
           <BrandMark /> Rhubarb
         </Link>
         {NAV.map(([to, label]) => (
-          <Link key={to} to={to} className={route.path === to || (to === "/history" && route.path.startsWith("/history/")) || (to === "/" && route.path.startsWith("/day/")) ? "navlink active" : "navlink"} tour={`nav-${label.toLowerCase()}`}>
+          <Link key={to} to={to} className={route.path === to || (to === "/history" && (route.path.startsWith("/history/") || route.path === "/evidence")) || (to === "/learning" && (route.path === "/board" || route.path === "/honeycomb")) || (to === "/" && route.path.startsWith("/day/")) ? "navlink active" : "navlink"} tour={`nav-${label.toLowerCase()}`}>
             {label}
           </Link>
         ))}
@@ -165,10 +160,7 @@ export function App() {
         )}
         <div className="side-foot">
           <ListeningLight />
-          <Link to="/privacy" className={route.path === "/privacy" ? "navlink active small" : "navlink small"} tour="nav-privacy">
-            Privacy
-          </Link>
-          <Link to={profile ? "/settings" : "/welcome"} className={route.path === "/settings" || route.path === "/welcome" ? "navlink active small" : "navlink small"}>
+          <Link to={profile ? "/settings" : "/welcome"} className={route.path === "/settings" || route.path === "/welcome" || route.path === "/privacy" ? "navlink active small" : "navlink small"}>
             {profile ? "Settings" : "Set up"}
           </Link>
         </div>

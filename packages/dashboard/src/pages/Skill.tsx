@@ -174,7 +174,7 @@ export function SkillPage({ id }: { id: number }) {
   return (
     <div>
       <p className="eyebrow">
-        <Link to="/board">Board</Link> / skill
+        <Link to="/learning">Learning</Link> / plan
       </p>
       <h1 className="title">{skill.name}</h1>
       {ladder.length > 0 && (

@@ -20,7 +20,7 @@ function trend(scores: number[]): string {
   return `Holding steady around ${one(avg(scores))} of 5 across ${scores.length} spoken answers.`;
 }
 
-export function Evidence() {
+export function Evidence({ embedded = false }: { embedded?: boolean }) {
   const [p, setP] = useState<LearningProgress | null>(null);
   useEffect(() => {
     api.progress().then(setP);
@@ -43,8 +43,17 @@ export function Evidence() {
 
   return (
     <div className="evidence">
-      <h1 className="title">Evidence</h1>
-      <p className="muted lead">Whether any of this is working, in numbers. Every figure here comes from something you did, not from how long you spent in the app.</p>
+      {embedded ? (
+        <>
+          <p className="eyebrow">How it's going</p>
+          <p className="muted">Whether any of this is working, in numbers. Every figure comes from something you did, not from time spent in the app.</p>
+        </>
+      ) : (
+        <>
+          <h1 className="title">Evidence</h1>
+          <p className="muted lead">Whether any of this is working, in numbers. Every figure here comes from something you did, not from how long you spent in the app.</p>
+        </>
+      )}
 
       {nothing ? (
         <div className="empty">

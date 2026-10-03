@@ -16,10 +16,10 @@ const OWN_FIRST = "This is your Rhubarb, built from what your Bee hears. This li
 
 const STEPS: Step[] = [
   { path: "/", target: "listening", title: "It listens through your Bee", body: DEMO_FIRST },
-  { path: "/board", target: "board-top", title: "You decide what's worth learning", body: "This is the board. It ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
+  { path: "/learning", target: "board-top", title: "You decide what's worth learning", body: "This is Learning. It ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
   { path: "/lessons/1", target: "lesson-stage", title: "A lesson, then out loud", body: "Lessons are built from your own conversations, a card at a time. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
-  { path: "/evidence", target: "evidence-top", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. This page keeps the score, in numbers you can check." },
-  { path: "/privacy", target: "privacy-top", title: "Yours to forget", body: "No audio is ever kept, and nothing is sold or shared. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
+  { path: "/history", target: "evidence-top", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. This page keeps the score, in numbers you can check." },
+  { path: "/settings", target: "privacy-top", title: "Yours to forget", body: "No audio is ever kept, and nothing is sold or shared. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
 ];
 
 /**

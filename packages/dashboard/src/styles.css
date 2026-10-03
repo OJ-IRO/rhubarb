@@ -3141,3 +3141,11 @@ a.glance-tile:hover {
   outline: 2px solid var(--honey-deep);
   outline-offset: 2px;
 }
+
+/* ---------- merged pages ---------- */
+.learning-progress,
+.history-evidence,
+.settings-privacy {
+  margin-top: 34px;
+  padding-top: 8px;
+}

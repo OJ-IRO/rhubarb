@@ -76,14 +76,14 @@ function TodayPage() {
 
       {data.active + data.proposed > 0 && (
         <div className="glance">
-          <Link to="/honeycomb" className="glance-tile">
+          <Link to="/learning" className="glance-tile">
             <HexBadge n={data.active} tone="honey" size={38} />
             <span>
               <strong>{data.active === 1 ? "skill" : "skills"} under way</strong>
               <span className="muted">See the comb</span>
             </span>
           </Link>
-          <Link to="/board" className="glance-tile">
+          <Link to="/learning" className="glance-tile">
             <HexBadge n={data.proposed} size={38} />
             <span>
               <strong>{data.proposed === 1 ? "needs" : "need"} a decision</strong>

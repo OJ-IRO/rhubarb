@@ -106,7 +106,7 @@ function StartLesson({ onStarted }: { onStarted: (name: string) => void }) {
   );
 }
 
-export function Board() {
+export function Board({ embedded = false }: { embedded?: boolean }) {
   const [skills, setSkills] = useState<SkillRow[] | null>(null);
   const [busy, setBusy] = useState<number | null>(null);
   const [open, setOpen] = useState<number | null>(null);
@@ -123,7 +123,8 @@ export function Board() {
   }, []);
 
   if (!skills) return <Loading />;
-  const ranked = skills.filter((s) => s.status !== "dismissed").sort((a, b) => b.priority - a.priority);
+  // On the Learning page the board is only what's waiting for a yes; plans under way are in the comb below.
+  const ranked = skills.filter((s) => (embedded ? s.status === "proposed" : s.status !== "dismissed")).sort((a, b) => b.priority - a.priority);
   const top = ranked.slice(0, 3);
   const rest = ranked.slice(3);
 
@@ -148,8 +149,12 @@ export function Board() {
 
   return (
     <div className="board">
-      <h1 className="title">The board</h1>
-      <p className="muted lead">What your conversations suggest you might want to learn, in the order Rhubarb would take them. Say yes or no to each. Anything you ask for out loud, "Hey Rhubarb, teach me…", starts on its own.</p>
+      {!embedded && (
+        <>
+          <h1 className="title">The board</h1>
+          <p className="muted lead">What your conversations suggest you might want to learn, in the order Rhubarb would take them. Say yes or no to each. Anything you ask for out loud, "Hey Rhubarb, teach me…", starts on its own.</p>
+        </>
+      )}
 
       <StartLesson
         onStarted={(name) => {
@@ -158,7 +163,9 @@ export function Board() {
         }}
       />
 
-      {ranked.length === 0 && (
+      {embedded && <p className="eyebrow">Waiting for your yes</p>}
+      {embedded && ranked.length === 0 && <p className="muted">Nothing waiting for a decision. New suggestions arrive after you look over a day's review.</p>}
+      {!embedded && ranked.length === 0 && (
         <div className="empty">
           <p>
             <strong>Nothing here yet.</strong> The board fills a few hours after Rhubarb first hears you: skills and one-off lessons your conversations point at, ranked, each with the moments that put it there. You say yes or no to each one. Or just ask out loud: "Hey Rhubarb, give me a lesson on…"

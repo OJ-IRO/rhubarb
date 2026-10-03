@@ -73,7 +73,7 @@ function FlatComb({ cells, skills, onHover }: { cells: CombCell[]; skills: Map<n
   );
 }
 
-export function Honeycomb() {
+export function Honeycomb({ embedded = false }: { embedded?: boolean }) {
   const [skills, setSkills] = useState<SkillRow[] | null>(null);
   const [hover, setHover] = useState<number | null>(null);
   const [flat, setFlat] = useState(() => !canWebGL());
@@ -84,7 +84,7 @@ export function Honeycomb() {
 
   // Skills you've taken on sit at the heart of the comb; ones waiting on a decision ring them.
   const ordered = useMemo(
-    () => (skills ? skills.filter((s) => s.status !== "dismissed").sort((a, b) => (a.status === "proposed" ? 1 : 0) - (b.status === "proposed" ? 1 : 0) || b.priority - a.priority) : []),
+    () => (skills ? skills.filter((s) => (embedded ? s.status === "active" || s.status === "mastered" : s.status !== "dismissed")).sort((a, b) => (a.status === "proposed" ? 1 : 0) - (b.status === "proposed" ? 1 : 0) || b.priority - a.priority) : []),
     [skills]
   );
   const cells = useMemo<CombCell[]>(() => {
@@ -105,16 +105,27 @@ export function Honeycomb() {
 
   return (
     <div>
-      <h1 className="title">Honeycomb</h1>
-      <p className="muted lead">One cell per skill. It fills as you climb the ladder, and it fills faster when Rhubarb hears you use the skill for real.</p>
+      {embedded ? (
+        <>
+          <p className="eyebrow">Under way</p>
+          <p className="muted">One cell per plan you've said yes to. It fills as you climb, and faster when Rhubarb hears you use it for real.</p>
+        </>
+      ) : (
+        <>
+          <h1 className="title">Honeycomb</h1>
+          <p className="muted lead">One cell per skill. It fills as you climb the ladder, and it fills faster when Rhubarb hears you use the skill for real.</p>
+        </>
+      )}
       {cells.length === 0 ? (
         <div className="empty">
           <p>
             <strong>Empty comb.</strong> A cell appears for each skill you say yes to on the board, and fills with honey as you climb its levels. It fills faster when Rhubarb hears you use the skill for real.
           </p>
-          <Link to="/board" className="button">
-            Go to the board
-          </Link>
+          {!embedded && (
+            <Link to="/learning" className="button">
+              See what's waiting
+            </Link>
+          )}
         </div>
       ) : (
         <div className="comb-layout">

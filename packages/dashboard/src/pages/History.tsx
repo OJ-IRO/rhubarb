@@ -3,6 +3,7 @@ import { api, when, type DayDetail, type HistoryEntry } from "../api";
 import { Loading } from "../components/Hex";
 import { StatusChip } from "../components/Meter";
 import { DaySelect, longDay } from "../components/DaySelect";
+import { Evidence } from "./Evidence";
 import { Link, cardClick, go } from "../router";
 
 const KIND: Record<HistoryEntry["kind"], string> = { lesson: "lesson", answer: "out loud", credit: "for real", spark: "spark", level: "level" };
@@ -169,6 +170,9 @@ export function History({ day }: { day?: string }) {
           </ul>
         </section>
       ))}
+      <section className="history-evidence">
+        <Evidence embedded />
+      </section>
     </div>
   );
 }

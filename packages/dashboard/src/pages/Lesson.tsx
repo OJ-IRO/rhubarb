@@ -39,7 +39,7 @@ export function LessonPage({ id }: { id: number }) {
       <div>
         <h1 className="title">No lesson here yet.</h1>
         <p className="muted lead">Lessons are written when you say yes to a skill on the board. The first one takes a few minutes.</p>
-        <Link to="/board" className="button primary">
+        <Link to="/learning" className="button primary">
           Go to the board
         </Link>
       </div>

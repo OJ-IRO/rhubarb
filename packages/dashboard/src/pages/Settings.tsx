@@ -6,6 +6,7 @@ import { applyReading, readReading, type Reading } from "../lib/reading";
 import { Link } from "../router";
 import { ListInput, STYLES, WINDOWS, splitWindows } from "./Onboarding";
 import { useWhere } from "../lib/where";
+import { Privacy } from "./Privacy";
 
 const ALL: NudgePrefs = { lessons: true, feedback: true, credits: true, brief: true };
 
@@ -200,8 +201,13 @@ export function Settings() {
       <section>
         <p className="eyebrow">Your Bee and your data</p>
         <p>
-          Everything Rhubarb holds is on {where.hosted ? where.name : "this computer"}. See what it has, and forget any of it, on the <Link to="/privacy">privacy page</Link>. To connect a different Bee, run <code>bee login</code> {where.hosted ? "on the server" : "in a terminal"} and restart Rhubarb.
+          Everything Rhubarb holds is on {where.hosted ? where.name : "this computer"}. See what it has, and forget any of it, just below. To connect a different Bee, run <code>bee login</code> {where.hosted ? "on the server" : "in a terminal"} and restart Rhubarb.
         </p>
+      </section>
+
+      <section id="privacy" className="settings-privacy">
+        <p className="eyebrow">Privacy and safety</p>
+        <Privacy embedded />
       </section>
 
       <Toast toast={toast} onDone={() => setToast(null)} ms={3000} />
