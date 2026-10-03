@@ -295,11 +295,12 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     const text = body ? String((JSON.parse(String(body)) as { text?: string }).text ?? "").trim() : "";
     if (row) {
       await new Promise((r) => setTimeout(r, text ? 700 : 0));
-      const close = /stress|corner|crack|pressur|fatigue/i.test(text);
+      // the sample sparks: the Tempozan wheel's lights, and station departure tunes
+      const close = /weather|forecast|rain|sun|tomorrow|door|leav|depart|clos/i.test(text);
       Object.assign(row.card, {
         guess: text,
         guessClose: text ? close : null,
-        guessNote: text ? (close ? "That's the heart of it. The corners are where the stress gathers, and that's what the real answer turns on." : "Not quite, and most people land there. The real answer turns on where stress collects in a shape, not on how it looks or flies.") : null,
+        guessNote: text ? (close ? "That's the heart of it, and the rest of the answer is detail." : "Not quite, and most people guess something like that. Read on: the real answer is more practical than it looks.") : null,
       });
     }
     return as(row?.card ?? null);
@@ -309,30 +310,41 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     // The plan that was clicked, around the sample lesson and moments.
     const row = st.rows.find((r) => r.id === Number(m![1]));
     const detail = structuredClone(f.skillDetail);
-    return as({ ...detail, skill: row ? { ...detail.skill, ...row } : detail.skill, days: [...new Set(f.evidence.map((e) => localDay(e.spokenAt)))].sort().reverse() });
+    const id = Number(m[1]);
+    const own = f.evidence.filter((e) => e.skillId === id);
+    return as({
+      ...detail,
+      skill: row ? { ...detail.skill, ...row } : detail.skill,
+      ladder: id === 1 ? detail.ladder : [],
+      lessons: id === 1 ? detail.lessons : [],
+      practice: id === 1 ? detail.practice : [],
+      fieldEvidence: id === 1 ? detail.fieldEvidence : [],
+      evidence: own,
+      days: [...new Set(own.map((e) => localDay(e.spokenAt)))].sort().reverse(),
+    });
   }
   if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
   if (/^\/lessons\/\d+\/session$/.test(path)) return as({ id: 1, lessonId: 1, startedAt: Date.now(), completedAt: null, responses: "{}", tutor: "[]" });
-  if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the gate right. The part you'd add for level two is what happens when it never opens: the rollout stalls, it doesn't break.", score: 4 });
+  if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the request right. The part to add for level two is the answer: listen for a floor, then カウンター, and you know where to go.", score: 4 });
   if (/\/quiz$/.test(path)) {
     const answers = body ? (JSON.parse(String(body)) as { answers: Array<number | string> }).answers : [];
-    const per = f.quiz.questions.map((q, i) => (q.kind === "mcq" ? { correct: answers[i] === q.answer } : { correct: false, close: true, note: "You have the gate right. What is missing is what happens when it never opens: the rollout stalls, it does not break. Add that and you have it." }));
+    const per = f.quiz.questions.map((q, i) => (q.kind === "mcq" ? { correct: answers[i] === q.answer } : { correct: false, close: true, note: "Nearly. You have the direction; the piece to add is that 〜の方(ほう) softens it to \"over toward\", so it isn't an order." }));
     const score = per.filter((p) => p.correct).length;
     const missed = per.length - score;
     const counts = ["None", "One", "Two", "Three", "Four", "Five"];
     const note =
       missed === 0
-        ? "All of them. You can narrate a rollout now; Thursday is the place to prove it."
+        ? "All of them. You can follow where a clerk sends you now; the next shop is the place to prove it."
         : score >= 4
-          ? "That's a pass, and a comfortable one. The one you missed is about what the readiness gate does; the diagram card covers it."
-          : `${counts[missed] ?? missed} of these tripped you up, mostly around what the readiness gate does. Reread the diagram card and try the quiz again tomorrow.`;
+          ? "That's a pass, and a comfortable one. The one you missed is covered on the floors card."
+          : `${counts[missed] ?? missed} of these tripped you up, mostly the floors and what 聞(き)いてみてください asks you to do. Reread those two cards and try again tomorrow.`;
     pv!.lastQuiz = { score, total: per.length, perQuestion: per, note };
     return as(pv!.lastQuiz);
   }
   if (/\/quiz\/retry$/.test(path)) {
     const { idx } = JSON.parse(String(body)) as { idx: number; text: string };
     const r: QuizResult = pv!.lastQuiz ?? { score: 0, total: f.quiz.questions.length, perQuestion: f.quiz.questions.map(() => ({ correct: false })), note: "" };
-    r.perQuestion[idx] = { correct: true, note: "That's it. The listener is what decides the form, and you named it." };
+    r.perQuestion[idx] = { correct: true, note: "That's it: \"over toward the first floor\", a softer way of pointing." };
     r.score = r.perQuestion.reduce((n, p) => n + (p.correct ? 1 : p.close ? 0.5 : 0), 0);
     return as(r);
   }
@@ -402,7 +414,7 @@ export const api = {
   completeLesson: (id: number) => call<Lesson>(`/lessons/${id}/complete`, { method: "POST" }),
   async tutor(id: number, history: Array<{ role: "user" | "assistant"; content: string }>, onText: (t: string) => void): Promise<void> {
     if (isPreview()) {
-      const reply = "Fair push. The lesson says \"never zero pods,\" and that's true of the rolling strategy as configured here, but it depends on maxUnavailable. Set it to 100% and you've effectively got a recreate deploy. The safe default is 25%, which is what Maya's cluster uses.";
+      const reply = "Fair push. Some smaller shops do handle tax-free right at the register, so 免税(めんぜい)できますか can get a plain はい. The lesson leans on big stores because that's where you were sent downstairs, and that's where the floor numbers matter.";
       for (const word of reply.split(" ")) {
         await new Promise((r) => setTimeout(r, 30));
         onText(`${word} `);

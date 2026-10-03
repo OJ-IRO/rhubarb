@@ -1,6 +1,7 @@
 /**
- * Sample content for preview mode (#/preview/...). Hand-written in the house voice so the
- * UI can be judged without a daemon or a Bee. Never shown as real data: the banner says so.
+ * Sample content for the judges' demo (#/preview/...): one visitor's weeks learning Japanese in
+ * Osaka and Fukuoka, the story Rhubarb was built around. Hand-written in the house voice, every
+ * fact checked, every link and photo real. Never shown as anyone's data: the banner says so.
  */
 import { localDay, type PrivacyView } from "./api";
 import type { HistoryEntry, LearningProgress } from "@rhubarb/core";
@@ -16,14 +17,14 @@ export const profile: Profile = {
   name: "Riley",
   style: "story",
   sessionMinutes: 10,
-  learningWindows: "weekday evenings after 8, Sunday mornings",
-  goals: ["explain our infra to non-engineers", "negotiate better"],
+  learningWindows: "evenings after dinner",
+  goals: ["conversational Japanese for daily life in Japan"],
   offLimits: ["family finances"],
-  timezone: "America/Los_Angeles",
-  onboardedAt: now - 6 * d,
+  timezone: "Asia/Tokyo",
+  onboardedAt: now - 9 * d,
 };
 
-const mk = (id: number, name: string, priority: number, status: Skill["status"], brief: string, level = 0, domain: string | null = null): Skill => ({
+const mk = (id: number, name: string, priority: number, status: Skill["status"], brief: string, level = 0, domain: string | null = "Japanese", kind: Skill["kind"] = "skill", origin: Skill["origin"] = "noticed"): Skill => ({
   id,
   name,
   domain,
@@ -33,8 +34,8 @@ const mk = (id: number, name: string, priority: number, status: Skill["status"],
   priority,
   brief,
   level,
-  kind: "skill",
-  origin: "noticed",
+  kind,
+  origin,
   familiarity: null,
   reading: null,
   createdAt: now - 5 * d,
@@ -44,167 +45,150 @@ const mk = (id: number, name: string, priority: number, status: Skill["status"],
 export const skills: Skill[] = [
   mk(
     1,
-    "Kubernetes rolling deployments",
+    "Tax-free shopping in Japanese",
     92,
     "active",
-    "Kubernetes came up three times this week, twice in the platform team's standup and once when Maya walked you through Tuesday's rollout. Both times you nodded along and told me later you'd look it up. You have a sync with that team on Thursday. Twenty minutes before then would change how that meeting goes.",
-    1,
-    "Infrastructure"
+    "On Thursday at a shop counter in Namba you got the whole request out in Japanese, then lost the thread when the clerk sent you to 1階(いっかい)の免税(めんぜい)カウンター. You confirmed that in your day review. The opening is already yours; following where they send you is the next ten minutes.",
+    1
   ),
   mk(
     2,
-    "Salary negotiation",
+    "Phone calls with delivery drivers",
     84,
-    "proposed",
-    "On Monday you told Priya you'd \"probably just take whatever they offer\" and laughed, and on Wednesday you said the same thing to your brother without the laugh. The offer conversation is next week. This is the highest-stakes twenty minutes on your calendar, and it is learnable.",
-    0,
-    "Career"
+    "active",
+    "Twice this week a driver called about an order and asked where you were. You got your name out fine both times, then lost the call when he asked for a landmark near your building. Saying where you are, 〜の前(まえ) and 〜の隣(となり), is a short list to learn.",
+    0
   ),
   mk(
     3,
-    "Reading a term sheet",
+    "Understanding station announcements",
     71,
     "proposed",
-    "You asked what a liquidation preference was on Tuesday and got an answer you described afterward as \"a lot of words.\" You mentioned advising your friend's startup twice this month. You don't need to be a lawyer; you need to know the four terms that decide who gets paid.",
-    0,
-    "Finance"
+    "On the platform at Hakata you heard 「博多行(はかたゆ)きが到着(とうちゃく)いたします」 and asked what 到着(とうちゃく) meant. Station announcements are a small, fixed set of phrases on repeat, so this is one of the quickest wins on the board."
   ),
   mk(
     4,
-    "Conversational Japanese",
-    58,
-    "active",
-    "Your Tokyo trip is in five weeks. You've said \"I really should learn some Japanese before we go\" to three different people, which is how I know you mean it. Ordering food and asking directions is a small, achievable target.",
-    0,
-    "Language"
+    "Checking things with 〜んですけど",
+    63,
+    "proposed",
+    "You started three requests this week with 〜んですけど, which is exactly how people soften a question, and each time the sentence trailed off before the question itself. Finishing the sentence is the whole skill."
   ),
   mk(
     5,
-    "Explaining our pricing model",
-    46,
+    "Asking for something when you don't know the word",
+    58,
     "proposed",
-    "Twice in customer calls this week you handed the pricing question to someone else. Nobody minded, but you noticed. It's a ten-minute story once you've told it a few times.",
-    0,
-    "Work"
+    "In a shop on Thursday you asked for a cloth to polish silver without knowing the word, and got there by describing it. That works. A few set phrases for \"something like…\" make it work every time."
   ),
   mk(
     6,
-    "How honeybees make honey",
-    22,
+    "The history of the Ferris wheel, from Chicago to Osaka",
+    40,
     "mastered",
-    "You wondered about this on a walk, got the short version, and then explained it to Sam on Saturday better than the card did.",
-    3,
-    "Curiosity"
+    "You asked for this out loud while riding the Tempozan wheel in Osaka. One lesson: where the Ferris wheel came from, and why the one you were on changes colour at night.",
+    1,
+    "History",
+    "topic",
+    "asked"
   ),
   mk(
     7,
-    "Sourdough starter maintenance",
-    15,
+    "Ordering at a konbini",
+    46,
     "proposed",
-    "You've mentioned your starter dying twice. Low stakes, but it clearly bothers you.",
+    "At a konbini the clerk asked 「温(あたた)めますか」 and you said yes before you were sure what you'd agreed to. The register asks the same four questions every time: heat it, a bag, chopsticks, how to pay.",
     0,
-    "Home"
+    "Japanese",
+    "topic"
   ),
-  {
-    ...mk(
-      8,
-      "Why the fog rolls in every afternoon",
-      63,
-      "proposed",
-      "Twice this week you stopped mid-sentence on the walk home to point at the fog coming over the hills, and on Thursday you asked why it always shows up at the same time. That is one good lesson, not a course: where it comes from, why it arrives on a schedule, and why it burns off by noon.",
-      0,
-      "Weather"
-    ),
-    kind: "topic",
-  },
 ];
 
 export const skillRows: SkillRow[] = skills.map((s) => ({
   ...s,
-  evidenceCount: [7, 4, 3, 6, 2, 1, 2, 2][s.id - 1],
-  ladderLength: [4, 4, 3, 5, 3, 3, 3, 1][s.id - 1],
+  evidenceCount: [7, 4, 6, 3, 2, 1, 2][s.id - 1],
+  ladderLength: [4, 4, 3, 3, 3, 1, 1][s.id - 1],
   lessonReady: s.status === "active",
   lessonId: s.status === "active" ? 1 : null,
 }));
 
 export const ladder: LadderLevel[] = [
-  { id: 1, skillId: 1, idx: 0, title: "Follow the conversation", outcome: "can say what a rolling deployment is and why it's the default", status: "done" },
-  { id: 2, skillId: 1, idx: 1, title: "Explain what's happening", outcome: "can narrate a rollout pod by pod, including readiness checks and what stops a bad one", status: "current" },
-  { id: 3, skillId: 1, idx: 2, title: "Make the trade-offs", outcome: "can choose surge and unavailability settings for a given service and defend the choice", status: "locked" },
-  { id: 4, skillId: 1, idx: 3, title: "Teach it", outcome: "can explain rolling vs blue-green vs canary to a new engineer in five minutes", status: "locked" },
+  { id: 1, skillId: 1, idx: 0, title: "Open the request", outcome: "can say you'd like to buy tax-free as a visitor", status: "done" },
+  { id: 2, skillId: 1, idx: 1, title: "Follow where they send you", outcome: "can follow a clerk's directions to the tax-free counter and know what to bring", status: "current" },
+  { id: 3, skillId: 1, idx: 2, title: "Get through the counter", outcome: "can answer the counter's questions and confirm the total", status: "locked" },
+  { id: 4, skillId: 1, idx: 3, title: "Sort out a problem", outcome: "can say politely that something is wrong and ask again", status: "locked" },
 ];
 
+const TAX_FREE_PHOTO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Tax_Free_Shop_Miyabi_in_Kansai_Airport%2C_Osaka.jpg/1280px-Tax_Free_Shop_Miyabi_in_Kansai_Airport%2C_Osaka.jpg";
+
 export const deck: Deck = {
-  title: "What Maya meant by \"halfway through the pods\"",
-  subtitle: "Rolling deployments, level two: narrating a rollout",
+  title: "Where the clerk sent you: 1階(いっかい)の免税(めんぜい)カウンター",
+  subtitle: "Tax-free shopping, level two: following where they send you",
   minutes: 10,
   slides: [
     {
       kind: "cover",
-      title: "What Maya meant by \"halfway through the pods\"",
-      subtitle: "Rolling deployments, level two",
-      hook: "On Tuesday the rollout stalled for four minutes and nobody panicked. By the end of this you'll know exactly why they didn't.",
+      title: "Where the clerk sent you",
+      subtitle: "Tax-free shopping, level two",
+      hook: "On Thursday you asked perfectly and then the answer went past you. It was eleven words, and by the end of this card set you'll hear every one of them.",
     },
     {
       kind: "example",
       heading: "The moment",
-      quote: "We're halfway through the pods, the new ones are passing readiness, should be done in a couple minutes.",
-      when: "Tuesday, 2:14 pm",
-      who: "Maya",
+      quote: "1階の方の免税カウンターで聞いてみてください",
+      when: "Thursday, 3:40 pm, Namba",
+      who: "the clerk",
       explanation:
-        "Three things are packed into that sentence: the cluster replaces containers a few at a time, each new one has to prove it's healthy before it gets traffic, and the whole thing has a predictable pace. That is a rolling deployment, and it's the default in Kubernetes for a reason.",
+        "Four pieces: 1階(いっかい) is the first floor, の方(ほう) means over in that direction, 免税(めんぜい)カウンター is the tax-free counter, and 聞(き)いてみてください is please try asking. She wasn't saying no. She was saying: the register can't do it, the counter downstairs can.",
     },
     {
       kind: "text",
-      heading: "A few at a time, never all at once",
-      body: "When you ship a new version, Kubernetes doesn't turn the old one off and the new one on. It starts one or two new pods, waits for them to report ready, then retires one or two old ones, and repeats until the whole set has turned over. The service never has zero pods, which is why users don't notice.\n\nThe pace is set by two numbers you'll see on Thursday: how many extra pods it's allowed to start above the target (surge), and how many it's allowed to have missing below it (unavailable).",
-      aside: "Maya's \"halfway\" was literal: five of ten pods had turned over.",
-    },
-    {
-      kind: "diagram",
-      heading: "One turn of the loop",
-      mermaid:
-        "flowchart LR\n  A[Start a new pod] --> B{Passes readiness?}\n  B -- yes --> C[Send it traffic]\n  C --> D[Retire one old pod]\n  D --> E{All pods new?}\n  E -- no --> A\n  E -- yes --> F[Rollout complete]\n  B -- no, keeps failing --> G[Rollout stalls]",
-      caption: "The readiness check is the gate. Nothing gets traffic until it passes, and a version that never passes simply never finishes rolling out.",
-    },
-    {
-      kind: "keyidea",
-      statement: "The readiness check is the whole safety story.",
-      why: "Without it, Kubernetes would route real users to a container that hasn't finished starting. With it, a broken version can't spread past the first pod. That four-minute stall on Tuesday was the gate doing its job while a pod warmed up.",
-    },
-    {
-      kind: "image",
-      heading: "What the dashboard shows mid-rollout",
-      query: "kubernetes pods networking diagram",
-      url: "https://upload.wikimedia.org/wikipedia/commons/6/63/Pod-networking.png",
-      alt: "Diagram of Kubernetes pods and their networking inside a node",
-      caption: "Pods are the unit that gets replaced during a rollout. In the real console you'll see two ReplicaSets side by side: the old one shrinking, the new one growing. When the old one hits zero, the rollout is done.",
-      credit: "Wikimedia Commons, Pod-networking",
+      heading: "Most shops don't do tax-free at the till",
+      body: "In a big store, tax-free is handled at one desk, often on a single floor. So the usual answer to 免税(めんぜい)できますか isn't yes or no, it's directions. Expect a floor and a place, then 聞(き)いてみてください or お越(こ)しください, please come by.\n\nThat means the useful skill isn't more vocabulary for the request. It's hearing a floor number and a place name at speed.",
+      aside: "The clerk's 〜の方(ほう) softens it: \"over toward the first floor\", not a command.",
     },
     {
       kind: "steps",
-      heading: "How to narrate one on Thursday",
+      heading: "Floors, the way you'll hear them",
       steps: [
-        { title: "Name the two sets", body: "\"Old ReplicaSet at six, new at four, so we're about halfway.\"" },
-        { title: "Point at readiness", body: "\"New pods are passing readiness, so they're taking traffic.\"" },
-        { title: "Say what would stop it", body: "\"If a new pod kept failing readiness, this would stall rather than break anything.\"" },
+        { title: "1階(いっかい)", body: "first floor, the street level" },
+        { title: "2階(にかい)", body: "second floor" },
+        { title: "3階(さんがい)", body: "third floor: がい, not かい" },
+        { title: "地下(ちか)1階(いっかい)", body: "first basement, often written B1" },
       ],
     },
     {
+      kind: "diagram",
+      heading: "What happens after she sends you",
+      mermaid:
+        "flowchart LR\n  A[Ask at the register] --> B[Sent to the tax-free counter]\n  B --> C[Show your passport]\n  C --> D[Staff check the items]\n  D --> E[Pay the price without tax]\n  E --> F[Food and cosmetics sealed in a bag]",
+      caption: "The passport is the one thing you can't do without. Bring the physical one; a photo of it won't do.",
+    },
+    {
+      kind: "keyidea",
+      statement: "〜で聞(き)いてみてください means \"go and ask at…\", not \"ask me\".",
+      why: "Once you hear 聞いてみてください as directions, the sentence before it becomes the answer you were waiting for: a floor and a place.",
+    },
+    {
+      kind: "image",
+      heading: "What to look for",
+      query: "tax free shop Japan",
+      url: TAX_FREE_PHOTO,
+      alt: "A tax-free shop counter at Kansai International Airport in Osaka",
+      caption: "Shops that offer it put up a TAX FREE sign, like this one at Kansai Airport. In a department store, the tax-free counter is usually signposted from the escalators.",
+      credit: "Wikimedia Commons, Tax Free Shop Miyabi in Kansai Airport, Osaka",
+    },
+    {
       kind: "compare",
-      heading: "Rolling vs the two alternatives you'll hear about",
+      heading: "Three things you'll hear at the counter",
       columns: [
-        { title: "Rolling", points: ["Gradual, a few pods at a time", "Old and new run together briefly", "Cheap: no spare capacity needed"] },
-        { title: "Blue-green", points: ["Whole new copy stood up beside the old", "Traffic flips all at once", "Instant rollback, double the cost"] },
-        { title: "Canary", points: ["A slice of users gets the new version first", "Watch metrics, then widen", "Best for risky changes, needs routing rules"] },
+        { title: "パスポートお願(ねが)いします", points: ["Your passport, please", "Hand over the physical passport"] },
+        { title: "日本(にほん)で開(あ)けないでください", points: ["Don't open it in Japan", "Said about the sealed bag of food or cosmetics"] },
+        { title: "こちらにサインお願(ねが)いします", points: ["Please sign here", "Some stores use a screen instead of paper"] },
       ],
     },
     {
       kind: "learnmore",
-      links: [
-        { title: "Kubernetes docs: Performing a Rolling Update", url: "https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/", why: "The official walkthrough with the exact commands." },
-        { title: "Kubernetes docs: Deployments", url: "https://kubernetes.io/docs/concepts/workloads/controllers/deployment/", why: "Where maxSurge and maxUnavailable are actually defined." },
-      ],
+      links: [{ title: "Japan Tax-free Shop (Japan National Tourism Organization)", url: "https://tax-freeshop.jnto.go.jp/eng/index.php", why: "The official rules and a search for stores that offer it." }],
     },
   ],
 };
@@ -213,45 +197,45 @@ export const quiz: Quiz = {
   questions: [
     {
       kind: "mcq",
-      prompt: "Midway through a rolling deployment, how many versions of the service are running?",
-      choices: ["Only the old one", "Only the new one", "Both, side by side", "None, there's a brief gap"],
-      answer: 2,
-      explanation: "Old and new pods overlap until the last old one is retired. That overlap is why users never see downtime.",
+      prompt: "The clerk says 「1階(いっかい)の方(ほう)の免税(めんぜい)カウンターで聞(き)いてみてください」. What does she want you to do?",
+      choices: ["Ask her again more slowly", "Go and ask at the tax-free counter on the first floor", "Come back on another day", "Pay at the register first"],
+      answer: 1,
+      explanation: "で聞いてみてください is \"try asking at…\": she's sending you to the counter, not refusing.",
     },
     {
       kind: "mcq",
-      prompt: "A new pod keeps failing its readiness check. What happens to the rollout?",
-      choices: ["It completes anyway", "It stalls and stops sending traffic to that pod", "It rolls back automatically", "It restarts from scratch"],
+      prompt: "How is 3階 read?",
+      choices: ["さんかい", "さんがい", "みっかい", "さんばん"],
       answer: 1,
-      explanation: "The gate holds. Kubernetes won't route traffic to an unready pod and won't retire more old pods while it waits.",
+      explanation: "3階 is さんがい: the か softens to が after ん.",
     },
     {
       kind: "mcq",
-      prompt: "Which setting controls how many extra pods can exist above the target during a rollout?",
-      choices: ["maxUnavailable", "maxSurge", "replicas", "readinessProbe"],
+      prompt: "What do you need to show at the tax-free counter?",
+      choices: ["A photo of your passport", "Your physical passport", "Your hotel booking", "Your plane ticket"],
       answer: 1,
-      explanation: "maxSurge is the headroom above target; maxUnavailable is how far below target it may dip.",
+      explanation: "The counter needs the passport itself; a photo of it isn't accepted.",
     },
     {
       kind: "short",
-      prompt: "In two sentences, explain why Tuesday's four-minute stall wasn't a problem.",
-      rubric: "Mentions that a new pod hadn't passed readiness yet, that traffic was still served by healthy pods, and that a stall is the safe failure mode rather than a broken deploy.",
+      prompt: "In a sentence: what does 〜の方(ほう) add to 「1階の方」?",
+      rubric: "It means toward or over in the direction of the first floor; it softens the direction.",
     },
     {
       kind: "mcq",
-      prompt: "Which strategy gives you instant rollback at the cost of running two full copies?",
-      choices: ["Rolling", "Blue-green", "Canary", "Recreate"],
+      prompt: "At the counter they say 「日本(にほん)で開(あ)けないでください」 about your sealed bag. What does it mean?",
+      choices: ["Please open it now", "Don't open it while you're in Japan", "It can't be returned", "Keep the receipt in the bag"],
       answer: 1,
-      explanation: "Blue-green keeps the old copy alive until you're sure, so flipping back is a routing change.",
+      explanation: "Tax-free food and cosmetics are sealed, and opening them before you leave Japan can cost you the tax back.",
     },
   ],
 };
 
 export const beats: LessonBeat[] = [
-  { kind: "checkin", prompt: "What's the one thing a new pod has to do before it gets any traffic?", rubric: "pass its readiness check" },
-  { kind: "scenario", prompt: "It's Thursday. Someone says the rollout has been at 7 of 10 for six minutes. What do you look at first, and what do you say?", rubric: "check readiness of the new pods; explain that the gate is holding and no users are affected; ask what the failing pod is logging" },
-  { kind: "teachback", prompt: "Explain a rolling deployment out loud the way you'd explain it to Maya.", rubric: "a few at a time; readiness gate; old and new overlap; stall not break" },
-  { kind: "mission", prompt: "In Thursday's sync, narrate the state of any rollout that's mentioned using the three sentences from the steps card.", rubric: "used the vocabulary correctly in a real conversation" },
+  { kind: "checkin", prompt: "What does 聞(き)いてみてください tell you to do?", rubric: "go and try asking somewhere" },
+  { kind: "scenario", prompt: "The clerk says 「地下(ちか)1階(いっかい)の免税(めんぜい)カウンターへどうぞ」. Where do you go, and what do you get out first?", rubric: "the tax-free counter on the first basement floor; take out the physical passport" },
+  { kind: "teachback", prompt: "Out loud, in Japanese: ask to buy tax-free, then repeat back where she sends you.", rubric: "免税できますか or 免税お願いします; repeats a floor and カウンター back" },
+  { kind: "mission", prompt: "At the next shop, ask 「免税(めんぜい)できますか」 and follow wherever they send you.", rubric: "asked and followed the directions in a real shop" },
 ];
 
 export const lesson: Lesson = {
@@ -266,7 +250,7 @@ export const lesson: Lesson = {
   deck: JSON.stringify(deck),
   quiz: JSON.stringify(quiz),
   beats: JSON.stringify(beats),
-  citations: JSON.stringify(deck.slides.find((s) => s.kind === "learnmore")!.kind === "learnmore" ? (deck.slides.find((s) => s.kind === "learnmore") as { links: Array<{ title: string; url: string }> }).links.map((l) => ({ title: l.title, url: l.url })) : []),
+  citations: JSON.stringify([{ title: "Japan Tax-free Shop (Japan National Tourism Organization)", url: "https://tax-freeshop.jnto.go.jp/eng/index.php" }]),
   status: "ready",
   createdAt: now - 2 * h,
   completedAt: null,
@@ -279,43 +263,65 @@ export const lesson: Lesson = {
       { id: "length", ok: true, detail: "9 cards. A lesson should be 6 to 14." },
       { id: "one-idea-a-card", ok: true, detail: "No card tries to carry more than one idea's worth of text." },
       { id: "quiz", ok: true, detail: "5 questions, each with one answer that can be marked." },
-      { id: "sources", ok: true, detail: "3 further-reading links, all real addresses." },
+      { id: "sources", ok: true, detail: "1 further-reading link, a real address." },
       { id: "diagram", ok: true, detail: "The diagram is small enough to read at a glance." },
-      { id: "accurate", ok: true, detail: "The facts hold up, including the 25% default for maxUnavailable." },
-      { id: "right-level", ok: true, detail: "It stays on narrating a rollout, which is level two, and leaves the trade-offs for level three." },
+      { id: "accurate", ok: true, detail: "The facts hold up, including that a photo of a passport isn't accepted at the counter." },
+      { id: "right-level", ok: true, detail: "It stays on following where you're sent, which is level two, and leaves the counter's own questions for level three." },
     ],
   }),
 };
 
 export const evidence: Evidence[] = [
-  { id: 1, kind: "struggle", text: "Wait, what does halfway through the pods actually mean?", context: "someone: So we roll it out halfway through the pods first.\nyou: Wait, what does halfway through the pods actually mean?\nsomeone: Half the copies get the new version, the rest keep serving.", editedAt: null, spokenAt: iso(3 * d), utteranceId: 1, conversationUuid: "c1", speakerLabel: "you", place: "Office, 4th floor", source: "stream", stage: "classified", route: "skill", topic: "rolling deployments", confidence: 0.9, skillId: 1, createdAt: now },
-  { id: 2, kind: "intent", text: "I really need to actually understand how our deploys work before Thursday.", context: "you: I really need to actually understand how our deploys work before Thursday.\nsomeone: Maya can walk you through it.", editedAt: null, spokenAt: iso(2 * d), utteranceId: 2, conversationUuid: "c2", speakerLabel: "you", place: "Home", source: "stream", stage: "classified", route: "skill", topic: "kubernetes", confidence: 0.95, skillId: 1, createdAt: now },
-  { id: 3, kind: "gap", text: "I think rolling deploys are basically the same as blue-green? Something like that.", context: "someone: Is that the rolling one or the other one?\nyou: I think rolling deploys are basically the same as blue-green? Something like that.", editedAt: null, spokenAt: iso(1 * d), utteranceId: 3, conversationUuid: "c3", speakerLabel: "you", place: "Cafe on 3rd", source: "stream", stage: "classified", route: "skill", topic: "deployment strategies", confidence: 0.85, skillId: 1, createdAt: now },
+  {
+    id: 1, kind: "exposure", text: "えっと、タックスフリーで買いたいんですけど、アメリカ人なのでどうやってやる感じですか",
+    context: "you: えっと、タックスフリーで買いたいんですけど、アメリカ人なのでどうやってやる感じですか\nsomeone: 1階の方の免税カウンターで聞いてみてください\nsomeone: パスポートがあれば大丈夫ですね",
+    editedAt: null, spokenAt: iso(3 * d), utteranceId: 1, conversationUuid: "c1", speakerLabel: "you", place: "Namba, Osaka", source: "stream", stage: "classified", route: "skill", topic: "tax-free shopping", confidence: 0.9, skillId: 1, createdAt: now,
+  },
+  {
+    id: 2, kind: "struggle", text: "Wait, where did she say to go? Something about the first floor?",
+    context: "someone: 1階の方の免税カウンターで聞いてみてください\nyou: Wait, where did she say to go? Something about the first floor?",
+    editedAt: null, spokenAt: iso(3 * d), utteranceId: 2, conversationUuid: "c1", speakerLabel: "you", place: "Namba, Osaka", source: "stream", stage: "classified", route: "skill", topic: "tax-free directions", confidence: 0.95, skillId: 1, createdAt: now,
+  },
+  {
+    id: 3, kind: "gap", text: "I think tax-free only works if you spend like ten thousand yen.",
+    context: "someone: Is it worth asking for tax-free?\nyou: I think tax-free only works if you spend like ten thousand yen.",
+    editedAt: null, spokenAt: iso(2 * d), utteranceId: 3, conversationUuid: "c3", speakerLabel: "you", place: "Umeda, Osaka", source: "stream", stage: "classified", route: "skill", topic: "tax-free rules", confidence: 0.85, skillId: 1, createdAt: now,
+  },
+  {
+    id: 4, kind: "struggle", text: "What does 到着 mean? The announcement keeps saying it.",
+    context: "someone: 博多行きが到着いたします\nyou: What does 到着 mean? The announcement keeps saying it.",
+    editedAt: null, spokenAt: iso(1 * d), utteranceId: 4, conversationUuid: "c4", speakerLabel: "you", place: "Hakata, Fukuoka", source: "stream", stage: "classified", route: "skill", topic: "station announcements", confidence: 0.9, skillId: 3, createdAt: now,
+  },
+  {
+    id: 5, kind: "struggle", text: "I just said yes, I think she asked if I wanted it heated?",
+    context: "someone: 温めますか\nyou: はい\nyou: I just said yes, I think she asked if I wanted it heated?",
+    editedAt: null, spokenAt: iso(1 * d), utteranceId: 5, conversationUuid: "c5", speakerLabel: "you", place: "Hakata, Fukuoka", source: "stream", stage: "classified", route: "skill", topic: "konbini register", confidence: 0.85, skillId: 7, createdAt: now,
+  },
 ];
 
 export const practice: Practice[] = [
-  { id: 1, skillId: 1, lessonId: 1, cardId: null, kind: "teachback", prompt: "Explain what a rolling deployment is, out loud.", rubric: null, beeTodoId: 1, marker: "w1a2b", status: "graded", scheduledFor: now - 1 * d, journalId: "j1", answerText: "So it swaps the pods a few at a time instead of all at once, and each new one has to be ready before it gets traffic, so there's never a moment with nothing running.", grade: JSON.stringify({ score: 4, feedback: "You had the core right: a few at a time, readiness first, no gap. What you skipped is what happens when a pod never becomes ready. Say \"it stalls instead of breaking\" and you've got the whole picture.", missing: ["stall behaviour"] }), createdAt: now - 1 * d },
+  { id: 1, skillId: 1, lessonId: 1, cardId: null, kind: "teachback", prompt: "Out loud, in Japanese: ask to buy tax-free.", rubric: null, beeTodoId: 1, marker: "w1a2b", status: "graded", scheduledFor: now - 1 * d, journalId: "j1", answerText: "すみません、免税できますか。パスポートあります。", grade: JSON.stringify({ score: 4, feedback: "Clear and polite, and mentioning the passport up front saves a step. The one thing to add is listening for where they send you: a floor, then カウンター.", missing: ["following the directions"] }), createdAt: now - 1 * d },
 ];
 
 export const fieldEvidence: FieldEvidence[] = [
-  { id: 1, skillId: 1, utteranceId: 9, text: "It's fine, the new pods just haven't passed readiness yet, nobody's getting routed to them.", context: null, spokenAt: iso(5 * h), verdict: JSON.stringify({ used: true, correct: true, level: 1, note: "That's the readiness gate explained correctly, unprompted, to someone who was worried. Level two is yours." }), credited: true, createdAt: now },
+  { id: 1, skillId: 1, utteranceId: 9, text: "すみません、免税カウンターは何階ですか", context: null, spokenAt: iso(5 * h), verdict: JSON.stringify({ used: true, correct: true, level: 1, note: "You asked which floor the tax-free counter was on, in Japanese, before anyone sent you there. That's level one done for real." }), credited: true, createdAt: now },
 ];
 
 export const cards: Array<{ card: Card; item: Item }> = [
   {
-    card: { id: 1, itemId: 1, title: "How honeybees turn nectar into honey", answerMd: "Honey starts as nectar, which is mostly water and sucrose, and the bee's job is to strip out the water and split the sugar. A forager carries it home in a second stomach where an enzyme starts breaking sucrose into glucose and fructose, then house bees pass it around and fan it until the water drops from about seventy percent to under twenty. That dryness is the whole trick: nothing can grow in it, which is why sealed jars keep for years. The number worth keeping is the exchange rate, about two million flower visits for one pound.", citations: "[]", createdAt: now - 4 * d , guess: "They chew the pollen into it somehow?", guessClose: false, guessNote: "Not pollen: it starts as nectar. The part worth holding onto is that the whole job is getting water out."},
-    item: { id: 1, kind: "question", sourceText: "I wonder how honeybees actually make honey.", topic: "how honeybees make honey", status: "researched", confidence: 0.8, utteranceId: 5, conversationUuid: "c5", spokenAt: iso(4 * d), createdAt: now - 4 * d, place: "Golden Gate Park", speakerLabel: "you" },
+    card: { id: 1, itemId: 1, title: "Why does the Tempozan Ferris wheel change colour at night?", answerMd: "Its lights are a weather forecast for the next day. Orange means sunny, green means cloudy and blue means rain, so a glance across Osaka Bay tells you whether to pack an umbrella tomorrow. The wheel opened in 1997 at 112.5 metres, among the biggest in the world at the time, and the forecast lighting is what locals still point at.", citations: "[]", createdAt: now - 4 * d, guess: "Something to do with the seasons?", guessClose: false, guessNote: "Not the seasons: it's tomorrow's weather. Orange for sun, green for cloud, blue for rain." },
+    item: { id: 1, kind: "question", sourceText: "Why does the wheel keep changing colour like that?", topic: "Tempozan Ferris wheel lights", status: "researched", confidence: 0.8, utteranceId: 6, conversationUuid: "c6", spokenAt: iso(4 * d), createdAt: now - 4 * d, place: "Minato, Osaka", speakerLabel: "you" },
   },
   {
-    card: { id: 2, itemId: 2, title: "Why airplane windows are round", answerMd: "Square windows concentrate stress at their corners, and on a pressurised fuselage that flexes every flight, those corners are where cracks start. Two de Havilland Comets broke apart in 1954 for roughly this reason, and the investigation changed the rules. Rounded corners spread the load around the opening instead of focusing it on a point. The detail worth keeping: it isn't about aerodynamics at all, it's about metal fatigue.", citations: "[]", createdAt: now - 2 * d , guess: null, guessClose: null, guessNote: null},
-    item: { id: 2, kind: "question", sourceText: "Man, I wonder why airplane windows are always round.", topic: "why airplane windows are round", status: "researched", confidence: 0.8, utteranceId: 6, conversationUuid: "c6", spokenAt: iso(2 * d), createdAt: now - 2 * d, place: "SFO", speakerLabel: "you" },
+    card: { id: 2, itemId: 2, title: "Why do Japanese train stations play little tunes?", answerMd: "They're departure melodies, 発車(はっしゃ)メロディ, and they replaced the harsh bells that used to signal doors closing. A short tune tells you the train is about to leave without startling anyone, and many stations pick a song with a local story, so regulars know where they are with their eyes shut. The detail worth keeping: if you hear the melody start, don't run for the doors, the next train is minutes away.", citations: "[]", createdAt: now - 2 * d, guess: null, guessClose: null, guessNote: null },
+    item: { id: 2, kind: "question", sourceText: "Why does every station play a different little song?", topic: "station departure melodies", status: "researched", confidence: 0.8, utteranceId: 7, conversationUuid: "c7", spokenAt: iso(2 * d), createdAt: now - 2 * d, place: "Hakata, Fukuoka", speakerLabel: "you" },
   },
 ];
 
 export const today: Today = {
   profile,
   letter:
-    "Your week has mostly been about Thursday. Kubernetes came up again yesterday, and you handled the readiness question with Sam better than you think, so level two is closer than the board suggests. The salary conversation is the other thing on your mind; you've mentioned it three times and decided nothing, which is exactly when a plan helps. Today: ten minutes on the rolling deployment lesson, then leave the rest.",
+    "At the tax-free counter on Thursday you got the request out in Japanese, then lost the thread when the clerk sent you to 1階(いっかい)の免税(めんぜい)カウンター. You confirmed that, and it's exactly level two of the tax-free plan: ten minutes, and the next shop will go differently. The station announcements from Hakata are waiting for a yes on the board; it's the same handful of phrases on repeat, so it's a quick win.",
   letterDate: new Date().toDateString(),
   lesson: { lesson, skill: skills[0], ladderLength: ladder.length },
   duePractice: [],
@@ -324,8 +330,8 @@ export const today: Today = {
   active: 2,
   sparks: cards,
   upcoming: [
-    { id: 9, skillId: 1, lessonId: 1, cardId: null, kind: "mission", prompt: "In Thursday's sync, narrate the state of any rollout that's mentioned using the three sentences from the steps card.", rubric: null, beeTodoId: 9, marker: "m9", status: "scheduled", scheduledFor: now + 26 * h, journalId: null, answerText: null, grade: null, createdAt: now - h },
-    { id: 10, skillId: null, lessonId: null, cardId: 1, kind: "recall", prompt: "How do honeybees turn nectar into honey?", rubric: null, beeTodoId: 10, marker: "m10", status: "scheduled", scheduledFor: now + 3 * d, journalId: null, answerText: null, grade: null, createdAt: now - 2 * h },
+    { id: 9, skillId: 1, lessonId: 1, cardId: null, kind: "mission", prompt: "At the next shop, ask 「免税(めんぜい)できますか」 and follow wherever they send you.", rubric: null, beeTodoId: 9, marker: "m9", status: "scheduled", scheduledFor: now + 26 * h, journalId: null, answerText: null, grade: null, createdAt: now - h },
+    { id: 10, skillId: null, lessonId: null, cardId: 1, kind: "recall", prompt: "What do the Tempozan wheel's colours mean?", rubric: null, beeTodoId: 10, marker: "m10", status: "scheduled", scheduledFor: now + 3 * d, journalId: null, answerText: null, grade: null, createdAt: now - 2 * h },
   ],
   nextSlot: new Date(now + 6 * h).toISOString(),
 };
@@ -359,13 +365,13 @@ export const progress: LearningProgress = {
 };
 
 export const history: HistoryEntry[] = [
-  { at: now - 5 * h, kind: "credit", title: "Used it for real: Kubernetes rolling deployments", detail: "That's the readiness gate explained correctly, unprompted, to someone who was worried. Level two is yours.", skillId: 1, lessonId: null, score: null },
-  { at: now - 1 * d, kind: "answer", title: "Explained it out loud: Kubernetes rolling deployments", detail: "4 of 5. You had the core right: a few at a time, readiness first, no gap. What you skipped is what happens when a pod never becomes ready.", skillId: 1, lessonId: 1, score: 4 },
-  { at: now - 1 * d - 2 * h, kind: "lesson", title: "Finished a lesson: Kubernetes rolling deployments", detail: "Level 1.", skillId: 1, lessonId: 1, score: null },
-  { at: now - 2 * d, kind: "spark", title: "Wondered: Why airplane windows are round", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
-  { at: now - 3 * d, kind: "answer", title: "Took the check: Kubernetes rolling deployments", detail: "4 of 5", skillId: 1, lessonId: 1, score: 0.8 },
-  { at: now - 4 * d, kind: "spark", title: "Wondered: How honeybees turn nectar into honey", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
-  { at: now - 6 * d, kind: "answer", title: "Explained it out loud: Conversational Japanese", detail: "2 of 5. The order was right and the politeness level was not. Say the verb last and you're most of the way there.", skillId: 4, lessonId: null, score: 2 },
+  { at: now - 5 * h, kind: "credit", title: "Used it for real: Tax-free shopping in Japanese", detail: "You asked which floor the tax-free counter was on, in Japanese, before anyone sent you there.", skillId: 1, lessonId: null, score: null },
+  { at: now - 1 * d, kind: "answer", title: "Said it out loud: Tax-free shopping in Japanese", detail: "4 of 5. Clear and polite. Next: listen for the floor and カウンター in the answer.", skillId: 1, lessonId: 1, score: 4 },
+  { at: now - 1 * d - 2 * h, kind: "lesson", title: "Finished a lesson: The history of the Ferris wheel, from Chicago to Osaka", detail: "The one you asked for on the Tempozan wheel.", skillId: 6, lessonId: null, score: null },
+  { at: now - 2 * d, kind: "spark", title: "Wondered: Why do Japanese train stations play little tunes?", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
+  { at: now - 3 * d, kind: "answer", title: "Took the check: Tax-free shopping in Japanese", detail: "4 of 5", skillId: 1, lessonId: 1, score: 0.8 },
+  { at: now - 4 * d, kind: "spark", title: "Wondered: Why does the Tempozan Ferris wheel change colour at night?", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
+  { at: now - 6 * d, kind: "answer", title: "Said it out loud: Phone calls with delivery drivers", detail: "2 of 5. Your name came through clearly; the landmark didn't. 〜の前(まえ) after a place you can see is all it takes.", skillId: 2, lessonId: null, score: 2 },
 ];
 
 /** A day review as the server writes one: claims to mark right or wrong, and a few questions. */
@@ -376,13 +382,13 @@ export function sampleReview(day: string): import("@rhubarb/core").DayReview {
     createdAt: now - 10 * h,
     doneAt: null,
     findings: [
-      { id: 1, claim: "In the platform standup, Maya said the rollout was \"halfway through the pods\" and you asked what that meant.", momentIds: [1], unsure: null, verdict: null, correction: null },
-      { id: 2, claim: "You said you want to understand how your team's deploys work before Thursday's sync.", momentIds: [2], unsure: null, verdict: null, correction: null },
-      { id: 3, claim: "You said rolling deploys and blue-green deploys are the same thing.", momentIds: [3], unsure: "This may have been someone else at the table: the transcript can't tell voices apart.", verdict: null, correction: null },
+      { id: 1, claim: "On the platform at Hakata, an announcement said 「博多行(はかたゆ)きが到着(とうちゃく)いたします」 and you asked what 到着(とうちゃく) meant.", momentIds: [4], unsure: null, verdict: null, correction: null },
+      { id: 2, claim: "At a konbini the clerk asked 「温(あたた)めますか」 and you said yes before you were sure what it meant.", momentIds: [5], unsure: "You may have understood it and just answered fast.", verdict: null, correction: null },
+      { id: 3, claim: "You wondered out loud why every station plays a different little tune.", momentIds: [], unsure: null, verdict: null, correction: null },
     ],
     questions: [
-      { id: 1, text: "Is Thursday's sync somewhere you'll need to explain the rollout, or just follow it?", answer: null },
-      { id: 2, text: "Do you want to get comfortable with deploys, or only enough for this one meeting?", answer: null },
+      { id: 1, text: "Will you be taking trains most days, so the station announcements are worth learning?", answer: null },
+      { id: 2, text: "At the konbini, is it the register questions you want, or ordering hot food?", answer: null },
     ],
   };
 }

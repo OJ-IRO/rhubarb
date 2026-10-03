@@ -60,9 +60,6 @@ function Offline({ onRetry }: { onRetry: () => void }) {
         <button className="primary" onClick={onRetry}>
           Try again
         </button>
-        <a className="button" href="#/preview/">
-          Look around with sample content
-        </a>
       </div>
       <p className="muted small">First time here? It needs a paired Bee and AWS access before it can start. The README walks through both.</p>
     </main>
@@ -174,11 +171,6 @@ export function App() {
           <Link to={profile ? "/settings" : "/welcome"} className={route.path === "/settings" || route.path === "/welcome" ? "navlink active small" : "navlink small"}>
             {profile ? "Settings" : "Set up"}
           </Link>
-          {!preview && (
-            <a href="#/preview/board" className="navlink small">
-              Design preview
-            </a>
-          )}
         </div>
       </nav>
       <main className="shell">

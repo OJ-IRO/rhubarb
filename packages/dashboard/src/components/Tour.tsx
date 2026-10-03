@@ -11,13 +11,25 @@ interface Step {
   body: string;
 }
 
+const DEMO_FIRST = "What you're about to see is sample content: one visitor's weeks learning Japanese in Osaka and Fukuoka, so you can see what a full Rhubarb looks like. This light says whether it can hear the Bee right now.";
+const OWN_FIRST = "This is your Rhubarb, built from what your Bee hears. This light says whether it can hear your Bee right now.";
+
 const STEPS: Step[] = [
-  { path: "/", target: "listening", title: "It listens through your Bee", body: "What you're about to see is sample content: one made-up week, so you can see what a full Rhubarb looks like. Yours fills in as it hears you. This light says whether it can hear your Bee right now." },
+  { path: "/", target: "listening", title: "It listens through your Bee", body: DEMO_FIRST },
   { path: "/board", target: "board-top", title: "You decide what's worth learning", body: "This is the board. It ranks what your days have asked of you, with the moments that put each skill there. Say yes to one, or set it aside." },
   { path: "/lessons/1", target: "lesson-stage", title: "A lesson, then out loud", body: "Lessons are built from your own conversations, a card at a time. Then your phone buzzes, you explain the idea into your Bee, and you get feedback the same way." },
   { path: "/evidence", target: "evidence-top", title: "It hears you get better", body: "When a later conversation shows you using a skill for real, that counts. This page keeps the score, in numbers you can check." },
-  { path: "/privacy", target: "privacy-top", title: "Yours to forget", body: "Everything stays on your own machine, never with a company. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
+  { path: "/privacy", target: "privacy-top", title: "Yours to forget", body: "No audio is ever kept, and nothing is sold or shared. This page shows what's held, what Rhubarb refuses to learn from, and lets you forget a moment, a day, or all of it." },
 ];
+
+/**
+ * The judges' demo tours its sample content. Someone's own Rhubarb tours their own pages and never
+ * jumps into the sample: mixing the two made a made-up week look like theirs.
+ */
+function stepsFor(demo: boolean): Step[] {
+  if (demo) return STEPS;
+  return STEPS.filter((s) => !s.path.startsWith("/lessons")).map((s) => (s.target === "listening" ? { ...s, body: OWN_FIRST } : s));
+}
 
 export function tourSeen(): boolean {
   try {
@@ -39,11 +51,13 @@ export function resetTour(): void {
 export function Tour({ onClose }: { onClose: () => void }) {
   const [i, setI] = useState(0);
   const [from] = useState(() => window.location.hash || "#/");
+  const [demo] = useState(() => Boolean(import.meta.env.VITE_DEMO) || (window.location.hash || "").startsWith("#/preview"));
+  const steps = stepsFor(demo);
   const [box, setBox] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
   // The ring glides when the step changes and snaps while you scroll. Gliding during a scroll
   // makes it lag its target and wobble.
   const [gliding, setGliding] = useState(true);
-  const step = STEPS[i];
+  const step = steps[i];
 
   const finish = useCallback(() => {
     try {
@@ -53,14 +67,13 @@ export function Tour({ onClose }: { onClose: () => void }) {
     }
     onClose();
     // Back to where they were: their own app, or the preview's Today if they were already looking around.
-    window.location.hash = from.startsWith("#/preview") ? "#/preview/" : "#/";
-  }, [onClose, from]);
+    window.location.hash = demo ? "#/preview/" : "#/";
+  }, [onClose, demo]);
 
-  // Each step opens the page it describes, in the sample content. Pointing at a real app that is
-  // still empty taught nothing, and pointed at a lesson that did not exist yet.
+  // Each step opens the page it describes: in the sample content on the demo, in their own app otherwise.
   useEffect(() => {
-    window.location.hash = `#/preview${step.path === "/" ? "/" : step.path}`;
-  }, [step.path]);
+    window.location.hash = demo ? `#/preview${step.path === "/" ? "/" : step.path}` : `#${step.path}`;
+  }, [step.path, demo]);
 
   // Where the card sits: in whichever direction from the target has the most room, so it never
   // covers the thing it is pointing at. A target that fills the screen leaves the bottom-right corner.
@@ -126,14 +139,14 @@ export function Tour({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [finish]);
 
-  const last = i === STEPS.length - 1;
+  const last = i === steps.length - 1;
   return (
     <>
       {box && <div className={gliding ? "tour-ring" : "tour-ring snap"} style={{ top: box.top - 5, left: box.left - 5, width: box.width + 10, height: box.height + 10 }} aria-hidden="true" />}
       <aside className={`tour ${side}`} role="dialog" aria-label="A quick look around">
         <p className="eyebrow">
           <span>
-            {i + 1} of {STEPS.length}
+            {i + 1} of {steps.length}
           </span>
         </p>
         <h2>{step.title}</h2>
