@@ -1,25 +1,50 @@
-# Product Feedback — Bee Developer Platform
+# Product Feedback: Bee Developer Platform
 
-Working notes for the mandatory hackathon Product Feedback section. Filled in continuously; finalized at submission.
+Product feedback for the Amazon "Build, Ship, Shape" hackathon, Bee track. The detailed friction
+log, entry by entry, is in [FRICTION-LOG.md](FRICTION-LOG.md).
 
-## Tools / APIs / SDKs used
-- `@beeai/cli` 0.7.3 (proxy, stream, login) — <notes>
-- Bee developer API (`/v1/*` via proxy) — <notes>
-- Bee SSE stream (`new-utterance`, `journal-*`, todo events) — <notes>
-- Bee Agent Skill — <notes>
-- Amazon Bedrock (Claude) — <notes>
+## Tools, APIs and SDKs used
 
-## What worked well
-- `bee login` pairing: under a minute, clear instructions, token persisted on macOS (issue #9 did not reproduce on 0.7.3)
-- `bee stream --json` as a child process is a genuinely good integration surface: typed events, per-utterance text with `spoken_at`, and the `journal-text` event delivers a full voice-note transcript ~3s after the button is released
-- Todo `alarm_at` fires a real push notification with haptics on a locked phone, which makes the Bee a two-way channel with zero extra hardware
-- `bee proxy` removes the private-CA problem entirely for local integrations
+**Bee CLI (`@beeai/cli` 0.7.3).** `bee login` took under a minute. `bee stream --json` is a
+genuinely good integration surface: typed events, per-utterance text with `spoken_at`, and a
+voice-note transcript about three seconds after the button is released. `bee proxy` removes the
+private-CA problem for local apps. Two things hurt: the stream drops roughly every ninety minutes
+and exits rather than reconnecting, and `bee` isn't on the PATH of a fresh shell under nvm.
 
-## What needs improvement
-- <fill as discovered>
+**Bee developer API.** Todos with `alarm_at` are the standout: a real push with haptics on a
+locked phone turns the Bee into a two-way channel with no extra hardware. Location clusters and
+conversation locations were easy to use. Pain points: short conversations are deleted after
+processing with no event or documentation; the realtime and final transcripts use different ids
+and the REST conversation has no `conversation_uuid`, so the two can't be joined; speaker labels
+come back "Unknown" on every line; `/v1/changes` sometimes returns a 500 with an HTML body; the
+proxy rejects a bare `application/json` content type; and stream events use camelCase where REST
+uses snake_case.
 
-## Onboarding experience
-- <fill: Developer Mode discovery, pairing flow, docs quality>
+**Bee device and app.** Japanese transcription was better than expected. Pairing a new Bee failed
+for two days with an error that didn't say whether the fault was Bluetooth, the phone or the
+account. The docs send you to "the Version row in Settings" for Developer Mode; it's under About.
 
-## Would I build on this again?
-- <fill at end>
+**Claude (Anthropic API; Amazon Bedrock tried first).** Claude Opus writes the lessons and
+reviews, Sonnet sorts moments. Structured output through a single tool call was reliable. On
+Bedrock, a brand-new AWS account was refused the newest models and sat at a zero-token daily
+quota, so we moved to Anthropic's API to keep building; the code switches back with one
+environment variable.
+
+**Tavily.** Search results good enough to cite in lessons; image search filled in the gaps
+Wikimedia couldn't.
+
+**Railway and Vercel.** Railway kept the listener running around the clock for about $5 a month;
+its domain defaulted to the wrong port the first time. Vercel hosts the judges' demo.
+
+## Feature requests
+
+1. **Speaker labels on the live stream**, with the owner's voice marked. The biggest unlock for
+   anything that learns from what the wearer says.
+2. **Stable ids** between the realtime and final transcripts, and `conversation_uuid` on REST
+   conversations.
+3. **A `conversation-discarded` event**, or a short grace period to read a conversation before
+   it's deleted.
+4. **Auto-reconnect in `bee stream`** with `Last-Event-ID` replay.
+5. **Place names** (a business or landmark) on conversation locations, not only street addresses,
+   so apps never need to handle a full address.
+6. **A webhook option**, so a server doesn't have to keep a CLI process alive.
