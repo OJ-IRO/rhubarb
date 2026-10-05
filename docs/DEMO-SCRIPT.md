@@ -48,8 +48,8 @@ showing "Listening · heard you … ago".
 "Hakata, Fukuoka", and scroll a few real moments (the station announcement, the tax-free line).
 **Voice-over:**
 > This is a real day. My Bee heard eight hundred lines: station announcements in Hakata, a
-> shop counter, a phone call with a delivery driver. Rhubarb keeps the words, never the audio,
-> and picks out the moments worth learning from.
+> clerk at a tax-free counter, me asking a shop for something I didn't know the word for.
+> Rhubarb keeps the words, never the audio, and picks out the moments worth learning from.
 
 ### 0:35 – 1:00 · It checks before it assumes
 **Screen:** Your day → "Look it over" → the tax-free finding → **Right** → next finding →
