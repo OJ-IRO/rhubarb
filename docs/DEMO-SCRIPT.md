@@ -4,8 +4,8 @@ Target length **2:50** (the rule is under 3:00). English voice-over; Japanese li
 subtitles. Public on YouTube. Every app shot comes from the **real Rhubarb** on Railway, never the
 Vercel demo: the Bee track requires real Bee data doing something for the user.
 
-Voice-over is about 330 words. Read it at an easy pace and it lands near 2:40, leaving room for
-the Japanese lines to breathe.
+The voice-over is about 260 words, around two minutes at an easy pace. The rest is the real
+Japanese exchanges and the screens, which is where the time should go.
 
 ---
 
