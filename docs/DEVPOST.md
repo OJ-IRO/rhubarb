@@ -40,7 +40,7 @@ Rhubarb is a tutor that listens through the Bee.
    and drops private moments (health, passwords read aloud, someone in crisis) the instant they
    arrive, before any AI sees them.
 2. **It notices** the moments worth learning from: a question I asked, a line I didn't follow,
-   Japanese I heard or said, something I got wrong. Saying "Hey Rhubarb, teach me…" starts a
+   Japanese I heard or said, something I got wrong. Asking out loud ("teach me about…") starts a
    lesson straight away.
 3. **It checks with me first.** Every evening it writes up what it thinks happened, as claims I
    mark Right or Not quite, and asks a couple of questions. Speech recognition mishears and doesn't
@@ -103,8 +103,8 @@ everything.
 
 ### Accomplishments we're proud of
 
-- It works on real life. In its first four days the Bee heard 3,043 lines; Rhubarb noticed 148 moments,
-  proposed 9 plans and wrote 5 fact-checked lessons, in Japanese and English, from Osaka to
+- It works on real life. In its first four days the Bee heard 3,043 lines; Rhubarb noticed 148
+  moments, proposed 9 plans and wrote 5 fact-checked lessons, in Japanese and English, from Osaka to
   Hakata.
 - Bee transcribes Japanese well enough to learn from: station announcements, clerks, my own lines.
 - The learner stays in charge: nothing is proposed from a day until they've looked it over, and
@@ -118,7 +118,7 @@ build.
 
 ### What's next for Rhubarb
 
-- Telling the wearer's voice from everyone else's.
+- Using Bee's voice recognition to tell the wearer's lines from everyone else's.
 - A phone-only mode, so it works without the wearable.
 - Taking it to adult English learners in community colleges and workforce programs: the same
   loop, with real-world use as the measure of progress.
