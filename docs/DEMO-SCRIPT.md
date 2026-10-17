@@ -20,7 +20,7 @@ Your wheel footage plus your real Rhubarb screens do exactly that. Never record 
 ### 0:15 – 0:25 · The ask
 **Screen:** keep the footage; if it has your voice asking, let it play with a subtitle.
 **Voice-over (only if your clip has no audio):**
-> "Hey Bee, give me a lesson on the history of the Ferris wheel, and this one in particular."
+> "Hey Bee, I'm currently on the Osaka Ferris wheel…" (use your real words from the clip)
 
 ### 0:25 – 0:50 · Bee mishears, I fix it
 **Screen:** Learning → "The history of the Ferris wheel, from Chicago to Osaka" → scroll to
