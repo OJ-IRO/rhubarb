@@ -43,8 +43,8 @@ Rhubarb is a tutor that listens through the Bee.
    Japanese I heard or said, something I got wrong. Saying "Hey Rhubarb, teach me…" starts a
    lesson straight away.
 3. **It checks with me first.** Every evening it writes up what it thinks happened, as claims I
-   mark Right or Not quite, and asks a couple of questions. Speech recognition mishears and can't
-   tell voices apart, so nothing is suggested until I've confirmed what really happened.
+   mark Right or Not quite, and asks a couple of questions. Speech recognition mishears and doesn't
+   always know who said what, so nothing is suggested until I've confirmed what really happened.
 4. **It suggests and teaches.** From what I confirmed, it suggests what to learn. When I say yes,
    and how much I already know, it writes a short lesson built around my own words, like the
    exact sentence the tax-free clerk said to me. A second AI checks every lesson for factual
@@ -91,8 +91,9 @@ everything.
   restarts the stream, which drops about every ninety minutes.
 - **The nightly transcript has different ids from the live one,** so recovering missed lines
   double-counted everything until we matched lines by time and text.
-- **No speaker labels.** Every line arrives as "Unknown". A friend's question could become my
-  lesson. The evening review, where the learner confirms what happened, is the answer we built.
+- **Who said what.** Bee's voice recognition only knows the wearer once it's set up, and the live
+  stream carries no speaker at all, so lines arrived as "Unknown". A friend's question could become
+  my lesson. The evening review, where the learner confirms what happened, is the answer we built.
 - **Mishearing.** Bee heard "Osaka" as "Old Southfield", and a lesson came out about the wrong
   Ferris wheel. Now any moment can be corrected and the lesson rewritten from the fixed words.
 - **Runaway cost.** An early version could spend about $5 on one lesson, rewriting it from
@@ -102,7 +103,7 @@ everything.
 
 ### Accomplishments we're proud of
 
-- It works on real life. In four days the Bee heard 3,043 lines; Rhubarb noticed 148 moments,
+- It works on real life. In its first four days the Bee heard 3,043 lines; Rhubarb noticed 148 moments,
   proposed 9 plans and wrote 5 fact-checked lessons, in Japanese and English, from Osaka to
   Hakata.
 - Bee transcribes Japanese well enough to learn from: station announcements, clerks, my own lines.
@@ -137,7 +138,7 @@ locked phone turns the Bee into a two-way channel with no extra hardware. Locati
 conversation locations were easy to use. Pain points: short conversations are deleted after
 processing with no event or documentation; the realtime and final transcripts use different ids
 and the REST conversation has no `conversation_uuid`, so the two can't be joined; speaker labels
-come back "Unknown" on every line; `/v1/changes` sometimes returns a 500 with an HTML body; the
+aren't on the live stream, and REST lines read "Unknown" until the wearer sets up voice recognition; `/v1/changes` sometimes returns a 500 with an HTML body; the
 proxy rejects a bare `application/json` content type; and stream events use camelCase where REST
 uses snake_case.
 
