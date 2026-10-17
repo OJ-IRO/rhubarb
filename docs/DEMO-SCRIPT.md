@@ -31,7 +31,7 @@ of the other way to use it: ask about anything, wherever you are.
 **Screen:** Your day → **Look it over** → tap **Right** on one finding → **Not quite** on another
 and type a short correction → Done.
 **Voice-over:**
-> But Bee can mishear, and it can't tell my voice from anyone else's. So every evening, Rhubarb
+> But Bee can mishear, and it doesn't always know who said what. So every evening, Rhubarb
 > shows me what it thinks happened, and I mark it right or not quite. Nothing gets built on a
 > guess.
 
@@ -83,8 +83,6 @@ use…", add this right after the lesson beat (and shorten the Ferris wheel beat
 
 - [ ] There's a day review waiting (Your day shows the banner), or tap "Review this day now" on
       a recent day an hour before recording.
-- [ ] If you've set up Bee voice recognition by then, cut "it can't tell my voice from anyone
-      else's" from the review beat.
 - [ ] Mac: QuickTime → File → New Screen Recording, browser zoom 125%, one tab, light mode,
       notifications off. Move slowly; pause on each screen.
 - [ ] Voice-over recorded last, then laid over the clips (iMovie or CapCut).
