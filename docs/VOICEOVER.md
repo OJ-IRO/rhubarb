@@ -15,8 +15,9 @@ how much reading help you want.
 Every lesson is built around your own words: the exact line the clerk said to you, checked by a
 second AI before you ever see it.
 
-And Rhubarb talks back through the Bee. Practice arrives as an alarm on your phone, and you answer
-out loud into the Bee. A new plan, a finished lesson, a skill you used for real: your phone buzzes.
+Rhubarb doesn't just listen. It reaches you through the Bee app, too. When it's time to practise,
+your phone buzzes with a question, and you answer out loud into your Bee. It also lets you know when
+a new plan is ready, or when your lesson is written.
 
 Curious about something? Just ask out loud. Ride the Ferris wheel in Osaka and ask how it got
 there. Bee heard "Osaka" as "Old Southfield." Fix one word, and the lesson on that exact wheel is
