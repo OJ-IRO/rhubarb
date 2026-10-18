@@ -117,7 +117,17 @@ Format per hackathon guidance: task, steps, expected vs. actual, severity, worka
 - **Task:** Use `/v1/changes` plus `/v1/conversations/:id` to recover lines the live stream missed, and to pick up speaker labels.
 - **Steps:** Captured a full day live, then read the same conversations back through REST.
 - **Expected:** The same utterance ids, so the REST copy can be matched to the live copy and fill in speaker labels.
-- **Actual:** Every REST utterance has a new id (for example live 3520110070 and REST 3520133419 for "Why are you in Osaka?"), timestamps switch from ISO strings to epoch milliseconds, the payload is wrapped in `{ conversation: ... }`, the conversation has no `conversation_uuid` to join on, and every speaker is `"Unknown"`.
+- **Actual:** Every REST utterance has a new id (for example live 3520110070 and REST 3520133419 for "Why are you in Osaka?"), timestamps switch from ISO strings to epoch milliseconds, the payload is wrapped in `{ conversation: ... }`, the conversation has no `conversation_uuid` to join on, and every speaker is `"Unknown"` (voice recognition had not been set up in the Bee app; nothing in the API or docs said that was why).
 - **Severity:** major (a naive sweep double-counts every long conversation, and speaker attribution is not possible from either feed)
 - **Workaround:** match REST lines to stored live lines by timestamp (they agree to the second) and text similarity; remember the stream's conversation id-to-uuid pair from `new-conversation` events.
 - **Suggestion:** keep ids stable between the realtime and final transcripts, or include the realtime id on each final utterance; include `conversation_uuid` in the REST conversation; document when speaker labels are expected to appear.
+
+### 2026-10-17 — A new AWS account can't call any model on Amazon Bedrock
+- **Task:** Run Rhubarb's Claude calls on Amazon Bedrock in us-east-1, for the AWS Builder mini challenge.
+- **Steps:** Created an IAM user with Bedrock access, then called `bedrock-runtime converse` on Claude Opus 5, Sonnet 5, Opus 4.6, Sonnet 4.6, Haiku 4.5 and Amazon Nova, in six regions.
+- **Expected:** At least one model answers, perhaps at a low limit.
+- **Actual:** Opus 5 and Sonnet 5 answer "not available for this account"; every other model, Amazon's own included, answers "Too many tokens per day" on the first two-word request. The account has a card on file, owes nothing, and isn't on the free plan. Nothing in the console said the quota was zero or how to raise it, and the IAM user couldn't even read its own quotas.
+- **Severity:** blocker (for the AWS Builder mini challenge)
+- **Workaround:** run on Anthropic's API, keep Bedrock as the first choice with automatic fallback, and open an AWS Support case.
+- **Suggestion:** for hackathon participants, a starter Bedrock quota on sign-up, or a clear console message ("your daily token quota is 0; request an increase here") instead of a throttling error.
+

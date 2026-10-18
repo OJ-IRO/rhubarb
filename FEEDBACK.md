@@ -16,7 +16,7 @@ locked phone turns the Bee into a two-way channel with no extra hardware. Locati
 conversation locations were easy to use. Pain points: short conversations are deleted after
 processing with no event or documentation; the realtime and final transcripts use different ids
 and the REST conversation has no `conversation_uuid`, so the two can't be joined; speaker labels
-come back "Unknown" on every line; `/v1/changes` sometimes returns a 500 with an HTML body; the
+aren't on the live stream, and REST lines read "Unknown" until voice recognition is set up, which the docs don't mention; `/v1/changes` sometimes returns a 500 with an HTML body; the
 proxy rejects a bare `application/json` content type; and stream events use camelCase where REST
 uses snake_case.
 
@@ -27,8 +27,7 @@ account. The docs send you to "the Version row in Settings" for Developer Mode; 
 **Claude (Anthropic API; Amazon Bedrock tried first).** Claude Opus writes the lessons and
 reviews, Sonnet sorts moments. Structured output through a single tool call was reliable. On
 Bedrock, a brand-new AWS account was refused the newest models and sat at a zero-token daily
-quota, so we moved to Anthropic's API to keep building; the code switches back with one
-environment variable.
+quota, so Rhubarb runs Bedrock first and falls back to Anthropic's API automatically.
 
 **Tavily.** Search results good enough to cite in lessons; image search filled in the gaps
 Wikimedia couldn't.
