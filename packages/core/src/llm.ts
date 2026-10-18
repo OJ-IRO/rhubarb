@@ -4,39 +4,97 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 
 /**
- * Bedrock model ids (us-east-1). The writer writes and judges; the worker handles volume.
+ * Two ways to reach Claude: Amazon Bedrock, or Anthropic's API directly.
  *
- * These are cross-region inference profiles on the classic Bedrock endpoint, not the newer
- * Mantle one. A new AWS account is not allowed the newest models (Claude Opus 5, Sonnet 5,
- * Opus 4.8, 4.7 all answer "not available for this account"), and the Mantle endpoint serves
- * only those. Opus 4.6 and Sonnet 4.6 are the strongest models such an account can run, and
- * support everything this code uses: adaptive thinking, effort, and cached system blocks.
- * Override with RHUBARB_WRITER_MODEL / RHUBARB_WORKER_MODEL once the account is allowed more.
+ * RHUBARB_LLM picks the first choice ("bedrock" or "anthropic"). Without it, an ANTHROPIC_API_KEY
+ * means Anthropic, and no key means Bedrock. When Bedrock is first choice and a key is also set,
+ * any call Bedrock can't serve (an account not yet allowed a model, a zero token quota, an outage)
+ * is made again through Anthropic, so the learner never notices which way it went.
+ *
+ * Bedrock ids are cross-region inference profiles. A new AWS account is refused the newest models
+ * ("not available for this account") and starts at a zero daily token quota until AWS Support
+ * raises it. Override the models with RHUBARB_BEDROCK_WRITER_MODEL / RHUBARB_BEDROCK_WORKER_MODEL,
+ * or RHUBARB_WRITER_MODEL / RHUBARB_WORKER_MODEL for the Anthropic route.
  */
-/**
- * Two ways to reach Claude. With ANTHROPIC_API_KEY set, Rhubarb talks to Anthropic directly and
- * uses the current models. Otherwise it goes through Amazon Bedrock, where a new AWS account may
- * be held to older models and a token quota that starts at zero until AWS Support raises it.
- */
-export const DIRECT = Boolean(process.env.ANTHROPIC_API_KEY);
+type Route = "bedrock" | "anthropic";
+const HAS_KEY = Boolean(process.env.ANTHROPIC_API_KEY);
+const FIRST: Route = process.env.RHUBARB_LLM === "bedrock" || process.env.RHUBARB_LLM === "anthropic"
+  ? process.env.RHUBARB_LLM
+  : HAS_KEY ? "anthropic" : "bedrock";
+const FALLBACK = FIRST === "bedrock" && HAS_KEY;
+const AWS_REGION = process.env.AWS_REGION ?? "us-east-1";
 
+const ROUTE_MODELS: Record<Route, { writer: string; worker: string }> = {
+  bedrock: {
+    writer: process.env.RHUBARB_BEDROCK_WRITER_MODEL ?? "us.anthropic.claude-opus-5",
+    worker: process.env.RHUBARB_BEDROCK_WORKER_MODEL ?? "global.anthropic.claude-sonnet-5",
+  },
+  anthropic: {
+    writer: process.env.RHUBARB_WRITER_MODEL ?? "claude-opus-5",
+    worker: process.env.RHUBARB_WORKER_MODEL ?? "claude-sonnet-5",
+  },
+};
+
+const routeStore = new AsyncLocalStorage<Route>();
+function currentRoute(): Route {
+  return routeStore.getStore() ?? FIRST;
+}
+
+/** The writer writes and judges; the worker handles volume. Read inside a call, they follow its route. */
 export const MODELS = {
-  writer: process.env.RHUBARB_WRITER_MODEL ?? (DIRECT ? "claude-opus-5" : "us.anthropic.claude-opus-4-6-v1"),
-  worker: process.env.RHUBARB_WORKER_MODEL ?? (DIRECT ? "claude-sonnet-5" : "global.anthropic.claude-sonnet-4-6"),
-} as const;
+  get writer(): string {
+    return ROUTE_MODELS[currentRoute()].writer;
+  },
+  get worker(): string {
+    return ROUTE_MODELS[currentRoute()].worker;
+  },
+};
 
-/** Opus 4.6 and Sonnet 4.6 take low, medium, high and max. xhigh arrived with 4.7 and would be a 400 here. */
+/** A model id chosen before a call started, translated to the route the call is actually taking. */
+export function routeModel(id: string): string {
+  const here = ROUTE_MODELS[currentRoute()];
+  for (const r of Object.values(ROUTE_MODELS)) {
+    if (id === r.writer) return here.writer;
+    if (id === r.worker) return here.worker;
+  }
+  return id;
+}
+
+/** Opus 4.6 and Sonnet 4.6 take low, medium, high and max. xhigh arrived with 4.7 and would be a 400 there. */
 export type Effort = "low" | "medium" | "high" | "max";
 
-let client: Anthropic | AnthropicBedrock | null = null;
+const clients: Partial<Record<Route, Anthropic | AnthropicBedrock>> = {};
 export function llm(): Anthropic | AnthropicBedrock {
-  client ??= DIRECT ? new Anthropic() : new AnthropicBedrock({ awsRegion: process.env.AWS_REGION ?? "us-east-1" });
-  return client;
+  const route = currentRoute();
+  // With a fallback waiting, a refusal should hand over at once, not after the SDK's own retries.
+  return (clients[route] ??= route === "anthropic"
+    ? new Anthropic()
+    : new AnthropicBedrock({ awsRegion: AWS_REGION, ...(FALLBACK ? { maxRetries: 0 } : {}) }));
 }
 
 /** For logs and the dashboard: which way Claude is being reached. */
 export function llmRoute(): string {
-  return DIRECT ? `Anthropic API (${MODELS.writer}, ${MODELS.worker})` : `Amazon Bedrock ${process.env.AWS_REGION ?? "us-east-1"} (${MODELS.writer}, ${MODELS.worker})`;
+  const describe = (r: Route) => r === "anthropic"
+    ? `Anthropic API (${ROUTE_MODELS.anthropic.writer}, ${ROUTE_MODELS.anthropic.worker})`
+    : `Amazon Bedrock ${AWS_REGION} (${ROUTE_MODELS.bedrock.writer}, ${ROUTE_MODELS.bedrock.worker})`;
+  return FALLBACK ? `${describe("bedrock")}, falling back to ${describe("anthropic")}` : describe(FIRST);
+}
+
+// After Bedrock refuses, go straight to Anthropic for a while instead of being refused on every call.
+const BEDROCK_REST_MS = 10 * 60_000;
+let bedrockRefusedAt = 0;
+
+async function onRoute<T>(call: () => Promise<T>): Promise<T> {
+  if (!FALLBACK) return call();
+  if (Date.now() - bedrockRefusedAt > BEDROCK_REST_MS) {
+    try {
+      return await routeStore.run("bedrock", call);
+    } catch (e) {
+      if (e instanceof BudgetReached || !unavailableReason(e)) throw e;
+      bedrockRefusedAt = Date.now();
+    }
+  }
+  return routeStore.run("anthropic", call);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -164,7 +222,7 @@ export function llmHealth(): LlmHealth {
 export async function tracked<T>(call: () => Promise<T>): Promise<T> {
   try {
     checkBudget();
-    const out = await call();
+    const out = await onRoute(call);
     recordUsage(out);
     health.problem = null;
     health.since = null;
@@ -210,7 +268,7 @@ export async function classify<T>(opts: ClassifyOptions<T>): Promise<T> {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await tracked(() => llm().messages.create({
-      model: opts.model ?? MODELS.worker,
+      model: routeModel(opts.model ?? MODELS.worker),
       max_tokens: opts.maxTokens ?? 4096,
       system: opts.system,
       output_config: { effort: opts.effort ?? "low" },
@@ -267,7 +325,7 @@ export interface WriteOptions {
 export async function write(opts: WriteOptions): Promise<string> {
   const msg = await tracked(() => {
     const stream = llm().messages.stream({
-      model: opts.model ?? (opts.quick ? MODELS.worker : MODELS.writer),
+      model: routeModel(opts.model ?? (opts.quick ? MODELS.worker : MODELS.writer)),
       max_tokens: opts.maxTokens ?? (opts.quick ? 2000 : 16000),
       system: opts.system,
       thinking: { type: "adaptive" },
