@@ -17,8 +17,8 @@ of the other way to use it: ask about anything, wherever you are.
 ### 0:00 – 0:15 · The problem
 **Screen:** Your day, on a real day with lots heard (Oct 1 in Hakata or Oct 6).
 **Voice-over:**
-> I'm learning Japanese while living in Japan. Every day I have the exact conversations I'm
-> trying to learn from, and by dinner they're gone. So I built a tutor that listens through my Bee.
+> Every day is full of things worth learning from, and by dinner they're gone. On a trip to
+> Japan, I wore my Bee, and let a tutor learn from my day.
 
 ### 0:15 – 0:35 · What Bee heard
 **Screen:** the same day: how much was heard, the moments it noticed, where (Hakata, Fukuoka).

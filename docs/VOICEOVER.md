@@ -1,15 +1,15 @@
 # Rhubarb voice-over (words only)
 
 Rhubarb is a tutor that listens through your Bee and teaches you from your own life. Wear it
-through your day, and every conversation becomes something to learn from. A clerk you didn't
-follow. A station announcement you half caught. A sentence you tried to say and couldn't finish.
+through your day, and every conversation becomes something to learn from. A word in a meeting
+you didn't know. A question you couldn't answer. On my trip to Japan, a clerk I couldn't follow.
 Each moment is pinned to where it happened: a landmark or a neighbourhood, never your address.
 
 But the real challenge is trust. Bee can mishear, and it doesn't always know who said what. Build
 a lesson on a bad guess, and you teach the wrong thing. So every evening, Rhubarb shows you what it
 thinks happened, and you mark it right or not quite. Nothing gets built until you say so.
 
-From what you confirm, it suggests what to learn. Say yes, say how much you already know, and pick
+From what you confirm, it suggests what to learn, for any part of your day. Say yes, say how much you already know, and pick
 how much reading help you want.
 
 Every lesson is built around your own words: the exact line the clerk said to you, checked by a

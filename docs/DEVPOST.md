@@ -24,23 +24,27 @@ Paste each section into the matching Devpost field. Things only you can fill in 
 
 ### Inspiration
 
-I'm learning Japanese while living in Osaka. Every day I have exactly the conversations I'm
-trying to learn from: a clerk at a tax-free counter, a delivery driver asking where my building
-is, a station announcement I half catch. By dinner they're gone. Classes teach from a textbook's
-week, not mine, and nothing ever checks whether what I learned shows up when I actually talk.
+Every day is full of things worth learning from, and almost all of it is gone by dinner. A word
+in a meeting you didn't know. A question you couldn't answer. Something you wondered about on
+the train. Courses teach from someone else's week, not yours, and nothing checks whether what you
+learned shows up when it matters.
 
-The Bee hears all of it. So the question became: what if the tutor started from my real day,
-and measured progress by whether I use the thing for real?
+I wore my Bee on a trip to Japan. It heard a clerk at a tax-free counter I couldn't follow,
+station announcements I half caught, and me on the Osaka Ferris wheel asking how it got there.
+The Bee hears all of it. So the question became: what if a tutor started from your real day,
+whatever you're trying to get better at, and measured progress by whether you use it for real?
 
 ### What it does
 
-Rhubarb is a tutor that listens through the Bee.
+Rhubarb is a tutor that listens through the Bee and builds learning plans from your own day: a
+language you're picking up, a skill for work, or a passing curiosity. My trip to Japan is the
+example below.
 
 1. **It listens.** It reads the Bee's live transcript as it happens. It keeps text, never audio,
    and drops private moments (health, passwords read aloud, someone in crisis) the instant they
    arrive, before any AI sees them.
 2. **It notices** the moments worth learning from: a question I asked, a line I didn't follow,
-   Japanese I heard or said, something I got wrong. Asking out loud ("teach me about…") starts a
+   a word in a language I'm learning, something I got wrong. Asking out loud ("teach me about…") starts a
    lesson straight away.
 3. **It checks with me first.** Every evening it writes up what it thinks happened, as claims I
    mark Right or Not quite, and asks a couple of questions. Speech recognition mishears and doesn't
@@ -104,8 +108,8 @@ everything.
 ### Accomplishments we're proud of
 
 - It works on real life. In its first four days the Bee heard 3,043 lines; Rhubarb noticed 148
-  moments, proposed 9 plans and wrote 5 fact-checked lessons, in Japanese and English, from Osaka to
-  Hakata.
+  moments, proposed 9 plans and wrote 5 fact-checked lessons, in Japanese and English, on a trip through
+  Osaka and Fukuoka.
 - Bee transcribes Japanese well enough to learn from: station announcements, clerks, my own lines.
 - The learner stays in charge: nothing is proposed from a day until they've looked it over, and
   anything can be corrected or forgotten.
