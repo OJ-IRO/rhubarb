@@ -30,6 +30,6 @@ streak. Not time in an app.
 Look back at any day to see what you heard and what came of it. Private moments are dropped before
 any AI sees them. Text only, never audio. And you can forget a moment, a day, or everything.
 
-Built on Bee's live stream with Claude, and open source.
+Built on Bee's live stream, with Claude on Amazon Bedrock, and open source.
 
 This is Rhubarb, where your day is the lesson, and it hears you get better. Thank you for your time.

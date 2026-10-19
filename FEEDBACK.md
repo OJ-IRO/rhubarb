@@ -26,8 +26,9 @@ account. The docs send you to "the Version row in Settings" for Developer Mode; 
 
 **Claude (Anthropic API; Amazon Bedrock tried first).** Claude Opus writes the lessons and
 reviews, Sonnet sorts moments. Structured output through a single tool call was reliable. On
-Bedrock, a brand-new AWS account was refused the newest models and sat at a zero-token daily
-quota, so Rhubarb runs Bedrock first and falls back to Anthropic's API automatically.
+Bedrock, a brand-new AWS account was refused every model until an AWS Support case enabled Claude
+Opus 4.6 and Sonnet 4.6 a day later (Opus 5 and Sonnet 5 still refused). Rhubarb now runs on Bedrock
+first and falls back to Anthropic's API automatically.
 
 **Tavily.** Search results good enough to cite in lessons; image search filled in the gaps
 Wikimedia couldn't.

@@ -128,6 +128,6 @@ Format per hackathon guidance: task, steps, expected vs. actual, severity, worka
 - **Expected:** At least one model answers, perhaps at a low limit.
 - **Actual:** Opus 5 and Sonnet 5 answer "not available for this account"; every other model, Amazon's own included, answers "Too many tokens per day" on the first two-word request. The account has a card on file, owes nothing, and isn't on the free plan. Nothing in the console said the quota was zero or how to raise it, and the IAM user couldn't even read its own quotas.
 - **Severity:** blocker (for the AWS Builder mini challenge)
-- **Workaround:** run on Anthropic's API, keep Bedrock as the first choice with automatic fallback, and open an AWS Support case.
+- **Workaround:** run on Anthropic's API, keep Bedrock as the first choice with automatic fallback, and open an AWS Support case. A day later Support enabled Claude Opus 4.6 and Sonnet 4.6, and Rhubarb now runs on those through Bedrock; Opus 5 and Sonnet 5 were still refused.
 - **Suggestion:** for hackathon participants, a starter Bedrock quota on sign-up, or a clear console message ("your daily token quota is 0; request an increase here") instead of a throttling error.
 

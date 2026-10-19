@@ -48,13 +48,13 @@ rhubarb-skill/      — an Agent Skill that reads your learning state from the l
 docs/              — Bee capability research, the plan, hardware spike results, a real captured event log for replay
 ```
 
-Bee access runs through the official [`@beeai/cli`](https://github.com/bee-computer/bee-cli) (`bee proxy` for REST, `bee stream` for live events). Models run on Amazon Bedrock. All Bee data stays on your machine in SQLite; only research queries and model calls leave it.
+Bee access runs through the official [`@beeai/cli`](https://github.com/bee-computer/bee-cli) (`bee proxy` for REST, `bee stream` for live events). Claude runs on Amazon Bedrock first, with Anthropic's API as an automatic fallback (see [Claude on Amazon Bedrock](#claude-on-amazon-bedrock)). All Bee data stays on your machine in SQLite; only research queries and model calls leave it.
 
 ## Setup
 
-1. Bee app → Settings → tap **Version** 5× to enable Developer Mode
+1. Bee app → Settings → About → tap **Version** 5× to enable Developer Mode
 2. `npm i -g @beeai/cli && bee login` (approve the pairing in the Bee app)
-3. AWS credentials with Bedrock access to Claude in `us-east-1` (`aws configure`); optional `TAVILY_API_KEY` for web-sourced citations and images
+3. AWS credentials with Bedrock access to Claude in `us-east-1` (`aws configure`), and/or an `ANTHROPIC_API_KEY`; optional `TAVILY_API_KEY` for web-sourced citations and images
 4. `npm install && npm run build`
 5. `./scripts/start.sh` starts the Bee proxy and the Rhubarb daemon detached; logs in `~/.rhubarb/logs/`
 6. Open http://127.0.0.1:4242 and answer the six onboarding questions
@@ -73,9 +73,36 @@ Environment variables the container needs: `RHUBARB_ACCESS_TOKEN` (a long random
 
 Scripts and the agent skill reach a hosted Rhubarb with `Authorization: Bearer <access token>`.
 
+## Claude on Amazon Bedrock
+
+Every Claude call goes through one place, [`packages/core/src/llm.ts`](packages/core/src/llm.ts), using
+the [Anthropic Bedrock SDK](https://www.npmjs.com/package/@anthropic-ai/bedrock-sdk) against Amazon
+Bedrock's runtime in `us-east-1`, through cross-region inference profiles.
+
+| Job | Model on Bedrock | Called through |
+|---|---|---|
+| Writing lessons, evening reviews and reflection; fact-checking lessons; grading spoken practice; judging real-world use | Claude Opus (`us.anthropic.claude-opus-4-6-v1`) | `write()`, `judge()`, the research loop |
+| Sorting what was heard, reading spoken asks, short replies | Claude Sonnet (`global.anthropic.claude-sonnet-4-6`) | `classify()`, `write({ quick: true })` |
+
+What it uses on Bedrock: structured output through a single forced tool call (Bedrock rejects
+`output_config.format` and strict tools, so results are validated with zod and retried once),
+adaptive thinking, `output_config.effort`, prompt caching on the stable system prompt, and a
+tool-use loop for web research with Tavily.
+
+Settings:
+
+- `RHUBARB_LLM=bedrock` makes Bedrock the first choice. With no `ANTHROPIC_API_KEY`, Bedrock is the only route.
+- `AWS_REGION` (default `us-east-1`) and the usual AWS credentials (`aws configure`, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`).
+- `RHUBARB_BEDROCK_WRITER_MODEL` / `RHUBARB_BEDROCK_WORKER_MODEL` pick the models (defaults are Claude Opus 5 and Sonnet 5, for accounts allowed them).
+- With an `ANTHROPIC_API_KEY` also set, any call Bedrock can't serve (a model not yet enabled, a zero daily token quota, an outage) is made again through Anthropic's API, and Bedrock rests for ten minutes before it's tried again. The learner never sees the difference.
+
+Every call is metered by model and purpose against a daily budget, so the cost of each route is
+visible. A new AWS account starts with no Bedrock token quota and without the newest models; an AWS
+Support case enables them (see `FRICTION-LOG.md`).
+
 ## Tests
 
-`npm test` runs 56 tests with no Bee, no AWS and no network: the first-pass detector, spoken asks to Bee, the nightly sweep's matching, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, the hosted-mode token gate, and the API's handling of hostile requests.
+`npm test` runs 68 tests with no Bee, no AWS and no network: the first-pass detector, spoken asks to Bee, the nightly sweep's matching, echo and term matching, the writing-style lint, storage, level progression, practice answer matching, quiet hours, forgetting, the web-search guard, the private-speech filter, the made-up-quote check, learning progress, the hosted-mode token gate, and the API's handling of hostile requests.
 
 ## For agents
 
