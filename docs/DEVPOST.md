@@ -12,10 +12,10 @@ Paste each section into the matching Devpost field. Things only you can fill in 
 | Project name | Rhubarb |
 | Elevator pitch (200 characters) | A tutor that listens through your Bee, turns your real conversations into lessons, and hears you get better when you use what you learned. |
 | Track | Bee |
-| Mini challenges | Open Source. (AWS Builder only if the app runs on Amazon Bedrock by submission day; today it calls Claude through Anthropic's API.) |
+| Mini challenges | Open Source, AWS Builder (Claude on Amazon Bedrock) |
 | Video | **[YOU]** YouTube link, public, under 3:00 |
 | Try it out | https://github.com/OJ-IRO/rhubarb (public on submission day) · https://rhubarb-demo.vercel.app (a guided demo with sample content; the real app holds private conversations, so it isn't public) |
-| Built with | bee, bee-cli, typescript, node.js, react, vite, sqlite, claude, three.js, mermaid, tavily, railway, vercel |
+| Built with | bee, bee-cli, amazon-bedrock, typescript, node.js, react, vite, sqlite, claude, three.js, mermaid, tavily, railway, vercel |
 | Team | **[YOU]** OJ, plus Jay if he agrees (he started the project on 2026-09-11) |
 
 ---
@@ -83,6 +83,9 @@ everything.
 - **Stack.** TypeScript on Node, SQLite, a React dashboard, a three.js honeycomb for progress.
   It runs on a small private server (Railway) so it never sleeps; the judges' demo is a static
   site (Vercel). 68 automated tests.
+- **Claude on Amazon Bedrock.** Every call goes through one module on the Anthropic Bedrock SDK in
+  us-east-1: Claude Opus writes, fact-checks and grades; Claude Sonnet sorts what was heard. If
+  Bedrock can't serve a call, it's made again through Anthropic's API, so the learner never notices.
 - **Cost under control.** Every Claude call is metered by purpose with a daily cap; a full
   lesson costs about $0.67.
 - **An Agent Skill** (`rhubarb-skill/SKILL.md`) lets Claude read what you're learning, so other
@@ -150,11 +153,11 @@ uses snake_case.
 for two days with an error that didn't say whether the fault was Bluetooth, the phone or the
 account. The docs send you to "the Version row in Settings" for Developer Mode; it's under About.
 
-**Claude (Anthropic API; Amazon Bedrock tried first).** Claude Opus writes the lessons and
+**Claude (Amazon Bedrock, with Anthropic's API as fallback).** Claude Opus writes the lessons and
 reviews, Sonnet sorts moments. Structured output through a single tool call was reliable. On
-Bedrock, a brand-new AWS account was refused the newest models and sat at a zero-token daily
-quota, so we moved to Anthropic's API to keep building; the code switches back with one
-environment variable.
+Bedrock, a brand-new AWS account was refused every model until an AWS Support case enabled Claude
+Opus 4.6 and Sonnet 4.6 a day later (Opus 5 and Sonnet 5 still refused). Rhubarb now runs on Bedrock
+first and falls back to Anthropic's API automatically.
 
 **Tavily.** Search results good enough to cite in lessons; image search filled in the gaps
 Wikimedia couldn't.
@@ -204,5 +207,5 @@ entry, is in the repo: `FRICTION-LOG.md`. Summary of the eleven entries:
 - [ ] Repo flipped to public; MIT shows in the About section
 - [ ] Numbers in "Accomplishments" refreshed
 - [ ] Team decided (Jay)
-- [ ] Track: Bee · Mini: Open Source (and AWS Builder only if on Bedrock)
+- [ ] Track: Bee · Minis: Open Source and AWS Builder
 - [ ] Submit by Oct 22 (deadline Oct 23, 12:00pm PDT)
