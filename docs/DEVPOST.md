@@ -22,113 +22,51 @@ Paste each section into the matching Devpost field. Things only you can fill in 
 
 ## About the project
 
+Paste everything below into the "About the project" field.
+
 ### Inspiration
 
-Every day is full of things worth learning from, and almost all of it is gone by dinner. A word
-in a meeting you didn't know. A question you couldn't answer. Something you wondered about on
-the train. Courses teach from someone else's week, not yours, and nothing checks whether what you
-learned shows up when it matters.
-
-I wore my Bee on a trip to Japan. It heard a clerk at a tax-free counter I couldn't follow,
-station announcements I half caught, and me on the Osaka Ferris wheel asking how it got there.
-The Bee hears all of it. So the question became: what if a tutor started from your real day,
-whatever you're trying to get better at, and measured progress by whether you use it for real?
+Most of what you could learn from your day is gone by dinner: a word you didn't know, a question you couldn't answer, a clerk you couldn't follow. On a trip to Japan I wore a Bee and realised it hears all of it. What if a tutor started from your real day, and counted progress by whether you use what you learned?
 
 ### What it does
 
-Rhubarb is a tutor that listens through the Bee and builds learning plans from your own day: a
-language you're picking up, a skill for work, or a passing curiosity. My trip to Japan is the
-example below.
+Rhubarb is a tutor that listens through your Bee and builds learning plans from your own day, for a language, a work skill, or anything you're curious about.
 
-1. **It listens.** It reads the Bee's live transcript as it happens. It keeps text, never audio,
-   and drops private moments (health, passwords read aloud, someone in crisis) the instant they
-   arrive, before any AI sees them.
-2. **It notices** the moments worth learning from: a question I asked, a line I didn't follow,
-   a word in a language I'm learning, something I got wrong. Asking out loud ("teach me about…") starts a
-   lesson straight away.
-3. **It checks with me first.** Every evening it writes up what it thinks happened, as claims I
-   mark Right or Not quite, and asks a couple of questions. Speech recognition mishears and doesn't
-   always know who said what, so nothing is suggested until I've confirmed what really happened.
-4. **It suggests and teaches.** From what I confirmed, it suggests what to learn. When I say yes,
-   and how much I already know, it writes a short lesson built around my own words, like the
-   exact sentence the tax-free clerk said to me. A second AI checks every lesson for factual
-   mistakes before I see it, and anything it isn't sure of is shown to me, not hidden.
-5. **Practice comes through the Bee.** An alarm arrives on my phone; I answer out loud into the
-   Bee; it tells me what I got and what to add.
-6. **It hears me get better.** Later conversations are checked for the skill being used for
-   real. Asking a shop 「免税できますか」 on my own, days after the lesson, counts as progress.
-   Not a streak, not time in the app: real use.
+- **Listens:** reads the Bee's live transcript. Text only, never audio. Private moments are dropped before any AI sees them.
+- **Checks with you:** every evening it shows what it thinks happened. You mark each finding right or not quite, and fix anything Bee misheard. Nothing is built on a guess.
+- **Teaches:** suggests plans from what you confirmed. Say yes and how much you already know, and it writes a short lesson around your own words, fact-checked by a second AI.
+- **Practises through the Bee:** your phone buzzes with a question, and you answer out loud into your Bee.
+- **Hears you get better:** later conversations are checked for the skill used for real. That's the progress, not streaks.
 
-Also: quick answers to passing curiosities ("why does the Tempozan Ferris wheel change colour?",
-guess first, then the answer), where each moment happened (a landmark or neighbourhood only,
-never an address, nothing near home), reading help per plan (romaji and English for a beginner,
-none for someone fluent), a day-by-day look back, and the power to forget a moment, a day, or
-everything.
+Also: ask out loud to get a lesson on anything, quick "guess first" answers, places (a landmark, never your address), reading help per plan, a day-by-day look back, and forget anything.
 
 ### How we built it
 
-- **Bee at the core.** `bee login` and `bee proxy` for the API, and `bee stream --json` as a
-  supervised child process for the live transcript, voice notes and todo events. Short
-  conversations are deleted on Bee's side minutes after they end, so live capture is the only
-  way to keep them; a nightly pass over `/v1/changes` recovers anything the stream missed.
-- **Bee as the two-way channel.** Practice prompts, "your lesson is ready" and "heard you use it"
-  arrive as Bee todos with alarms, which buzz a locked phone. Practice answers come back as Bee
-  voice notes. Conversation locations and place clusters give each moment its place, and the
-  calendar brief raises the priority of skills with something coming up.
-- **The pipeline.** A cheap first pass flags candidate moments; Claude sorts them; an evening
-  review is written for the learner to confirm; proposals and lessons are made only from what
-  they confirmed. Lessons are card decks with a diagram, a real photo and sources, written with
-  web research (Tavily), then read by a second model for factual errors and checked by code
-  for invented quotes, length and broken links.
-- **Stack.** TypeScript on Node, SQLite, a React dashboard, a three.js honeycomb for progress.
-  It runs on a small private server (Railway) so it never sleeps; the judges' demo is a static
-  site (Vercel). 68 automated tests.
-- **Claude on Amazon Bedrock.** Every call goes through one module on the Anthropic Bedrock SDK in
-  us-east-1: Claude Opus writes, fact-checks and grades; Claude Sonnet sorts what was heard. If
-  Bedrock can't serve a call, it's made again through Anthropic's API, so the learner never notices.
-- **Cost under control.** Every Claude call is metered by purpose with a daily cap; a full
-  lesson costs about $0.67.
-- **An Agent Skill** (`rhubarb-skill/SKILL.md`) lets Claude read what you're learning, so other
-  assistants can pitch their help at your level.
+- **Bee:** `bee stream --json` for the live transcript and voice notes, the Bee API to recover missed lines, todos with alarms to reach the phone, and conversation locations for places.
+- **Claude on Amazon Bedrock:** Opus writes, fact-checks and grades; Sonnet sorts what was heard. Anthropic's API is an automatic fallback.
+- **Stack:** TypeScript, Node, SQLite, React, three.js. Runs on Railway around the clock; the judges' demo is on Vercel. Tavily for sources, 68 tests, a daily cost cap.
 
 ### Challenges we ran into
 
-- **Bee silently deletes short conversations,** which are exactly the useful ones (a counter
-  exchange is twenty seconds long). Live capture had to be the backbone, with a supervisor that
-  restarts the stream, which drops about every ninety minutes.
-- **The nightly transcript has different ids from the live one,** so recovering missed lines
-  double-counted everything until we matched lines by time and text.
-- **Who said what.** Bee's voice recognition only knows the wearer once it's set up, and the live
-  stream carries no speaker at all, so lines arrived as "Unknown". A friend's question could become
-  my lesson. The evening review, where the learner confirms what happened, is the answer we built.
-- **Mishearing.** Bee heard "Osaka" as "Old Southfield", and a lesson came out about the wrong
-  Ferris wheel. Now any moment can be corrected and the lesson rewritten from the fixed words.
-- **Runaway cost.** An early version could spend about $5 on one lesson, rewriting it from
-  scratch whenever the fact-checker disagreed over a detail. Metering every call, capping each
-  day, and correcting disputed facts in place cut a lesson to about $0.67.
-- **Pairing.** A new Bee failed to pair for two days with a generic error.
+- Bee deletes short conversations minutes after they end, so we capture everything live.
+- The live stream drops about every 90 minutes, and nightly transcripts use different ids, so we built a supervisor and matching by time and text.
+- Bee can mishear ("Osaka" became "Old Southfield") and doesn't always know who's speaking. That's why the evening check exists.
+- A new AWS account couldn't call any model until AWS Support enabled them.
 
-### Accomplishments we're proud of
+### Accomplishments that we're proud of
 
-- It works on real life. In its first four days the Bee heard 3,043 lines; Rhubarb noticed 148
-  moments, proposed 9 plans and wrote 5 fact-checked lessons, in Japanese and English, on a trip through
-  Osaka and Fukuoka.
-- Bee transcribes Japanese well enough to learn from: station announcements, clerks, my own lines.
-- The learner stays in charge: nothing is proposed from a day until they've looked it over, and
-  anything can be corrected or forgotten.
+- It works on real life: in its first four days, 3,043 lines heard, 148 moments noticed, 9 plans and 5 fact-checked lessons, in Japanese and English.
+- The learner stays in charge: confirm, correct, or forget anything.
 
 ### What we learned
 
-A first reading of someone's day is a guess. The product got much better the moment it started
-asking before assuming. And measuring learning by real use, not by quiz scores, changes what you
-build.
+A first reading of someone's day is a guess. Rhubarb got much better once it asked before assuming.
 
 ### What's next for Rhubarb
 
-- Using Bee's voice recognition to tell the wearer's lines from everyone else's.
-- A phone-only mode, so it works without the wearable.
-- Taking it to adult English learners in community colleges and workforce programs: the same
-  loop, with real-world use as the measure of progress.
+- Use Bee's voice recognition to tell your lines from everyone else's.
+- A phone-only mode, no wearable needed.
+- Bring it to adult English learners, with real-world use as the measure of progress.
 
 ---
 
