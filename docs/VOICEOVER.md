@@ -20,8 +20,7 @@ your phone buzzes with a question, and you answer out loud into your Bee. It als
 a new plan is ready, or when your lesson is written.
 
 Curious about something? Just ask out loud. Ride the Ferris wheel in Osaka and ask how it got
-there. Bee heard "Osaka" as "Old Southfield." Fix one word, and the lesson on that exact wheel is
-waiting when you get back down. Smaller questions become sparks: a quick answer, but you guess first.
+there. Bee heard "Osaka" as "Old Southfield." Fix one word, and Rhubarb rewrites the lesson about that exact wheel. Smaller questions become sparks: a quick answer, but you guess first.
 
 The real test comes later. Use what you learned in a real conversation, days after the lesson, and
 Rhubarb listens for it. Every skill grows in your honeycomb, and real use is what counts. Not a
