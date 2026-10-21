@@ -108,9 +108,10 @@ export const skillRows: SkillRow[] = skills.map((s) => ({
   ...s,
   evidenceCount: [7, 4, 6, 3, 2, 1, 2][s.id - 1],
   ladderLength: [4, 4, 3, 3, 3, 1, 1][s.id - 1],
-  lessonReady: s.status === "active",
+  // The delivery-driver plan is mid-ladder with its next lesson still being written.
+  lessonReady: s.status === "active" && s.id !== 2,
   // The Ferris wheel topic is one lesson, already read; everything else active points at the sample lesson.
-  lessonId: s.id === 6 ? 2 : s.status === "active" ? 1 : null,
+  lessonId: s.id === 6 ? 2 : s.status === "active" && s.id !== 2 ? 1 : null,
 }));
 
 export const ladder: LadderLevel[] = [
@@ -118,6 +119,10 @@ export const ladder: LadderLevel[] = [
   { id: 2, skillId: 1, idx: 1, title: "Follow where they send you", outcome: "can follow a clerk's directions to the tax-free counter and know what to bring", status: "current" },
   { id: 3, skillId: 1, idx: 2, title: "Get through the counter", outcome: "can answer the counter's questions and confirm the total", status: "locked" },
   { id: 4, skillId: 1, idx: 3, title: "Sort out a problem", outcome: "can say politely that something is wrong and ask again", status: "locked" },
+  { id: 6, skillId: 2, idx: 0, title: "Say who you are and where you are", outcome: "can answer a driver's call with your name and the building", status: "current" },
+  { id: 7, skillId: 2, idx: 1, title: "Give a landmark they can see", outcome: "can say 〜の前 or 〜の隣 with something the driver can spot from the road", status: "locked" },
+  { id: 8, skillId: 2, idx: 2, title: "Change the time or place", outcome: "can ask for a later delivery or a different door", status: "locked" },
+  { id: 9, skillId: 2, idx: 3, title: "Sort out a missed delivery", outcome: "can explain what went wrong and arrange the redelivery", status: "locked" },
   // A topic is one rung: the whole story in one lesson.
   { id: 5, skillId: 6, idx: 0, title: "The history of the Ferris wheel, from Chicago to Osaka", outcome: "can tell where the Ferris wheel came from, and what makes the one you rode worth noticing", status: "done" },
 ];
@@ -303,6 +308,11 @@ export const evidence: Evidence[] = [
     id: 5, kind: "struggle", text: "I just said yes, I think she asked if I wanted it heated?",
     context: "someone: 温めますか\nyou: はい\nyou: I just said yes, I think she asked if I wanted it heated?",
     editedAt: null, spokenAt: iso(1 * d), utteranceId: 5, conversationUuid: "c5", speakerLabel: "you", place: "Hakata, Fukuoka", source: "stream", stage: "classified", route: "skill", topic: "konbini register", confidence: 0.85, skillId: 7, createdAt: now,
+  },
+  {
+    id: 8, kind: "struggle", text: "I'm at the apartment, it's near the... sorry, I don't know how to say it.",
+    context: "someone: 建物(たてもの)の近(ちか)くに何(なに)がありますか\nyou: I'm at the apartment, it's near the... sorry, I don't know how to say it.",
+    editedAt: null, spokenAt: iso(7 * d), utteranceId: 10, conversationUuid: "c7", speakerLabel: "you", place: "Umeda, Osaka", source: "stream", stage: "classified", route: "skill", topic: "delivery call directions", confidence: 0.9, skillId: 2, createdAt: now,
   },
   {
     // Bee heard "Old Southfield"; the ask was fixed by hand and the lesson written again from it.

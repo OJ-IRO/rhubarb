@@ -230,7 +230,13 @@ export function SkillPage({ id }: { id: number }) {
               </li>
             );
           })}
-          {ladder.length === 0 && <li className="muted">Building the ladder…</li>}
+          {ladder.length === 0 && (
+            <li className="muted">
+              {skill.status === "proposed"
+                ? "Say yes and Rhubarb writes the ladder: the levels to climb, and the first lesson."
+                : "Rhubarb is writing the ladder now. It takes a couple of minutes, and the first lesson follows it."}
+            </li>
+          )}
         </ol>
       </section>
 
