@@ -122,6 +122,9 @@ export const ladder: LadderLevel[] = [
   { id: 5, skillId: 6, idx: 0, title: "The history of the Ferris wheel, from Chicago to Osaka", outcome: "can tell where the Ferris wheel came from, and what makes the one you rode worth noticing", status: "done" },
 ];
 
+/** The tax-free plan's own rungs; the ladder array also holds the Ferris wheel topic's one rung. */
+const taxFreeLadder = ladder.filter((l) => l.skillId === 1);
+
 const TAX_FREE_PHOTO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Tax_Free_Shop_Miyabi_in_Kansai_Airport%2C_Osaka.jpg/1280px-Tax_Free_Shop_Miyabi_in_Kansai_Airport%2C_Osaka.jpg";
 
 export const deck: Deck = {
@@ -338,7 +341,7 @@ export const today: Today = {
   letter:
     "At the tax-free counter on Thursday you got the request out in Japanese, then lost the thread when the clerk sent you to 1階(いっかい)の免税(めんぜい)カウンター. You confirmed that, and it's exactly level two of the tax-free plan: ten minutes, and the next shop will go differently. The station announcements from Hakata are waiting for a yes on the board; it's the same handful of phrases on repeat, so it's a quick win.",
   letterDate: new Date().toDateString(),
-  lesson: { lesson, skill: skills[0], ladderLength: ladder.length },
+  lesson: { lesson, skill: skills[0], ladderLength: taxFreeLadder.length },
   duePractice: [],
   dueCards: [{ cardId: 1, dueAt: now - h, card: cards[0].card }],
   proposed: 4,
@@ -371,9 +374,9 @@ export const ferrisLesson: Lesson = {
   review: JSON.stringify(ferrisReview),
 };
 
-export const skillDetail: SkillDetail = { skill: skills[0], ladder, evidence, lessons: [lesson], practice, fieldEvidence };
+export const skillDetail: SkillDetail = { skill: skills[0], ladder: taxFreeLadder, evidence, lessons: [lesson], practice, fieldEvidence };
 
-export const lessonView: LessonView = { lesson, skill: skills[0], ladder, session: null };
+export const lessonView: LessonView = { lesson, skill: skills[0], ladder: taxFreeLadder, session: null };
 
 const momentDays = [...new Set(evidence.map((e) => localDay(e.spokenAt)))].sort().reverse();
 export const privacy: PrivacyView = {
