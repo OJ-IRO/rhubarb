@@ -4,7 +4,7 @@ import { api, isPreview, localDay, when, type Today as TodayData } from "../api"
 import { DaySelect, longDay } from "../components/DaySelect";
 import { ReviewCard } from "../components/DayReview";
 import { GettingStarted } from "../components/GettingStarted";
-import { HexBadge, HexLevels, Loading } from "../components/Hex";
+import { HexLevels, Loading } from "../components/Hex";
 import { DayView } from "./History";
 import { Link, go } from "../router";
 
@@ -52,54 +52,29 @@ function TodayPage() {
   }
 
   if (!data) return <Loading />;
+  const today = localDay(Date.now());
   const due = data.duePractice.length + data.dueCards.length;
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Morning" : hour < 18 ? "Afternoon" : "Evening";
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const nothingYet = data.active + data.proposed === 0;
+  const upNext = Boolean(data.lesson) || data.active > 0 || due > 0 || (data.upcoming ?? []).length > 0 || Boolean(data.nextSlot);
 
+  // Today reads like any other day (the same review, places, moments and what came of them),
+  // with what's waiting on you first, because today isn't over yet.
   return (
     <div>
       <div className="day-head">
-        <h1 className="title">Good {greeting.toLowerCase()}.</h1>
-        <DaySelect value={localDay(Date.now())} onChange={goToDay} />
+        <h1 className="title">{longDay(today)}</h1>
+        <DaySelect value={today} onChange={goToDay} />
       </div>
+      <p className="muted day-greeting">{greeting}. Here's today so far.</p>
 
-      {/* A day waiting on its review comes first: nothing below is built on it until it's checked. */}
-      {open && <ReviewCard day={open.day} initial={open} onDone={() => setTimeout(() => void load(), 1500)} />}
+      {/* An earlier day waiting on its review comes first: nothing is built on it until it's checked. */}
+      {open && open.day !== today && <ReviewCard day={open.day} initial={open} onDone={() => setTimeout(() => void load(), 1500)} />}
 
-      {data.letter ? (
-        <p className="letter">{data.letter}</p>
-      ) : data.active + data.proposed === 0 ? (
-        <GettingStarted profile={data.profile} onReflect={reflect} reflecting={reflecting} onGoalsSaved={() => void load()} />
-      ) : (
-        <p className="letter muted">No letter for today yet. Tonight's reflection writes one.</p>
-      )}
+      {nothingYet && <GettingStarted profile={data.profile} onReflect={reflect} reflecting={reflecting} onGoalsSaved={() => void load()} />}
 
-      {data.active + data.proposed > 0 && (
-        <div className="glance">
-          <Link to="/learning" className="glance-tile">
-            <HexBadge n={data.active} tone="honey" size={38} />
-            <span>
-              <strong>{data.active === 1 ? "skill" : "skills"} under way</strong>
-              <span className="muted">See the comb</span>
-            </span>
-          </Link>
-          <Link to="/learning" className="glance-tile">
-            <HexBadge n={data.proposed} size={38} />
-            <span>
-              <strong>{data.proposed === 1 ? "needs" : "need"} a decision</strong>
-              <span className="muted">{data.proposed > 0 ? "Have a look at the board" : "Nothing waiting on you"}</span>
-            </span>
-          </Link>
-          <div className="glance-tile">
-            <HexBadge n={due} size={38} />
-            <span>
-              <strong>due today</strong>
-              <span className="muted">{due > 0 ? "Listed below" : "You're clear"}</span>
-            </span>
-          </div>
-        </div>
-      )}
-
+      {upNext && <p className="eyebrow">Up next</p>}
       {data.lesson ? (
         <section className="card lesson-card">
           <p className="eyebrow">Today's lesson</p>
@@ -145,21 +120,6 @@ function TodayPage() {
         </section>
       )}
 
-      {data.sparks.length > 0 && (
-        <section className="card">
-          <p className="eyebrow">Things you wondered lately</p>
-          <ul className="due-list">
-            {data.sparks.map(({ card, item }) => (
-              <li key={card.id}>
-                <span className="due-kind">{new Date(item.spokenAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</span>
-                <span>{card.title}</span>
-              </li>
-            ))}
-          </ul>
-          <Link to="/sparks">All sparks</Link>
-        </section>
-      )}
-
       {((data.upcoming ?? []).length > 0 || data.nextSlot) && (
         <section className="card">
           <p className="eyebrow">Coming up</p>
@@ -190,6 +150,17 @@ function TodayPage() {
               </span>
             </li>
           </ul>
+        </section>
+      )}
+
+      <p className="eyebrow">Today so far</p>
+      <ReviewCard day={today} initial={open && open.day === today ? open : undefined} onDone={() => setTimeout(() => void load(), 1500)} />
+      <DayView day={today} heading={false} />
+
+      {data.letter && (
+        <section className="card morning-note">
+          <p className="eyebrow">This morning's note</p>
+          <p className="letter">{data.letter}</p>
         </section>
       )}
 

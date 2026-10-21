@@ -297,6 +297,11 @@ export const evidence: Evidence[] = [
     context: "someone: 温めますか\nyou: はい\nyou: I just said yes, I think she asked if I wanted it heated?",
     editedAt: null, spokenAt: iso(1 * d), utteranceId: 5, conversationUuid: "c5", speakerLabel: "you", place: "Hakata, Fukuoka", source: "stream", stage: "classified", route: "skill", topic: "konbini register", confidence: 0.85, skillId: 7, createdAt: now,
   },
+  {
+    id: 6, kind: "exposure", text: "すみません、免税カウンターは何階ですか",
+    context: "you: すみません、免税カウンターは何階ですか\nsomeone: 免税カウンターは1階でございます\nyou: ありがとうございます",
+    editedAt: null, spokenAt: iso(5 * h), utteranceId: 9, conversationUuid: "c9", speakerLabel: "you", place: "Shinsaibashi, Osaka", source: "stream", stage: "classified", route: "skill", topic: "tax-free counter", confidence: 0.9, skillId: 1, createdAt: now,
+  },
 ];
 
 export const practice: Practice[] = [

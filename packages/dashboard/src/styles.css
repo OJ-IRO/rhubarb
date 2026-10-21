@@ -3149,3 +3149,21 @@ a.glance-tile:hover {
   margin-top: 34px;
   padding-top: 8px;
 }
+
+/* Today is a day like any other; the greeting is a line under its date, not the heading. */
+.day-greeting {
+  margin: -6px 0 26px;
+}
+/* When the day picker wraps under the date, the greeting goes below it, not underneath it. */
+@media (max-width: 720px) {
+  .day-greeting {
+    margin-top: 10px;
+  }
+}
+.morning-note {
+  margin-top: 30px;
+}
+.morning-note .letter {
+  font-size: 17.5px;
+  margin: 0;
+}
