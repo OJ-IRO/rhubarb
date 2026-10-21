@@ -669,8 +669,10 @@ textarea {
   gap: 10px;
   margin-top: 12px;
 }
+/* Columns follow the space they're in, not the window: inside a narrow card they wrap instead of
+   squeezing every word into a column of letters. */
 .choices.row {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 .choice {
   text-align: left;
@@ -2806,13 +2808,8 @@ a.glance-tile:hover {
 }
 .reading-pick .choices.row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
-}
-@media (max-width: 900px) {
-  .reading-pick .choices.row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 .plan-reading {
   margin: 4px 0 18px;
