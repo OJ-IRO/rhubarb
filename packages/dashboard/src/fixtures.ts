@@ -7,6 +7,7 @@ import { localDay, type PrivacyView } from "./api";
 import type { HistoryEntry, LearningProgress } from "@rhubarb/core";
 import type { Card, Deck, Evidence, FieldEvidence, Item, LadderLevel, Lesson, LessonBeat, Practice, Profile, Quiz, Skill } from "@rhubarb/core";
 import type { SkillRow, Today, SkillDetail, LessonView } from "./api";
+import { ferrisBeats, ferrisCitations, ferrisDeck, ferrisQuiz, ferrisReview } from "./fixtures-ferris";
 
 const now = Date.now();
 const h = 3600_000;
@@ -108,7 +109,8 @@ export const skillRows: SkillRow[] = skills.map((s) => ({
   evidenceCount: [7, 4, 6, 3, 2, 1, 2][s.id - 1],
   ladderLength: [4, 4, 3, 3, 3, 1, 1][s.id - 1],
   lessonReady: s.status === "active",
-  lessonId: s.status === "active" ? 1 : null,
+  // The Ferris wheel topic is one lesson, already read; everything else active points at the sample lesson.
+  lessonId: s.id === 6 ? 2 : s.status === "active" ? 1 : null,
 }));
 
 export const ladder: LadderLevel[] = [
@@ -116,6 +118,8 @@ export const ladder: LadderLevel[] = [
   { id: 2, skillId: 1, idx: 1, title: "Follow where they send you", outcome: "can follow a clerk's directions to the tax-free counter and know what to bring", status: "current" },
   { id: 3, skillId: 1, idx: 2, title: "Get through the counter", outcome: "can answer the counter's questions and confirm the total", status: "locked" },
   { id: 4, skillId: 1, idx: 3, title: "Sort out a problem", outcome: "can say politely that something is wrong and ask again", status: "locked" },
+  // A topic is one rung: the whole story in one lesson.
+  { id: 5, skillId: 6, idx: 0, title: "The history of the Ferris wheel, from Chicago to Osaka", outcome: "can tell where the Ferris wheel came from, and what makes the one you rode worth noticing", status: "done" },
 ];
 
 const TAX_FREE_PHOTO = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Tax_Free_Shop_Miyabi_in_Kansai_Airport%2C_Osaka.jpg/1280px-Tax_Free_Shop_Miyabi_in_Kansai_Airport%2C_Osaka.jpg";
@@ -298,6 +302,12 @@ export const evidence: Evidence[] = [
     editedAt: null, spokenAt: iso(1 * d), utteranceId: 5, conversationUuid: "c5", speakerLabel: "you", place: "Hakata, Fukuoka", source: "stream", stage: "classified", route: "skill", topic: "konbini register", confidence: 0.85, skillId: 7, createdAt: now,
   },
   {
+    // Bee heard "Old Southfield"; the ask was fixed by hand and the lesson written again from it.
+    id: 7, kind: "intent", text: "Hey Bee, I'm currently on the Osaka Ferris wheel. Can you give me a lesson on the history of Ferris wheels, and this one in particular?",
+    context: "you: Hey Bee, I'm currently on the Old Southfield Ferris wheel. Can you give me a lesson on the history of Ferris wheels, and this one in particular?",
+    editedAt: now - 4 * d + 2 * h, spokenAt: iso(4 * d + 10 * 60_000), utteranceId: 8, conversationUuid: "c6", speakerLabel: "you", place: "Minato, Osaka", source: "stream", stage: "classified", route: "skill", topic: "Ferris wheel history", confidence: 0.95, skillId: 6, createdAt: now,
+  },
+  {
     id: 6, kind: "exposure", text: "すみません、免税カウンターは何階ですか",
     context: "you: すみません、免税カウンターは何階ですか\nsomeone: 免税カウンターは1階でございます\nyou: ありがとうございます",
     editedAt: null, spokenAt: iso(5 * h), utteranceId: 9, conversationUuid: "c9", speakerLabel: "you", place: "Shinsaibashi, Osaka", source: "stream", stage: "classified", route: "skill", topic: "tax-free counter", confidence: 0.9, skillId: 1, createdAt: now,
@@ -341,6 +351,26 @@ export const today: Today = {
   nextSlot: new Date(now + 6 * h).toISOString(),
 };
 
+/** The Ferris wheel lesson, finished the day after it was asked for. */
+export const ferrisLesson: Lesson = {
+  id: 2,
+  skillId: 6,
+  levelIdx: 0,
+  style: "story",
+  bodyMd: ferrisDeck.slides
+    .map((s) => ("body" in s ? s.body : "explanation" in s ? s.explanation : "why" in s ? s.why : ""))
+    .filter(Boolean)
+    .join("\n\n"),
+  deck: JSON.stringify(ferrisDeck),
+  quiz: JSON.stringify(ferrisQuiz),
+  beats: JSON.stringify(ferrisBeats),
+  citations: JSON.stringify(ferrisCitations),
+  status: "done",
+  createdAt: now - 4 * d + 3 * h,
+  completedAt: now - 1 * d - 2 * h,
+  review: JSON.stringify(ferrisReview),
+};
+
 export const skillDetail: SkillDetail = { skill: skills[0], ladder, evidence, lessons: [lesson], practice, fieldEvidence };
 
 export const lessonView: LessonView = { lesson, skill: skills[0], ladder, session: null };
@@ -372,7 +402,7 @@ export const progress: LearningProgress = {
 export const history: HistoryEntry[] = [
   { at: now - 5 * h, kind: "credit", title: "Used it for real: Tax-free shopping in Japanese", detail: "You asked which floor the tax-free counter was on, in Japanese, before anyone sent you there.", skillId: 1, lessonId: null, score: null },
   { at: now - 1 * d, kind: "answer", title: "Said it out loud: Tax-free shopping in Japanese", detail: "4 of 5. Clear and polite. Next: listen for the floor and カウンター in the answer.", skillId: 1, lessonId: 1, score: 4 },
-  { at: now - 1 * d - 2 * h, kind: "lesson", title: "Finished a lesson: The history of the Ferris wheel, from Chicago to Osaka", detail: "The one you asked for on the Tempozan wheel.", skillId: 6, lessonId: null, score: null },
+  { at: now - 1 * d - 2 * h, kind: "lesson", title: "Finished a lesson: The history of the Ferris wheel, from Chicago to Osaka", detail: "The one you asked for on the Tempozan wheel.", skillId: 6, lessonId: 2, score: null },
   { at: now - 2 * d, kind: "spark", title: "Wondered: Why do Japanese train stations play little tunes?", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },
   { at: now - 3 * d, kind: "answer", title: "Took the check: Tax-free shopping in Japanese", detail: "4 of 5", skillId: 1, lessonId: 1, score: 0.8 },
   { at: now - 4 * d, kind: "spark", title: "Wondered: Why does the Tempozan Ferris wheel change colour at night?", detail: "Answered on the Sparks page.", skillId: null, lessonId: null, score: null },

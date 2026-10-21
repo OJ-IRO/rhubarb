@@ -315,15 +315,20 @@ async function previewCall<T>(path: string, method: string, body?: BodyInit | nu
     return as({
       ...detail,
       skill: row ? { ...detail.skill, ...row } : detail.skill,
-      ladder: id === 1 ? detail.ladder : [],
-      lessons: id === 1 ? detail.lessons : [],
+      ladder: f.ladder.filter((l) => l.skillId === id),
+      lessons: id === 1 ? detail.lessons : id === 6 ? [f.ferrisLesson] : [],
+      // The Ferris wheel ask was corrected and its lesson written again from the fixed words.
+      rewrite: detail.rewrite ?? (id === 6 ? { state: "done" as const, at: f.ferrisLesson.createdAt, lessonId: 2 } : null),
       practice: id === 1 ? detail.practice : [],
       fieldEvidence: id === 1 ? detail.fieldEvidence : [],
       evidence: own,
       days: [...new Set(own.map((e) => localDay(e.spokenAt)))].sort().reverse(),
     });
   }
-  if (/^\/lessons\/\d+$/.test(path)) return as(f.lessonView);
+  if ((m = path.match(/^\/lessons\/(\d+)$/))) {
+    if (Number(m[1]) === 2) return as({ lesson: f.ferrisLesson, skill: f.skills.find((x) => x.id === 6) ?? null, ladder: f.ladder.filter((l) => l.skillId === 6), session: null });
+    return as(f.lessonView);
+  }
   if (/^\/lessons\/\d+\/session$/.test(path)) return as({ id: 1, lessonId: 1, startedAt: Date.now(), completedAt: null, responses: "{}", tutor: "[]" });
   if (/\/beat\/\d+\/answer$/.test(path)) return as({ feedback: "You've got the request right. The part to add for level two is the answer: listen for a floor, then カウンター, and you know where to go.", score: 4 });
   if (/\/quiz$/.test(path)) {
