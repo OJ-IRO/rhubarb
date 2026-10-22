@@ -1,7 +1,7 @@
 # Devpost submission: Rhubarb (draft)
 
 Paste each section into the matching Devpost field. Things only you can fill in are marked
-**[YOU]**. Numbers are from the live server on 2026-10-03; refresh them the day you submit.
+**[YOU]**. Numbers are from the live server on 2026-10-21.
 
 ---
 
@@ -55,7 +55,7 @@ Also: ask out loud to get a lesson on anything, quick "guess first" answers, pla
 
 ### Accomplishments that we're proud of
 
-- It works on real life: in its first four days, 3,043 lines heard, 148 moments noticed, 9 plans and 5 fact-checked lessons, in Japanese and English.
+- It works on real life: across six days of wearing the Bee, 6,978 lines heard, 20 plans suggested and 7 lessons written and fact-checked, in Japanese and English.
 - The learner stays in charge: confirm, correct, or forget anything.
 
 ### What we learned

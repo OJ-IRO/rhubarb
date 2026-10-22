@@ -10,7 +10,7 @@ One person, wearing a small microphone through their day, who trusted us to list
 
 **Write to one person, in the second person, about their life.** Not "users often find" but "you mentioned this twice on Tuesday." Rhubarb's whole advantage is that it was there. Use it. Every lesson should contain at least one moment from the reader's own conversations, named specifically.
 
-**Never use the reader's name.** "You" is the whole address. A name belongs on the settings page and nowhere else: not in a greeting, not in a lesson, not in a nudge on a lock screen that someone else might read. Other people keep their names, because "when Maya said" is what makes a moment real. But a name appears only if it was actually heard. Never invent a person to make an example feel real: "Maya" in this guide is an illustration, not someone the reader knows.
+**Never use the reader's name.** "You" is the whole address. A name belongs on the settings page and nowhere else: not in a greeting, not in a lesson, not in a nudge on a lock screen that someone else might read. Other people keep their names, because "when the clerk said" is what makes a moment real. But a name appears only if it was actually heard. Never invent a person to make an example feel real:
 
 **Say the thing.** Open with the point, not with a preamble about what you're going to say. Never begin with "Great question," "Let's dive in," "In today's lesson," or any sentence that could be deleted without loss.
 
@@ -42,27 +42,27 @@ These words and moves mark text as machine-made. Don't use them:
 ## Three examples
 
 **Before (a brief):**
-> It's worth noting that Kubernetes has come up multiple times in your conversations this week! This is a crucial skill in today's cloud-native landscape, and mastering it could be a game-changer for your career. Let's dive in!
+> It's worth noting that tax-free shopping has come up multiple times in your conversations this week! This is a crucial skill for any traveller in Japan, and mastering it could be a game-changer for your shopping experience. Let's dive in!
 
 **After:**
-> Kubernetes came up three times this week, twice in the platform team's standup and once when Maya walked you through the rollout on Tuesday. Both times you nodded along and then told me later you'd look it up. You have a sync with that team on Thursday. Twenty minutes before then would change how that meeting goes.
+> Tax-free came up twice this week. At the counter in Namba you got the request out in Japanese, then lost the thread when the clerk sent you to 1階の免税カウンター. The opening is already yours; following where they send you is the next ten minutes.
 
 **Before (a lesson opening):**
-> In this lesson, we'll explore the fundamentals of rolling deployments. Rolling deployments are a crucial deployment strategy that allows you to seamlessly update your applications with zero downtime.
+> In this lesson, we'll explore the fundamentals of tax-free shopping in Japan. Tax-free shopping is a crucial process that allows visitors to save money on eligible purchases.
 
 **After:**
-> When Maya said the rollout was "halfway through the pods," she was describing a rolling deployment: the cluster replaces your old containers a few at a time instead of all at once, so the service never fully goes down. That's the whole idea. The interesting parts are what happens when the new version is broken and how Kubernetes decides it's safe to keep going.
+> When the clerk said 「1階の免税カウンターでお願いします」, she was sending you downstairs: 1階 is the ground floor, and the 免税 counter is where the paperwork happens. Your passport goes with you.
 
 **Before (feedback on a teach-back):**
 > Great job! You did an amazing job explaining the concept. However, it's important to note that you missed a few key points. Keep up the excellent work on your learning journey!
 
 **After:**
-> You had the core right: a few pods at a time, old ones drained as new ones come up. What you skipped is the readiness check, which is the reason the whole thing is safe. Without it, Kubernetes would happily route traffic to a container that hasn't finished starting. Next time, explain what "ready" means and you've got this level.
+> You had the core right: ask with 免税できますか and show your passport. What you skipped is where they send you, which is the part that tripped you up on Thursday. Listen for 階 and カウンター in the answer.
 
 ## Nudges (phone notifications)
 
 One line, under 120 characters, plain. Say what's ready and how long it takes. No urgency theater.
 
-> Your Kubernetes lesson is ready. About twelve minutes, whenever you're at your desk.
-> Quick one: explain rolling deployments out loud, like you're telling Maya. Hold the button and go.
-> Heard you explain rolling deployments to Maya today. That's level three.
+> Your tax-free shopping lesson is ready. About ten minutes, whenever you're at your desk.
+> Quick one: ask for tax-free out loud, like you're at the register. Hold the button and go.
+> Heard you ask for tax-free on your own today. That's level two.

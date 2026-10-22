@@ -9,7 +9,7 @@ const SkillOut = z.object({
     .default("skill")
     .describe("skill: a capability built over weeks (a language, negotiating). topic: one lesson's worth, something they kept circling and would enjoy understanding properly (the history of a place, how a machine works)"),
   existingId: z.number().nullable().describe("id of an existing skill this evidence belongs to, or null for a new skill"),
-  name: z.string().describe("short, specific skill name, e.g. 'Kubernetes rolling deployments' not 'DevOps'"),
+  name: z.string().describe("short, specific skill name, e.g. 'Asking for tax-free at the register' not 'Japanese'"),
   domain: z.string().nullable(),
   competentLooksLike: z.string().describe("one sentence: what it sounds like when this person uses the skill well in conversation"),
   terms: z.array(z.string()).describe("6-12 words or phrases that signal this skill is in play when overheard"),

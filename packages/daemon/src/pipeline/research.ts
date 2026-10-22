@@ -31,7 +31,7 @@ const MAX_QUERY_CHARS = 120;
  * A web search is the one place the wearer's speech could leave for a third party, because the
  * model writes the query with their quoted words in front of it. So a query is refused if it is
  * long, or if any run of five words in it appears word for word in what we showed the model.
- * A topic ("kubernetes readiness probe") passes. A sentence someone said does not.
+ * A topic ("Tempozan Ferris wheel lights") passes. A sentence someone said does not.
  */
 export function queryLeaksPrompt(query: string, shown: string): boolean {
   if (query.length > MAX_QUERY_CHARS) return true;
